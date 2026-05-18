@@ -1,0 +1,34 @@
+Stack Buffer Underflow in ldif_read_record
+==========================================
+
+Project:     openldap (libraries/libldap — LDAP client library)
+Bug class:   stack-buffer-underflow
+Sanitizer:   UndefinedBehaviorSanitizer (UBSan, array-bounds check)
+
+Summary
+-------
+The ldif_read_record() function in libraries/libldap/ldif.c reads an
+LDIF (LDAP Data Interchange Format) record one line at a time. A
+helper bookkeeping path decrements an index into a fixed-size
+char[4096] line buffer without checking that the index stays
+non-negative. With a crafted input the index wraps around to
+(size_t)-1 and the next access reads outside the buffer's lower
+bound.
+
+UBSan's array-bounds check catches this as
+"index 18446744073709551615 out of bounds for type 'char[4096]'".
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary,
+triggers UBSan to report the array-bounds runtime error at the
+documented source location inside libraries/libldap/ldif.c.
+
+The harness (harness/fuzz_ldif.c) wraps a small libFuzzer driver
+around ldif_open_mem() + a loop of ldif_read_record() calls.
+
+References
+----------
+- Upstream report: https://bugs.openldap.org/show_bug.cgi?id=10431
+- Source: libraries/libldap/ldif.c, function ldif_read_record
+- Buggy line: ldif.c:811

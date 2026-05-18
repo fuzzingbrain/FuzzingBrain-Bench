@@ -1,0 +1,33 @@
+bug_id: openldap-ldif-stack-underflow
+project: openldap
+title: "Stack Buffer Underflow in ldif_read_record"
+upstream_report: https://bugs.openldap.org/show_bug.cgi?id=10431
+
+target:
+  repo:         https://github.com/openldap/openldap
+  vuln_commit:  2c5388b2da73f4293b3b6c236b2de597b6272d50
+  language:     c
+  build_system: autoconf
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain     # pasted into Bugzilla bug body
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-01-27
+notes: |
+  Detected by UBSan's array-bounds check, not ASan. Builds with
+  -fsanitize=address,undefined; the array-bounds reports come from
+  the undefined arm.
