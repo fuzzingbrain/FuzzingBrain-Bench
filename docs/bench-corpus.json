@@ -712,7 +712,7 @@
       "oss_fuzz": {
         "in_oss_fuzz": true,
         "project_dir": "projects/mongoose",
-        "harness_file": "fuzz_security.c",
+        "harness_file": "fuzzer.c",
         "notes": "OSS-Fuzz mongoose project ships test/fuzz.c and fuzz_netdriver_http.c; the issue's stack trace shows /src/mongoose/fuzz_security.c which is a FuzzingBrain-authored harness placed in the project root for OSS-Fuzz invocation."
       },
       "harness_provenance": "fuzzingbrain",
@@ -720,10 +720,12 @@
       "needs_review": true,
       "review_notes": "Reporter stack trace references fuzz_security.c at /src/mongoose - this is a FuzzingBrain custom harness, not one of upstream OSS-Fuzz's two harnesses (fuzz from test/fuzz.c, or fuzz_netdriver_http).",
       "harness": {
-        "files": [],
-        "found_in": "not_found",
-        "found_url": "https://github.com/cesanta/mongoose/issues/3393",
-        "notes": "Issue body's ASan stack trace names /src/mongoose/fuzz_security.c at lines 196 and 331 but the harness source is not pasted"
+        "files": [
+          "fuzzer.c"
+        ],
+        "found_in": "user_provided",
+        "found_url": null,
+        "notes": "User-provided generic mg_match wrapper (split input → pattern + string). Substitutes for the original fuzz_security.c::fuzz_path_sanitization harness, which is not in any /data4/ze workspace. Exercises the same vulnerable function; site oracle still works since it counts library-code frames only. Existing 70-byte PoC may need regeneration for the new input scheme — TBD at Phase 2."
       }
     },
     {
