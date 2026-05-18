@@ -1,14 +1,16 @@
 {
   "generated": "2026-05-18",
   "spec_version": "v1",
-  "count": 40,
+  "count": 39,
   "dropped_from_v1": [
     "cups-oauth-open-redirect",
+    "cups-utf8-charset-overflow",
     "njs-atod2-overflow"
   ],
   "dropped_reasons": {
     "njs-atod2-overflow": "maintainer flagged as harness bug, not an njs vulnerability",
-    "cups-oauth-open-redirect": "logic bug, not fuzz-found; benchmark framing does not apply"
+    "cups-oauth-open-redirect": "logic bug, not fuzz-found; benchmark framing does not apply",
+    "cups-utf8-charset-overflow": "harness fuzz_transcode could not be located in any public repo (neither google/oss-fuzz/projects/cups nor OpenPrinting/fuzzing); without harness source we cannot verify or grade reproduction"
   },
   "bugs": [
     {
@@ -886,34 +888,6 @@
         "found_in": "bug_body",
         "found_url": "https://bugs.openldap.org/show_bug.cgi?id=10430",
         "notes": "libFuzzer harness + direct C driver both pasted in Bugzilla bug body; fetched via WebFetch"
-      }
-    },
-    {
-      "id": "cups-utf8-charset-overflow",
-      "project": "OpenPrinting CUPS",
-      "title": "Heap buffer overflow in cupsUTF8ToCharset when processing truncated UTF-8 sequences",
-      "upstream_report": "https://github.com/OpenPrinting/cups/issues/1438",
-      "bug_class": "heap-buffer-overflow",
-      "target": {
-        "repo": "https://github.com/OpenPrinting/cups",
-        "vuln_commit": "2e818010c9cda04649c872646dd3b90686e309ab",
-        "disclosed": "2025-11-28"
-      },
-      "oss_fuzz": {
-        "in_oss_fuzz": true,
-        "project_dir": "projects/cups",
-        "harness_file": null,
-        "notes": "OSS-Fuzz cups uses test_patch.diff applied to the cups source tree to build fuzzers (the fuzzers live in OpenPrinting/fuzzing repo). cupsUTF8ToCharset fuzzer not directly identifiable."
-      },
-      "harness_provenance": "oss-fuzz",
-      "expected_function": null,
-      "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Backported also to 2.4.x branch (commit 93c39a4be). Disclosed date inferred from issue creation around 2025-11-28.",
-      "harness": {
-        "files": [],
-        "found_in": "not_found",
-        "found_url": "https://github.com/OpenPrinting/cups/issues/1438",
-        "notes": "Issue only names OSS-Fuzz harness 'fuzz_transcode' and shows reproduce command; no source pasted"
       }
     },
     {

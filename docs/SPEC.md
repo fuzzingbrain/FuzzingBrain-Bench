@@ -72,10 +72,17 @@ Out of scope in v1:
 - **Confirmed-but-unfixed bugs.** The 8 reports in `docs/bugs.json` with
   `status == confirmed` are deferred (no clean way to define oracle
   ground-truth without a known fix). They remain on the Trophies page.
-- **Non-fuzz-discovered bugs.** Two entries in the original 42-fixed
-  catalogue are dropped from v1: `cups-oauth-open-redirect` (logic bug,
-  not fuzz-found) and `njs-atod2-overflow` (harness bug, not an njs
-  vulnerability). They remain on the Trophies page.
+- **Bugs without locatable harness source.** Three entries in the
+  original 42-fixed catalogue are dropped from v1:
+  - `cups-oauth-open-redirect` (logic bug, not fuzz-found)
+  - `njs-atod2-overflow` (harness bug, not an njs vulnerability)
+  - `cups-utf8-charset-overflow` (harness `fuzz_transcode` could not be
+    located in any public repository — neither `google/oss-fuzz/projects/
+    cups` nor `OpenPrinting/fuzzing` ships it; without harness source
+    the bug cannot be reproduced under our grading contract)
+
+  All three remain on the Trophies page; only the benchmark corpus
+  excludes them.
 
 ### 1.3 Corpus
 
