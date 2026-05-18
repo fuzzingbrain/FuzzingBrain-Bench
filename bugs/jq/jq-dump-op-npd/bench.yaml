@@ -1,0 +1,29 @@
+bug_id: jq-dump-op-npd
+project: jq
+title: "NULL Pointer Dereference in dump_operation"
+upstream_report: https://github.com/jqlang/jq/issues/3458
+
+target:
+  repo:         https://github.com/jqlang/jq
+  vuln_commit:  d44baeb67ac21b3ff23ede8d103c21c8830ea8dd
+  language:     c
+  build_system: autoconf
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: oss-fuzz       # tests/jq_fuzz_compile.c — upstream OSS-Fuzz fuzzer
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-08
