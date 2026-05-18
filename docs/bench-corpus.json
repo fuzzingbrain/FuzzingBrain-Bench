@@ -31,7 +31,15 @@
       "harness_provenance": "unknown",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Original PR #3625 was closed unmerged; actual fix landed via PR #3745 (AVRO-4247) on 2026-05-11 inside NonCopyingByteArrayOutputStream. Reporter URL points to the original (closed) PR."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Original PR #3625 was closed unmerged; actual fix landed via PR #3745 (AVRO-4247) on 2026-05-11 inside NonCopyingByteArrayOutputStream. Reporter URL points to the original (closed) PR.",
+      "harness": {
+        "files": [
+          "DecompressionBombFuzzer.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/apache/avro/pull/3625",
+        "notes": "Jazzer harness in PR body 'Trigger Method 2: Fuzzer (oss-fuzz / Jazzer)' section"
+      }
     },
     {
       "id": "avro-neg-block-size",
@@ -53,7 +61,15 @@
       "harness_provenance": "unknown",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file used by FuzzingBrain to trigger this C-language Avro bug is not obvious from OSS-Fuzz integration (which targets the Java implementation). Bug is in [C] datafile reader per PR title; likely a custom harness."
+      "review_notes": "Harness file used by FuzzingBrain to trigger this C-language Avro bug is not obvious from OSS-Fuzz integration (which targets the Java implementation). Bug is in [C] datafile reader per PR title; likely a custom harness.",
+      "harness": {
+        "files": [
+          "datafile_fuzzer.c"
+        ],
+        "found_in": "comment_3746385334",
+        "found_url": "https://github.com/apache/avro/pull/3623#issuecomment-3746385334",
+        "notes": "libFuzzer harness in reporter's first comment on PR #3623"
+      }
     },
     {
       "id": "avro-neg-string-len",
@@ -75,7 +91,15 @@
       "harness_provenance": "unknown",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Bug fix is in Avro C implementation; OSS-Fuzz integration covers Java only. Harness used by FuzzingBrain unclear."
+      "review_notes": "Bug fix is in Avro C implementation; OSS-Fuzz integration covers Java only. Harness used by FuzzingBrain unclear.",
+      "harness": {
+        "files": [
+          "value_reader_fuzzer.c"
+        ],
+        "found_in": "comment_3746521711",
+        "found_url": "https://github.com/apache/avro/pull/3622#issuecomment-3746521711",
+        "notes": "libFuzzer harness in reporter's first comment on PR #3622"
+      }
     },
     {
       "id": "binutils-rust-demangle-oom",
@@ -97,7 +121,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Sourceware bugzilla page is gated by Anubis (couldn't fetch directly); fix identified via GitHub mirror commit log referencing 'PR demangler/106641' which matches the bug description. Bugzilla 33878 report/disclosed date not retrievable. Harness file is a best-guess; could also be fuzz_objdump or fuzz_addr2line."
+      "review_notes": "Sourceware bugzilla page is gated by Anubis (couldn't fetch directly); fix identified via GitHub mirror commit log referencing 'PR demangler/106641' which matches the bug description. Bugzilla 33878 report/disclosed date not retrievable. Harness file is a best-guess; could also be fuzz_objdump or fuzz_addr2line.",
+      "harness": {
+        "files": [
+          "fuzz_rust_demangle.c"
+        ],
+        "found_in": "linked_advisory",
+        "found_url": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
+        "notes": "Sourceware bugzilla blocked by Anubis; harness pulled from cross-linked Ghidra advisory GHSA-m94m-fqr3-x442 which covers the shared libiberty/rust-demangle.c bug"
+      }
     },
     {
       "id": "dtc-fdt32-misalign",
@@ -119,7 +151,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": false,
-      "review_notes": null
+      "review_notes": null,
+      "harness": {
+        "files": [
+          "fuzz_fdt.c"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/dgibson/dtc/issues/178",
+        "notes": "libFuzzer harness in issue body 'Trigger Method 2: Fuzzer (libFuzzer)' section"
+      }
     },
     {
       "id": "freerdp-ntlm-memleak",
@@ -141,7 +181,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Fix landed in PR #12609 but the dedicated NTLM fuzzer (TestFuzzNTLM) was added separately in #12610 and is FuzzingBrain-authored; upstream OSS-Fuzz may not exercise NTLM message parsing directly."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Fix landed in PR #12609 but the dedicated NTLM fuzzer (TestFuzzNTLM) was added separately in #12610 and is FuzzingBrain-authored; upstream OSS-Fuzz may not exercise NTLM message parsing directly.",
+      "harness": {
+        "files": [
+          "TestFuzzNTLMMessage.c"
+        ],
+        "found_in": "linked_pr",
+        "found_url": "https://github.com/FreeRDP/FreeRDP/pull/12610",
+        "notes": "Harness in PR #12610 (linked from final comment on issue #12603); source fetched from PR head sha c3c724726668e2ce112c2e4c638891aef78345a8"
+      }
     },
     {
       "id": "fwupd-cab-mszip-bomb",
@@ -163,7 +211,13 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file for CAB MSZIP target not directly identifiable from OSS-Fuzz integration."
+      "review_notes": "Harness file for CAB MSZIP target not directly identifiable from OSS-Fuzz integration.",
+      "harness": {
+        "files": [],
+        "found_in": "not_found",
+        "found_url": "https://github.com/fwupd/fwupd/issues/9790",
+        "notes": "Issue body names harness 'cab_fuzzer' but does not paste source; only a Python create_bomb.py for input crafting is provided"
+      }
     },
     {
       "id": "fwupd-logitech-oob-read",
@@ -185,7 +239,16 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file for Logitech bulk controller response parser not directly identifiable."
+      "review_notes": "Harness file for Logitech bulk controller response parser not directly identifiable.",
+      "harness": {
+        "files": [
+          "protocol_fuzzer.c",
+          "build_and_repro.sh"
+        ],
+        "found_in": "linked_pr",
+        "found_url": "https://github.com/fwupd/fwupd/pull/9791",
+        "notes": "Issue body links to PR #9791 ('build_and_repro.sh'); harness fuzzing/protocol_fuzzer.c and build script fetched from PR head sha 6a9e389fa5e52478c5bf01ec0acee269fc321dd4"
+      }
     },
     {
       "id": "fwupd-logitech-stack-overflow",
@@ -207,7 +270,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Issue references multiple referenced commits (b662a216, 1a7415f4, 6d3d8a57, 127c2548, 52327cca) prior to the closing commit a9d1cc95 — the fix may comprise multiple commits. Closing commit a9d1cc95 (issue closer) selected as fixed_commit."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Issue references multiple referenced commits (b662a216, 1a7415f4, 6d3d8a57, 127c2548, 52327cca) prior to the closing commit a9d1cc95 — the fix may comprise multiple commits. Closing commit a9d1cc95 (issue closer) selected as fixed_commit.",
+      "harness": {
+        "files": [
+          "logitech_rdfu_fuzzer.c"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/fwupd/fwupd/issues/9779",
+        "notes": "Issue body 'Fuzzer' section shows the auto-generated harness produced by fwupd's oss-fuzz.py for the new logitech-rdfu Fuzzer entry"
+      }
     },
     {
       "id": "fwupd-sbatlevel-underflow",
@@ -229,7 +300,13 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Specific fuzz target filename for sbatlevel parser not directly visible from oss-fuzz/projects/fwupd contents."
+      "review_notes": "Specific fuzz target filename for sbatlevel parser not directly visible from oss-fuzz/projects/fwupd contents.",
+      "harness": {
+        "files": [],
+        "found_in": "not_found",
+        "found_url": "https://github.com/fwupd/fwupd/issues/9659",
+        "notes": "Issue body only references the binary 'pefile_fuzzer'; no harness source pasted"
+      }
     },
     {
       "id": "ghidra-cplus-demangle-oom",
@@ -251,7 +328,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Both ghidra-cplus-demangle-oom and ghidra-rust-demangle-oom are closed by the same advisory GHSA-m94m-fqr3-x442 and 'fixed' by the same commit 42e8ad7 (GP-6408: Demangler GNU analyzer timeout option), not by patching the underlying demangler code. The disclosed date is the advisory publish date."
+      "review_notes": "Both ghidra-cplus-demangle-oom and ghidra-rust-demangle-oom are closed by the same advisory GHSA-m94m-fqr3-x442 and 'fixed' by the same commit 42e8ad7 (GP-6408: Demangler GNU analyzer timeout option), not by patching the underlying demangler code. The disclosed date is the advisory publish date.",
+      "harness": {
+        "files": [
+          "fuzz_rust_demangle.c"
+        ],
+        "found_in": "advisory_body",
+        "found_url": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
+        "notes": "Same advisory and same harness as ghidra-rust-demangle-oom; cplus_demangle is reached through the same demangler entry point"
+      }
     },
     {
       "id": "ghidra-rust-demangle-oom",
@@ -273,7 +358,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Same fix commit as ghidra-cplus-demangle-oom (process-level timeout, not a code patch)."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Same fix commit as ghidra-cplus-demangle-oom (process-level timeout, not a code patch).",
+      "harness": {
+        "files": [
+          "fuzz_rust_demangle.c"
+        ],
+        "found_in": "advisory_body",
+        "found_url": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
+        "notes": "libFuzzer harness pasted in 'Trigger Method 2' of advisory body"
+      }
     },
     {
       "id": "graaljs-illformed-locale",
@@ -295,7 +388,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Fix is a merge commit (PullRequest: js/3678); vuln_commit is the first parent of the merge. Disclosed date approximated to the issue creation period; exact date not retrieved."
+      "review_notes": "Fix is a merge commit (PullRequest: js/3678); vuln_commit is the first parent of the merge. Disclosed date approximated to the issue creation period; exact date not retrieved.",
+      "harness": {
+        "files": [
+          "IntlFuzzer.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/oracle/graaljs/issues/985",
+        "notes": "Jazzer harness in 'Trigger Method 2' section"
+      }
     },
     {
       "id": "graaljs-regexlexer-oob",
@@ -317,7 +418,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Cross-repo: report in oracle/graaljs, fix in oracle/graal (commit 09eadacd, PullRequest graal/23146). Build will need to track graaljs's pinned graal submodule/version."
+      "review_notes": "Cross-repo: report in oracle/graaljs, fix in oracle/graal (commit 09eadacd, PullRequest graal/23146). Build will need to track graaljs's pinned graal submodule/version.",
+      "harness": {
+        "files": [
+          "RegExpFuzzer.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/oracle/graaljs/issues/986",
+        "notes": "Jazzer harness in 'Trigger Method 2' section; escapeForJS was elided as 'same as above' and reproduced from the upper snippet in the same issue body"
+      }
     },
     {
       "id": "harfbuzz-fontations-oob-write",
@@ -339,7 +448,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file best-guess (hb-shape-fuzzer.cc); could also be hb-subset-fuzzer.cc."
+      "review_notes": "Harness file best-guess (hb-shape-fuzzer.cc); could also be hb-subset-fuzzer.cc.",
+      "harness": {
+        "files": [
+          "repro.c"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/harfbuzz/harfbuzz/issues/5946",
+        "notes": "Only a small C main() reproducer is attached; no libFuzzer harness. Report says the bug was found by static data-flow audit, not by an existing fuzzer."
+      }
     },
     {
       "id": "icu-translit-rule-uaf",
@@ -361,7 +478,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "ICU Jira (ICU-23365) is not publicly accessible without login - disclosed date unknown. Follow-up PR #3944 added a unit test and zero-init refactor (commit 10fc3f3f) - PR #3936 is the primary fix."
+      "review_notes": "ICU Jira (ICU-23365) is not publicly accessible without login - disclosed date unknown. Follow-up PR #3944 added a unit test and zero-init refactor (commit 10fc3f3f) - PR #3936 is the primary fix.",
+      "harness": {
+        "files": [
+          "repro.cpp"
+        ],
+        "found_in": "bug_body",
+        "found_url": "https://unicode-org.atlassian.net/browse/ICU-23365",
+        "notes": "ICU Jira intermittently gated; standalone C++ reproducer extracted via WebFetch. OSS-Fuzz transliterator_fuzzer.cpp source not pasted in the Jira ticket."
+      }
     },
     {
       "id": "imagemagick-msl-comment-npd",
@@ -383,7 +508,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Disclosed date is the advisory publish date (2026-01-20); fix commit predates publication. Harness file not directly visible from oss-fuzz project dir."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Disclosed date is the advisory publish date (2026-01-20); fix commit predates publication. Harness file not directly visible from oss-fuzz project dir.",
+      "harness": {
+        "files": [
+          "msl_fuzzer.cc"
+        ],
+        "found_in": "advisory_body",
+        "found_url": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-5vx3-wx4q-6cj8",
+        "notes": "MSL libFuzzer harness in 'Fuzzer' section of advisory body; depends on utils.cc (ImageMagick fuzz helper) which is not pasted"
+      }
     },
     {
       "id": "imagemagick-msl-stack-overflow",
@@ -405,7 +538,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Disclosed date is advisory publish date (later than fix commit which landed during the embargo period)."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Disclosed date is advisory publish date (later than fix commit which landed during the embargo period).",
+      "harness": {
+        "files": [
+          "msl_fuzzer.cc"
+        ],
+        "found_in": "advisory_body",
+        "found_url": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-9vj4-wc7r-p844",
+        "notes": "Same MSL libFuzzer harness as imagemagick-msl-comment-npd"
+      }
     },
     {
       "id": "jq-dump-op-npd",
@@ -427,7 +568,13 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Disclosed date is best-effort from issue/PR creation; harness file is best-guess."
+      "review_notes": "Disclosed date is best-effort from issue/PR creation; harness file is best-guess.",
+      "harness": {
+        "files": [],
+        "found_in": "not_found",
+        "found_url": "https://github.com/jqlang/jq/issues/3458",
+        "notes": "Issue body says 'Fuzzer: OSS-Fuzz jq fuzzer' but does not paste source; provides only a Python generator for the trigger and a jq CLI reproducer"
+      }
     },
     {
       "id": "jsonjava-jsonml-classcast",
@@ -449,7 +596,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": false,
-      "review_notes": null
+      "review_notes": null,
+      "harness": {
+        "files": [
+          "JsonMLFuzzer.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/stleary/JSON-java/issues/1034",
+        "notes": "Jazzer harness in 'Trigger Method 2' section of issue body"
+      }
     },
     {
       "id": "jsonjava-unescape-numformat",
@@ -471,7 +626,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "PR #1038 fixes both jsonjava-unescape-strindex (#1035) and jsonjava-unescape-numformat (#1036) in the same commit."
+      "review_notes": "PR #1038 fixes both jsonjava-unescape-strindex (#1035) and jsonjava-unescape-numformat (#1036) in the same commit.",
+      "harness": {
+        "files": [
+          "XmlToJsonFuzzer.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/stleary/JSON-java/issues/1036",
+        "notes": "Jazzer harness in 'Trigger Method 2' section; same XmlToJsonFuzzer as jsonjava-unescape-strindex"
+      }
     },
     {
       "id": "jsonjava-unescape-strindex",
@@ -493,7 +656,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "PR #1038 fixes both jsonjava-unescape-strindex (#1035) and jsonjava-unescape-numformat (#1036) in a single commit."
+      "review_notes": "PR #1038 fixes both jsonjava-unescape-strindex (#1035) and jsonjava-unescape-numformat (#1036) in a single commit.",
+      "harness": {
+        "files": [
+          "XmlToJsonFuzzer.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/stleary/JSON-java/issues/1035",
+        "notes": "Jazzer harness in 'Trigger Method 2' section"
+      }
     },
     {
       "id": "libavif-jni-signext",
@@ -515,7 +686,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Vulnerability is JNI-specific; OSS-Fuzz libavif targets the C API. Harness used by FuzzingBrain is custom."
+      "review_notes": "Vulnerability is JNI-specific; OSS-Fuzz libavif targets the C API. Harness used by FuzzingBrain is custom.",
+      "harness": {
+        "files": [
+          "repro.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/AOMediaCodec/libavif/issues/3177",
+        "notes": "Only a small Java JNI reproducer pasted; native binary 'tr1_neg_length_parse' referenced by name in confirmation command but source NOT attached. Needs follow-up for native harness."
+      }
     },
     {
       "id": "mongoose-mg-match-overflow",
@@ -537,7 +716,13 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Reporter stack trace references fuzz_security.c at /src/mongoose - this is a FuzzingBrain custom harness, not one of upstream OSS-Fuzz's two harnesses (fuzz from test/fuzz.c, or fuzz_netdriver_http)."
+      "review_notes": "Reporter stack trace references fuzz_security.c at /src/mongoose - this is a FuzzingBrain custom harness, not one of upstream OSS-Fuzz's two harnesses (fuzz from test/fuzz.c, or fuzz_netdriver_http).",
+      "harness": {
+        "files": [],
+        "found_in": "not_found",
+        "found_url": "https://github.com/cesanta/mongoose/issues/3393",
+        "notes": "Issue body's ASan stack trace names /src/mongoose/fuzz_security.c at lines 196 and 331 but the harness source is not pasted"
+      }
     },
     {
       "id": "ndpi-hex-decode-sscanf",
@@ -559,7 +744,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); PR title 'add targeted parser harnesses' suggests the fix PR also added a new harness for this case (likely upstream-now). The triggering harness used by FuzzingBrain may have been custom prior to the fix."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); PR title 'add targeted parser harnesses' suggests the fix PR also added a new harness for this case (likely upstream-now). The triggering harness used by FuzzingBrain may have been custom prior to the fix.",
+      "harness": {
+        "files": [
+          "fuzz_ndpi_decode_tls_blocks.c"
+        ],
+        "found_in": "linked_pr",
+        "found_url": "https://github.com/ntop/nDPI/pull/3163",
+        "notes": "Issue body names harness 'fuzz_ndpi_decode_tls_blocks'; source landed in PR #3163 (linked in comments); fetched from PR head"
+      }
     },
     {
       "id": "netsnmp-vacm-parse-npd",
@@ -581,7 +774,15 @@
       "harness_provenance": "unknown",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "OSS-Fuzz integration uses snmp_mib_fuzzer which targets MIB parsing; bug is in vacm_parse_config_group (config file parsing). Harness used by FuzzingBrain likely custom."
+      "review_notes": "OSS-Fuzz integration uses snmp_mib_fuzzer which targets MIB parsing; bug is in vacm_parse_config_group (config file parsing). Harness used by FuzzingBrain likely custom.",
+      "harness": {
+        "files": [
+          "vacm_fuzzer.c"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/net-snmp/net-snmp/issues/1052",
+        "notes": "libFuzzer harness in 'Trigger Method 2' section"
+      }
     },
     {
       "id": "opencv-yaml-parsekey",
@@ -603,7 +804,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file is best-guess among three filestorage_read_* fuzzers."
+      "review_notes": "Harness file is best-guess among three filestorage_read_* fuzzers.",
+      "harness": {
+        "files": [
+          "poc.cpp"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/opencv/opencv/issues/28619",
+        "notes": "Issue provides a small C++ driver. Notes that the bug was discovered by fixing OSS-Fuzz harness filestorage_read_file_fuzzer.cc (via google/oss-fuzz#15092); upstream OSS-Fuzz harness source not pasted in this issue."
+      }
     },
     {
       "id": "openldap-ldif-stack-underflow",
@@ -625,7 +834,16 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": false,
-      "review_notes": null
+      "review_notes": null,
+      "harness": {
+        "files": [
+          "fuzz_ldif.c",
+          "test_ldif.c"
+        ],
+        "found_in": "bug_body",
+        "found_url": "https://bugs.openldap.org/show_bug.cgi?id=10431",
+        "notes": "libFuzzer harness + direct C driver both pasted in Bugzilla bug body; fetched via WebFetch"
+      }
     },
     {
       "id": "openldap-parse-whsp",
@@ -647,7 +865,16 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Fix also backported to RE26 branch as afda4781 (2026-02-13)."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Fix also backported to RE26 branch as afda4781 (2026-02-13).",
+      "harness": {
+        "files": [
+          "fuzz_schema.c",
+          "test_schema.c"
+        ],
+        "found_in": "bug_body",
+        "found_url": "https://bugs.openldap.org/show_bug.cgi?id=10430",
+        "notes": "libFuzzer harness + direct C driver both pasted in Bugzilla bug body; fetched via WebFetch"
+      }
     },
     {
       "id": "cups-utf8-charset-overflow",
@@ -669,7 +896,13 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Backported also to 2.4.x branch (commit 93c39a4be). Disclosed date inferred from issue creation around 2025-11-28."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Backported also to 2.4.x branch (commit 93c39a4be). Disclosed date inferred from issue creation around 2025-11-28.",
+      "harness": {
+        "files": [],
+        "found_in": "not_found",
+        "found_url": "https://github.com/OpenPrinting/cups/issues/1438",
+        "notes": "Issue only names OSS-Fuzz harness 'fuzz_transcode' and shows reproduce command; no source pasted"
+      }
     },
     {
       "id": "openssl-des-ofb-cfb-overread",
@@ -691,7 +924,16 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Original PR #30332 was closed unmerged (head 39c246e); fix applied directly as commit 134342e on master. Also backported to a stable branch (76e891f). No matching existing OSS-Fuzz harness for this code path."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Original PR #30332 was closed unmerged (head 39c246e); fix applied directly as commit 134342e on master. Also backported to a stable branch (76e891f). No matching existing OSS-Fuzz harness for this code path.",
+      "harness": {
+        "files": [
+          "poc_evp_api.c",
+          "poc_standalone.c"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/openssl/openssl/issues/30284",
+        "notes": "Two C PoC drivers pasted (Methods 2 standalone + EVP API). The fixed fuzz/provider.c discovery harness (referred to as 'provider_fixed.c') is described by diff intent but not pasted verbatim. Needs follow-up for the actual harness source."
+      }
     },
     {
       "id": "ots-processgeneric-npd",
@@ -713,7 +955,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); PR #309 contains two sequential commits on master: 36eea1dc (initial fix) and 35ec4294 (review address). fixed_commit is the final head (= merge head)."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); PR #309 contains two sequential commits on master: 36eea1dc (initial fix) and 35ec4294 (review address). fixed_commit is the final head (= merge head).",
+      "harness": {
+        "files": [
+          "fuzz_ots_passthru.cc"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/khaledhosny/ots/issues/308",
+        "notes": "libFuzzer harness in 'Reproduction Steps' section. Reporter notes the existing 'ots-fuzzer' doesn't cover the passthrough path; this is a new harness."
+      }
     },
     {
       "id": "pdfbox-cmap-bfrange-aioob",
@@ -735,7 +985,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Maintainer cherry-picked from PR #411 directly to trunk as svn commit r1931613 (sha 488685a2)."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Maintainer cherry-picked from PR #411 directly to trunk as svn commit r1931613 (sha 488685a2).",
+      "harness": {
+        "files": [
+          "Reproduce.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/apache/pdfbox/pull/411",
+        "notes": "Only a direct-API Java reproducer is provided in 'Trigger Method 2'; no Jazzer harness"
+      }
     },
     {
       "id": "pdfbox-inlineimage-type-confusion",
@@ -757,7 +1015,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Maintainer cherry-picked the fix from PR #410 as svn commit r1931610 (GitHub mirror sha 159ae247) directly to trunk; PR was closed unmerged but reported as 'closes #410' in commit message."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Maintainer cherry-picked the fix from PR #410 as svn commit r1931610 (GitHub mirror sha 159ae247) directly to trunk; PR was closed unmerged but reported as 'closes #410' in commit message.",
+      "harness": {
+        "files": [
+          "Reproduce.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/apache/pdfbox/pull/410",
+        "notes": "Only a direct-API Java reproducer; no Jazzer harness"
+      }
     },
     {
       "id": "pdfbox-pfb-negative-array",
@@ -779,7 +1045,15 @@
       "harness_provenance": "oss-fuzz",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Fix was applied across three branches (trunk r1931624 = 205b190e, branches/3.0 r1931622 = 410b6eed, and 2.0). trunk commit selected as fixed_commit."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Fix was applied across three branches (trunk r1931624 = 205b190e, branches/3.0 r1931622 = 410b6eed, and 2.0). trunk commit selected as fixed_commit.",
+      "harness": {
+        "files": [
+          "Reproduce.java"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/apache/pdfbox/pull/412",
+        "notes": "Only a direct-API Java reproducer; no Jazzer harness"
+      }
     },
     {
       "id": "simdutf-utf16-utf8-overflow",
@@ -801,7 +1075,16 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "PR #913 ('verifies issue 911') and PR #916 ('add fuzzer for convert_*_safe() functions') landed alongside the fix - the convert_*_safe fuzzer is new, so the discovery harness was FuzzingBrain-authored."
+      "review_notes": "PR #913 ('verifies issue 911') and PR #916 ('add fuzzer for convert_*_safe() functions') landed alongside the fix - the convert_*_safe fuzzer is new, so the discovery harness was FuzzingBrain-authored.",
+      "harness": {
+        "files": [
+          "fuzz_find_safe.cpp",
+          "poc.cpp"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/simdutf/simdutf/issues/911",
+        "notes": "Custom libFuzzer harness pasted in 'Fuzzer harness' section + small C++ PoC. Reporter notes this is a new harness for _safe() functions not covered by existing fuzzers."
+      }
     },
     {
       "id": "upx-elf32-pack2-memleak",
@@ -823,7 +1106,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Maintainer closed issue with comment 'Done' but no commit was referenced. Memory leak is in ElfLinker::addLoader (linker.cpp). No matching commit found between 2025-12-08 and 2025-12-12 via git log or commit search. May be unfixed-but-marked-fixed, or fixed silently inside a large rebase commit."
+      "review_notes": "(some review notes were patch-related and may now be moot under description-only framing); Maintainer closed issue with comment 'Done' but no commit was referenced. Memory leak is in ElfLinker::addLoader (linker.cpp). No matching commit found between 2025-12-08 and 2025-12-12 via git log or commit search. May be unfixed-but-marked-fixed, or fixed silently inside a large rebase commit.",
+      "harness": {
+        "files": [
+          "pack_file_fuzzer.cpp"
+        ],
+        "found_in": "sibling_issue",
+        "found_url": "https://github.com/upx/upx/issues/947",
+        "notes": "Issue #945 references 'pack_file_fuzzer' by name; source pasted in sibling FuzzingBrain issue #947 (also upx)"
+      }
     },
     {
       "id": "upx-elf64-generate-overflow",
@@ -845,7 +1136,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file not in upstream oss-fuzz; FuzzingBrain custom pack-file fuzzer."
+      "review_notes": "Harness file not in upstream oss-fuzz; FuzzingBrain custom pack-file fuzzer.",
+      "harness": {
+        "files": [
+          "pack_file_fuzzer.cpp"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/upx/upx/issues/947",
+        "notes": "libFuzzer harness in 'Alternative: Using libFuzzer harness' section"
+      }
     },
     {
       "id": "upx-pe-loadconf-overflow",
@@ -867,7 +1166,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Harness file not in upstream oss-fuzz; FuzzingBrain custom pack-file fuzzer."
+      "review_notes": "Harness file not in upstream oss-fuzz; FuzzingBrain custom pack-file fuzzer.",
+      "harness": {
+        "files": [
+          "pack_pe_fuzzer.cpp"
+        ],
+        "found_in": "issue_body",
+        "found_url": "https://github.com/upx/upx/issues/950",
+        "notes": "libFuzzer harness 'pack_pe_fuzzer.cpp' in 'Step 1: Create the PE Pack Fuzzer' section"
+      }
     },
     {
       "id": "upx-pe-resource-memleak",
@@ -889,7 +1196,15 @@
       "harness_provenance": "fuzzingbrain",
       "expected_function": null,
       "needs_review": true,
-      "review_notes": "Maintainer closed issue with 'Done' but no commit referenced. No matching commit message search hit. Status uncertain."
+      "review_notes": "Maintainer closed issue with 'Done' but no commit referenced. No matching commit message search hit. Status uncertain.",
+      "harness": {
+        "files": [
+          "pack_file_fuzzer.cpp"
+        ],
+        "found_in": "sibling_issue",
+        "found_url": "https://github.com/upx/upx/issues/947",
+        "notes": "Issue #946 references upstream 'test_packed_file_fuzzer' (no source pasted). Replicated FuzzingBrain pack_file_fuzzer.cpp from sibling issue #947 since bench-corpus marks all upx bugs as using same pack-file fuzzer."
+      }
     }
   ]
 }
