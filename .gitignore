@@ -1,0 +1,11 @@
+.DS_Store
+*.swp
+*.swo
+__pycache__/
+*.pyc
+.idea/
+.vscode/
+
+# Local-only working notes (kept out of the public repo)
+背景.md
+report_poc.md

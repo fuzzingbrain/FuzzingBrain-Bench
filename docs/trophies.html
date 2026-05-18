@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Trophies &mdash; FuzzingBrain Bench</title>
+  <meta name="description" content="Zero-day vulnerabilities surfaced by FuzzingBrain across open-source projects, with status and report links.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="inner">
+  <a class="brand" href="./">FuzzingBrain<span class="dot">·</span>Bench</a>
+  <nav>
+    <a href="./">Home</a>
+    <a href="trophies.html" class="active">Trophies</a>
+    <a href="benchmark.html">Benchmark</a>
+    <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Trophies</h1>
+  <p class="lead">
+    Bugs found by FuzzingBrain and reported upstream. Each link points to the original public issue, PR,
+    bugzilla, or security advisory.
+  </p>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="n-total">&mdash;</div><div class="lbl">total</div></div>
+    <div class="stat"><div class="n" id="n-fixed">&mdash;</div><div class="lbl">fixed</div></div>
+    <div class="stat"><div class="n" id="n-confirmed">&mdash;</div><div class="lbl">confirmed</div></div>
+    <div class="stat"><div class="n" id="n-projects">&mdash;</div><div class="lbl">projects</div></div>
+  </div>
+
+  <div class="filters">
+    <input id="search" type="search" placeholder="Search project or title&hellip;" autocomplete="off">
+    <select id="f-status">
+      <option value="">All statuses</option>
+      <option value="fixed">Fixed</option>
+      <option value="confirmed">Confirmed</option>
+    </select>
+    <select id="f-class">
+      <option value="">All classes</option>
+    </select>
+    <span class="count" id="count"></span>
+  </div>
+
+  <div id="table"></div>
+
+  <p class="note">
+    Verified publicly accessible on 2026-05-05. If a link rots, please
+    <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench/issues/new" target="_blank" rel="noopener">open an issue</a>.
+  </p>
+</main>
+
+<footer class="site"><div class="inner">
+  <div>FuzzingBrain&nbsp;Bench &middot; maintained by <a href="https://github.com/OwenSanzas" target="_blank" rel="noopener">OwenSanzas</a></div>
+  <div>Source: <a href="bugs.json">bugs.json</a></div>
+</div></footer>
+
+<script src="assets/site.js"></script>
+<script>
+(async function () {
+  const data = await loadBugs();
+  document.getElementById('n-total').textContent = data.summary.total;
+  document.getElementById('n-fixed').textContent = data.summary.fixed;
+  document.getElementById('n-confirmed').textContent = data.summary.confirmed;
+  document.getElementById('n-projects').textContent = new Set(data.bugs.map(b => b.project)).size;
+
+  // Sort: project asc, then title asc
+  const bugs = data.bugs.slice().sort((a, b) => {
+    const p = a.project.toLowerCase().localeCompare(b.project.toLowerCase());
+    return p !== 0 ? p : a.title.localeCompare(b.title);
+  });
+  renderTable(bugs, document.getElementById('table'));
+  attachFilters(bugs, document.getElementById('count'));
+})().catch(err => {
+  document.getElementById('table').innerHTML = '<p style="color:#c0392b">Failed to load bugs.json: ' + err.message + '</p>';
+});
+</script>
+</body>
+</html>

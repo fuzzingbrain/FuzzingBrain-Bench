@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>FuzzingBrain&nbsp;Bench</title>
+  <meta name="description" content="A benchmark and trophy case of zero-day vulnerabilities surfaced by FuzzingBrain across open-source projects.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="inner">
+  <a class="brand" href="./">FuzzingBrain<span class="dot">·</span>Bench</a>
+  <nav>
+    <a href="./" class="active">Home</a>
+    <a href="trophies.html">Trophies</a>
+    <a href="benchmark.html">Benchmark</a>
+    <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>Real bugs. <span class="accent">Reproducible PoCs.</span></h1>
+  <p class="lead">
+    FuzzingBrain&nbsp;Bench is a public catalogue of zero-day vulnerabilities surfaced by
+    <a href="https://github.com/OwenSanzas/FuzzingBrain-V2" target="_blank" rel="noopener">FuzzingBrain</a>
+    across widely-used open-source projects &mdash; each backed by an upstream report and a reproducible PoC.
+  </p>
+
+  <div class="stats">
+    <div class="stat"><div class="n" id="n-total">50</div><div class="lbl">bugs</div></div>
+    <div class="stat"><div class="n" id="n-fixed">42</div><div class="lbl">fixed</div></div>
+    <div class="stat"><div class="n" id="n-confirmed">8</div><div class="lbl">confirmed</div></div>
+    <div class="stat"><div class="n" id="n-projects">27</div><div class="lbl">projects</div></div>
+  </div>
+
+  <div class="cta-row">
+    <a class="btn primary" href="trophies.html">See the Trophies &rarr;</a>
+    <a class="btn" href="benchmark.html">About the Benchmark</a>
+    <a class="btn" href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">Source on GitHub</a>
+  </div>
+
+  <h2>Two views, one dataset</h2>
+  <p>
+    The <strong>Trophies</strong> page is the social view &mdash; a flat list of every bug we've shipped upstream,
+    with status and a link to the original report. It mirrors the style of the
+    <a href="https://aflplus.plus/" target="_blank" rel="noopener">AFL++ trophy case</a>.
+  </p>
+  <p>
+    The <strong>Benchmark</strong> page is the research view &mdash; the same bugs framed as an evaluation
+    harness for fuzzers, agentic vulnerability discovery systems, and triage tools, in the spirit of
+    <a href="https://exploitbench.ai/" target="_blank" rel="noopener">ExploitBench&nbsp;/&nbsp;V8-bench</a>.
+  </p>
+  <p>
+    Both pages read from the same <a href="bugs.json"><code>bugs.json</code></a> &mdash; one source of truth.
+  </p>
+</main>
+
+<footer class="site"><div class="inner">
+  <div>FuzzingBrain&nbsp;Bench &middot; maintained by <a href="https://github.com/OwenSanzas" target="_blank" rel="noopener">OwenSanzas</a></div>
+  <div>Last updated <span id="updated">2026-05-18</span></div>
+</div></footer>
+
+<script>
+fetch('bugs.json', { cache: 'no-cache' }).then(r => r.json()).then(d => {
+  document.getElementById('n-total').textContent = d.summary.total;
+  document.getElementById('n-fixed').textContent = d.summary.fixed;
+  document.getElementById('n-confirmed').textContent = d.summary.confirmed;
+  document.getElementById('n-projects').textContent = new Set(d.bugs.map(b => b.project)).size;
+  if (d.generated) document.getElementById('updated').textContent = d.generated;
+}).catch(()=>{});
+</script>
+</body>
+</html>

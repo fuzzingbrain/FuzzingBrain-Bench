@@ -1,0 +1,411 @@
+{
+  "$schema": "./schema.json",
+  "generated": "2026-05-18",
+  "summary": {
+    "total": 50,
+    "fixed": 42,
+    "confirmed": 8
+  },
+  "bugs": [
+    {
+      "id": "avro-neg-block-size",
+      "project": "avro",
+      "title": "Negative block size causes allocation-size-too-big crash",
+      "status": "fixed",
+      "report": "https://github.com/apache/avro/pull/3623",
+      "bug_class": "allocation-size-too-big"
+    },
+    {
+      "id": "avro-neg-string-len",
+      "project": "avro",
+      "title": "Negative string length causes allocation-size-too-big crash",
+      "status": "fixed",
+      "report": "https://github.com/apache/avro/pull/3622",
+      "bug_class": "allocation-size-too-big"
+    },
+    {
+      "id": "avro-decompression-bomb",
+      "project": "avro",
+      "title": "Decompression bomb causes OutOfMemoryError via unbounded codec decompression",
+      "status": "fixed",
+      "report": "https://github.com/apache/avro/pull/3625",
+      "bug_class": "oom"
+    },
+    {
+      "id": "binutils-rust-demangle-oom",
+      "project": "binutils",
+      "title": "OOM in rust_demangle via unbounded lifetime count in demangle_binder",
+      "status": "fixed",
+      "report": "https://sourceware.org/bugzilla/show_bug.cgi?id=33878",
+      "bug_class": "oom"
+    },
+    {
+      "id": "dtc-fdt32-misalign",
+      "project": "dtc",
+      "title": "Misaligned Memory Access in fdt32_to_cpu() During FDT Node Traversal",
+      "status": "fixed",
+      "report": "https://github.com/dgibson/dtc/issues/178",
+      "bug_class": "misaligned-access"
+    },
+    {
+      "id": "flatbuffers-verify-heap-overflow",
+      "project": "flatbuffers",
+      "title": "Heap Buffer Overflow in flatbuffers::Verify via Reflection VerifyObject",
+      "status": "confirmed",
+      "report": "https://github.com/google/flatbuffers/issues/9040",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "flatbuffers-parser-double-free",
+      "project": "flatbuffers",
+      "title": "Double-Free in FlatBuffers Parser::Deserialize (idl_parser.cpp)",
+      "status": "confirmed",
+      "report": "https://github.com/google/flatbuffers/issues/9009",
+      "bug_class": "double-free"
+    },
+    {
+      "id": "flatbuffers-flexbuffers-tostring",
+      "project": "flatbuffers",
+      "title": "Heap Buffer Overflow in FlexBuffers ToString (flexbuffers.h)",
+      "status": "confirmed",
+      "report": "https://github.com/google/flatbuffers/issues/9008",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "flatbuffers-genbinary-npd",
+      "project": "flatbuffers",
+      "title": "NULL Pointer Dereference in GenerateBinary",
+      "status": "confirmed",
+      "report": "https://github.com/google/flatbuffers/issues/8902",
+      "bug_class": "null-deref"
+    },
+    {
+      "id": "freerdp-ntlm-memleak",
+      "project": "FreeRDP",
+      "title": "Pre-Auth Memory Leak in FreeRDP NTLM AuthenticateMessage Parser Failure Path",
+      "status": "fixed",
+      "report": "https://github.com/FreeRDP/FreeRDP/issues/12603",
+      "bug_class": "memory-leak"
+    },
+    {
+      "id": "fwupd-sbatlevel-underflow",
+      "project": "fwupd",
+      "title": "Integer Underflow in sbatlevel Section Parser",
+      "status": "fixed",
+      "report": "https://github.com/fwupd/fwupd/issues/9659",
+      "bug_class": "integer-underflow"
+    },
+    {
+      "id": "fwupd-logitech-stack-overflow",
+      "project": "fwupd",
+      "title": "Stack Overflow in Logitech RDFU Firmware Parser via Deeply Nested JSON",
+      "status": "fixed",
+      "report": "https://github.com/fwupd/fwupd/issues/9779",
+      "bug_class": "stack-overflow"
+    },
+    {
+      "id": "fwupd-cab-mszip-bomb",
+      "project": "fwupd",
+      "title": "CAB MSZIP Decompression Bomb",
+      "status": "fixed",
+      "report": "https://github.com/fwupd/fwupd/issues/9790",
+      "bug_class": "oom"
+    },
+    {
+      "id": "fwupd-logitech-oob-read",
+      "project": "fwupd",
+      "title": "Out-of-Bounds Read in Logitech Bulk Controller Device Response Parsing",
+      "status": "fixed",
+      "report": "https://github.com/fwupd/fwupd/issues/9792",
+      "bug_class": "oob-read"
+    },
+    {
+      "id": "ghidra-cplus-demangle-oom",
+      "project": "Ghidra",
+      "title": "OOM in cplus_demangle due to malformed symbol",
+      "status": "fixed",
+      "report": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
+      "bug_class": "oom"
+    },
+    {
+      "id": "ghidra-rust-demangle-oom",
+      "project": "Ghidra",
+      "title": "OOM in rust_demangle due to nested generic parameters",
+      "status": "fixed",
+      "report": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
+      "bug_class": "oom"
+    },
+    {
+      "id": "graaljs-illformed-locale",
+      "project": "graaljs",
+      "title": "IllformedLocaleException treated as Internal Error in Intl API",
+      "status": "fixed",
+      "report": "https://github.com/oracle/graaljs/issues/985",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "graaljs-regexlexer-oob",
+      "project": "graaljs",
+      "title": "StringIndexOutOfBoundsException in RegexLexer.consumeChar causes Internal Error",
+      "status": "fixed",
+      "report": "https://github.com/oracle/graaljs/issues/986",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "harfbuzz-fontations-oob-write",
+      "project": "harfbuzz",
+      "title": "OOB Write in HarfBuzz fontations Glyph-Name Callback with size == 0",
+      "status": "fixed",
+      "report": "https://github.com/harfbuzz/harfbuzz/issues/5946",
+      "bug_class": "oob-write"
+    },
+    {
+      "id": "icu-translit-rule-uaf",
+      "project": "icu",
+      "title": "Use-After-Free / Null Pointer Dereference in TransliterationRule Destructor",
+      "status": "fixed",
+      "report": "https://unicode-org.atlassian.net/browse/ICU-23365",
+      "bug_class": "use-after-free"
+    },
+    {
+      "id": "imagemagick-msl-comment-npd",
+      "project": "ImageMagick",
+      "title": "NULL pointer dereference in MSL comment tag",
+      "status": "fixed",
+      "report": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-5vx3-wx4q-6cj8",
+      "bug_class": "null-deref"
+    },
+    {
+      "id": "imagemagick-msl-stack-overflow",
+      "project": "ImageMagick",
+      "title": "Stack overflow via recursive MSL write",
+      "status": "fixed",
+      "report": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-9vj4-wc7r-p844",
+      "bug_class": "stack-overflow"
+    },
+    {
+      "id": "jq-dump-op-npd",
+      "project": "jq",
+      "title": "NULL Pointer Dereference in dump_operation",
+      "status": "fixed",
+      "report": "https://github.com/jqlang/jq/issues/3458",
+      "bug_class": "null-deref"
+    },
+    {
+      "id": "jsonjava-jsonml-classcast",
+      "project": "json-java",
+      "title": "ClassCastException in JSONML.toJSONArray due to unsafe type cast",
+      "status": "fixed",
+      "report": "https://github.com/stleary/JSON-java/issues/1034",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "jsonjava-unescape-strindex",
+      "project": "json-java",
+      "title": "StringIndexOutOfBoundsException in XMLTokener.unescapeEntity due to missing length check",
+      "status": "fixed",
+      "report": "https://github.com/stleary/JSON-java/issues/1035",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "jsonjava-unescape-numformat",
+      "project": "json-java",
+      "title": "NumberFormatException in XMLTokener.unescapeEntity due to missing input validation",
+      "status": "fixed",
+      "report": "https://github.com/stleary/JSON-java/issues/1036",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "libavif-jni-signext",
+      "project": "libavif",
+      "title": "Heap Buffer Overflow in libavif Android JNI via Signed-Int Length Sign-Extension",
+      "status": "fixed",
+      "report": "https://github.com/AOMediaCodec/libavif/issues/3177",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "mongoose-mg-match-overflow",
+      "project": "mongoose",
+      "title": "Heap Buffer Overflow in mg_match",
+      "status": "fixed",
+      "report": "https://github.com/cesanta/mongoose/issues/3393",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "ndpi-hex-decode-sscanf",
+      "project": "ndpi",
+      "title": "nDPI ndpi_hex_decode Unbounded sscanf Over Borrowed Buffer (TLS Block Parser)",
+      "status": "fixed",
+      "report": "https://github.com/ntop/nDPI/issues/3159",
+      "bug_class": "oob-read"
+    },
+    {
+      "id": "netsnmp-vacm-parse-npd",
+      "project": "net-snmp",
+      "title": "NULL Pointer Dereference in vacm_parse_config_group",
+      "status": "fixed",
+      "report": "https://github.com/net-snmp/net-snmp/issues/1052",
+      "bug_class": "null-deref"
+    },
+    {
+      "id": "njs-atod2-overflow",
+      "project": "njs",
+      "title": "Heap Buffer Overflow in njs_atod2 (Harness Bug)",
+      "status": "fixed",
+      "report": "https://github.com/nginx/njs/issues/1006",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "opencv-yaml-parsekey",
+      "project": "opencv",
+      "title": "Heap buffer overflow in YAML parser parseKey() when key is empty",
+      "status": "fixed",
+      "report": "https://github.com/opencv/opencv/issues/28619",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "openh264-sad8x8-overflow",
+      "project": "openh264",
+      "title": "Heap Buffer Overflow in Scene Change Detection (WelsSampleSad8x8_c)",
+      "status": "confirmed",
+      "report": "https://github.com/cisco/openh264/issues/3926",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "openldap-parse-whsp",
+      "project": "openldap",
+      "title": "Heap Buffer Overflow in Schema Parser parse_whsp",
+      "status": "fixed",
+      "report": "https://bugs.openldap.org/show_bug.cgi?id=10430",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "openldap-ldif-stack-underflow",
+      "project": "openldap",
+      "title": "Stack Buffer Underflow in ldif_read_record",
+      "status": "fixed",
+      "report": "https://bugs.openldap.org/show_bug.cgi?id=10431",
+      "bug_class": "stack-buffer-underflow"
+    },
+    {
+      "id": "cups-utf8-charset-overflow",
+      "project": "OpenPrinting CUPS",
+      "title": "Heap buffer overflow in cupsUTF8ToCharset when processing truncated UTF-8 sequences",
+      "status": "fixed",
+      "report": "https://github.com/OpenPrinting/cups/issues/1438",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "cups-oauth-open-redirect",
+      "project": "OpenPrinting CUPS",
+      "title": "Open redirect issue in OAuth login flow",
+      "status": "fixed",
+      "report": "https://github.com/OpenPrinting/cups/issues/1419",
+      "bug_class": "open-redirect"
+    },
+    {
+      "id": "cups-ppd-jclbegin-memleak",
+      "project": "OpenPrinting CUPS",
+      "title": "Memory leak in PPD parser when processing duplicate JCLBegin keywords",
+      "status": "confirmed",
+      "report": "https://github.com/OpenPrinting/fuzzing/issues/46",
+      "bug_class": "memory-leak"
+    },
+    {
+      "id": "cups-fuzz-array-alloc-mismatch",
+      "project": "OpenPrinting CUPS",
+      "title": "Memory Allocation/Deallocation Mismatch in fuzz_array.c",
+      "status": "confirmed",
+      "report": "https://github.com/OpenPrinting/fuzzing/issues/43",
+      "bug_class": "alloc-dealloc-mismatch"
+    },
+    {
+      "id": "cups-getconflicts-misuse",
+      "project": "OpenPrinting CUPS",
+      "title": "Incorrect API usage in fuzz_ppd_gen_conflicts.c - cupsGetConflicts return value ignored",
+      "status": "confirmed",
+      "report": "https://github.com/OpenPrinting/fuzzing/issues/45",
+      "bug_class": "api-misuse"
+    },
+    {
+      "id": "openssl-des-ofb-cfb-overread",
+      "project": "openssl",
+      "title": "Stack Buffer Over-Read in DES OFB/CFB64 via Unchecked num Parameter",
+      "status": "fixed",
+      "report": "https://github.com/openssl/openssl/issues/30284",
+      "bug_class": "stack-buffer-overread"
+    },
+    {
+      "id": "ots-processgeneric-npd",
+      "project": "ots",
+      "title": "NULL Pointer Dereference in OTS ProcessGeneric() with TABLE_ACTION_PASSTHRU",
+      "status": "fixed",
+      "report": "https://github.com/khaledhosny/ots/issues/308",
+      "bug_class": "null-deref"
+    },
+    {
+      "id": "pdfbox-inlineimage-type-confusion",
+      "project": "pdfbox",
+      "title": "Type Confusion DoS in PDInlineImage.getDecode",
+      "status": "fixed",
+      "report": "https://github.com/apache/pdfbox/pull/410",
+      "bug_class": "type-confusion"
+    },
+    {
+      "id": "pdfbox-cmap-bfrange-aioob",
+      "project": "pdfbox",
+      "title": "ArrayIndexOutOfBoundsException in fontbox CMapParser.increment() via Malformed bfrange",
+      "status": "fixed",
+      "report": "https://github.com/apache/pdfbox/pull/411",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "pdfbox-pfb-negative-array",
+      "project": "pdfbox",
+      "title": "NegativeArraySizeException in fontbox PfbParser.parsePfb via Crafted PFB Header Size Field",
+      "status": "fixed",
+      "report": "https://github.com/apache/pdfbox/pull/412",
+      "bug_class": "uncaught-exception"
+    },
+    {
+      "id": "simdutf-utf16-utf8-overflow",
+      "project": "simdutf",
+      "title": "Heap buffer overflow in convert_utf16_to_utf8_safe due to write-before-check pattern",
+      "status": "fixed",
+      "report": "https://github.com/simdutf/simdutf/issues/911",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "upx-elf32-pack2-memleak",
+      "project": "upx",
+      "title": "Memory Leak in UPX PackLinuxElf32::pack2 when packing ELF executables",
+      "status": "fixed",
+      "report": "https://github.com/upx/upx/issues/945",
+      "bug_class": "memory-leak"
+    },
+    {
+      "id": "upx-pe-resource-memleak",
+      "project": "upx",
+      "title": "Memory Leak in UPX PeFile::Resource::convert() when processing PE resources",
+      "status": "fixed",
+      "report": "https://github.com/upx/upx/issues/946",
+      "bug_class": "memory-leak"
+    },
+    {
+      "id": "upx-elf64-generate-overflow",
+      "project": "upx",
+      "title": "Heap Buffer Overflow in UPX PackLinuxElf64::generateElfHdr when packing malformed ELF64",
+      "status": "fixed",
+      "report": "https://github.com/upx/upx/issues/947",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "upx-pe-loadconf-overflow",
+      "project": "upx",
+      "title": "Heap Buffer Overflow in UPX PeFile::processLoadConf when packing malformed PE32 files",
+      "status": "fixed",
+      "report": "https://github.com/upx/upx/issues/950",
+      "bug_class": "heap-buffer-overflow"
+    }
+  ]
+}
