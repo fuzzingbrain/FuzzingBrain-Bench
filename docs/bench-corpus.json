@@ -570,10 +570,12 @@
       "needs_review": true,
       "review_notes": "Disclosed date is best-effort from issue/PR creation; harness file is best-guess.",
       "harness": {
-        "files": [],
-        "found_in": "not_found",
-        "found_url": "https://github.com/jqlang/jq/issues/3458",
-        "notes": "Issue body says 'Fuzzer: OSS-Fuzz jq fuzzer' but does not paste source; provides only a Python generator for the trigger and a jq CLI reproducer"
+        "files": [
+          "jq_fuzz_compile.c"
+        ],
+        "found_in": "upstream_repo",
+        "found_url": "https://github.com/jqlang/jq/blob/master/tests/jq_fuzz_compile.c",
+        "notes": "Harness pulled from upstream jq repo via OSS-Fuzz default. Bug report referenced the OSS-Fuzz fuzzer by name only."
       }
     },
     {
