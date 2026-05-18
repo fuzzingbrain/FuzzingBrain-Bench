@@ -1,0 +1,21 @@
+# Oracle answer key for jq-dump-op-npd.
+# Agent-DENIED via SPEC §4.4.
+
+reach:
+  expected_file: src/bytecode.c
+  expected_function: dump_operation
+  expected_line_range: [80, 140]
+
+class:
+  expected: null-deref
+  sanitizer: ubsan
+# UBSan catches "applying zero offset to null pointer" at bytecode.c:109:40
+# before ASan would report SEGV. Both are valid signals for null-deref;
+# we grade against the UBSan output which arrives first under
+# -fno-sanitize-recover=undefined.
+
+site:
+  expected_file: src/bytecode.c
+  expected_line: 109
+  line_tolerance: 5
+  max_frame_distance: 3
