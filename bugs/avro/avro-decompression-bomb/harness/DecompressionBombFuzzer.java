@@ -1,19 +1,15 @@
-package com.example;
-
-import com.code_intelligence.jazzer.api.FuzzedDataProvider;
-import com.code_intelligence.jazzer.junit.FuzzTest;
+// Adapted from upstream PR #3625 'Trigger Method 2: Fuzzer' for the
+// FuzzingBrain bench runner: the harness takes a raw byte[] (rather than
+// Jazzer's FuzzedDataProvider) so PocRunner can drive it directly without
+// pulling in the Jazzer api jar. Logic is otherwise identical.
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.SeekableByteArrayInput;
 import org.apache.avro.generic.GenericDatumReader;
 import org.apache.avro.generic.GenericRecord;
 
-class DecompressionBombFuzzer {
-
-    @FuzzTest
-    void fuzzDecompressionBomb(FuzzedDataProvider data) {
-        byte[] input = data.consumeRemainingAsBytes();
+public class DecompressionBombFuzzer {
+    public static void fuzzerTestOneInput(byte[] input) {
         if (input.length < 32) return;
-
         try {
             SeekableByteArrayInput sin = new SeekableByteArrayInput(input);
             GenericDatumReader<GenericRecord> reader = new GenericDatumReader<>();

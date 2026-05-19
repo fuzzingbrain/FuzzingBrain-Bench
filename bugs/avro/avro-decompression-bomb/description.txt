@@ -1,0 +1,25 @@
+Decompression bomb in Avro Java DataFileReader
+================================================
+
+Project:     apache/avro (lang/java)
+Bug class:   oom (Java OutOfMemoryError)
+Sanitizer:   JVM (heap exhaustion at -Xmx256m)
+
+Avro container files can declare a compression codec ("snappy",
+"deflate", "bzip2", "xz", "zstandard") on a per-block basis. The Java
+implementation calls the codec's decompress() routine and accepts the
+returned ByteBuffer without checking the declared block size against
+any sane upper bound. A maliciously-crafted block can declare a small
+compressed payload that expands into a multi-gigabyte buffer, exhausting
+the heap and crashing the JVM with OutOfMemoryError.
+
+The harness exercises the Avro Java DataFileReader against
+fuzzer-controlled bytes; with -Xmx256m, decompression-bomb inputs
+deterministically trigger OOM.
+
+References
+----------
+- Upstream PR (vuln_commit picked from its first parent):
+  https://github.com/apache/avro/pull/3625
+- Fix (AVRO-4247) merged via #3745:
+  https://github.com/apache/avro/pull/3745
