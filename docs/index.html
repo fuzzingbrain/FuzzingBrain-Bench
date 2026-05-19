@@ -49,9 +49,14 @@
     The <strong>Benchmark</strong> page is the research view &mdash; the same bugs framed as an evaluation
     harness for fuzzers, agentic vulnerability discovery systems, and triage tools, in the spirit of
     <a href="https://exploitbench.ai/" target="_blank" rel="noopener">ExploitBench&nbsp;/&nbsp;V8-bench</a>.
+    Each PoC is scored against a 4-flag capability ladder
+    (<code>reach</code>&nbsp;/&nbsp;<code>crash</code>&nbsp;/&nbsp;<code>class</code>&nbsp;/&nbsp;<code>site</code>)
+    by deterministic oracles, with 3-round unanimity.
   </p>
   <p>
     Both pages read from the same <a href="bugs.json"><code>bugs.json</code></a> &mdash; one source of truth.
+    Per-bug build artifacts, the Go MCP server, and the Python runner live in the
+    <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">source repo</a>.
   </p>
 </main>
 

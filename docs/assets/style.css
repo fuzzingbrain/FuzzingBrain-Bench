@@ -151,6 +151,29 @@ table.bugs td.class code {
   white-space: nowrap;
 }
 
+table.cap-ladder {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  margin: 12px 0 18px;
+}
+table.cap-ladder th, table.cap-ladder td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+table.cap-ladder th {
+  background: var(--code-bg);
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+table.cap-ladder td:first-child { width: 50px; font-weight: 600; color: var(--accent); }
+table.cap-ladder td code { font-size: 13px; }
+
 .badge {
   display: inline-block;
   font-size: 11px;
