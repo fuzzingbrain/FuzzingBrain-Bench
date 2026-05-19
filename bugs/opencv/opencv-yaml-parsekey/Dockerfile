@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 FROM debian:bookworm-slim
-ARG VULN_COMMIT=4.x
+ARG VULN_COMMIT=1a3e1e05b71e15197f7decc451a2f650ff2ee591
 ARG SOURCE_DATE_EPOCH=1735689600
 ENV SOURCE_DATE_EPOCH=${SOURCE_DATE_EPOCH}
 ENV DEBIAN_FRONTEND=noninteractive
@@ -11,9 +11,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         zlib1g-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# The opencv issue (#28619) reports the bug exists on master/4.x; pin to
-# the upstream 4.x branch tip at this clone time.
-RUN git clone --depth 1 --branch 4.x https://github.com/opencv/opencv /src/opencv
+# Pin to the parent of the fix merge (PR #28620 / merge 8e1fa1bbd) for
+# issue #28619 — opencv master at clone time is already patched.
+RUN git clone --filter=blob:none https://github.com/opencv/opencv /src/opencv \
+ && git -C /src/opencv checkout ${VULN_COMMIT}
 
 COPY harness/ /src/harness/
 RUN chmod +x /src/harness/build.sh
