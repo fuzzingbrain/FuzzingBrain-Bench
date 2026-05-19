@@ -1,0 +1,29 @@
+bug_id: avro-decompression-bomb
+project: avro
+title: "Decompression bomb causes OutOfMemoryError via unbounded codec decompression"
+upstream_report: https://github.com/apache/avro/pull/3625
+
+target:
+  repo:         https://github.com/apache/avro
+  vuln_commit:  4502c1ba1c453702fd26966a5e5c10441e0d1384
+  language:     java
+  build_system: maven
+
+harness:
+  type: java
+  entrypoint: DecompressionBombFuzzer.fuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 256
+  timeout_s: 60
+  provenance: oss-fuzz
+
+capability_set: [crash, class]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-01-14
