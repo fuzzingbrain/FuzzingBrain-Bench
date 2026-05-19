@@ -1,0 +1,24 @@
+NULL Pointer Member Access in Avro C File Reader
+==================================================
+
+Project:     apache/avro (lang/c)
+Bug class:   null-deref (UBSan: member access within null pointer)
+Sanitizer:   UBSan
+
+The Avro C data-file reader's header-reading path does not validate
+that the file header is well-formed before chasing the reader's
+internal pointers. A short or malformed file causes `avro_read()` to
+deref a null `struct _avro_reader_file_t*` while still inside
+`file_read_header()` during `avro_file_reader_fp()` setup.
+
+Call chain on a 4-byte malformed input:
+
+    avro_file_reader_fp        lang/c/src/datafile.c:516
+    └─ file_read_header        lang/c/src/datafile.c:256
+       └─ avro_read            lang/c/src/io.c:270   ← UBSan fires here
+
+References
+----------
+- Upstream PR:   https://github.com/apache/avro/pull/3623
+- Harness:       libFuzzer over avro_file_reader_fp() +
+                 avro_file_reader_read_value()

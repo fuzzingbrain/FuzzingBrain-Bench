@@ -1,0 +1,29 @@
+bug_id: avro-neg-block-size
+project: avro
+title: "Negative Block Size Crash in Avro C DataFile Reader"
+upstream_report: https://github.com/apache/avro/pull/3623
+
+target:
+  repo:         https://github.com/apache/avro
+  vuln_commit:  3af7a4654d574be7c78125e610a7d4ca23542eab
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-01-13
