@@ -17,7 +17,7 @@ if [ "${cmd}" = "build-libs" ]; then
 
     for CONFIG_LIB in asan cov; do
         case "${CONFIG_LIB}" in
-            asan) CF="-fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1"; LF="-fsanitize=address,undefined" ;;
+            asan) CF="-fsanitize=address,undefined,fuzzer-no-link -fno-sanitize-recover=undefined -g -O1"; LF="-fsanitize=address,undefined" ;;
             cov)  CF="-fprofile-instr-generate -fcoverage-mapping -g -O0"; LF="-fprofile-instr-generate -fcoverage-mapping" ;;
         esac
 
