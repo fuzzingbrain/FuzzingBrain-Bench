@@ -1,0 +1,29 @@
+bug_id: ots-processgeneric-npd
+project: ots
+title: "NULL Pointer Dereference in OTS ProcessGeneric() with TABLE_ACTION_PASSTHRU"
+upstream_report: https://github.com/khaledhosny/ots/issues/308
+
+target:
+  repo:         https://github.com/khaledhosny/ots
+  vuln_commit:  8510bfd8c95350fc022552940a45120ff6e737b5
+  language:     cpp
+  build_system: meson
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-02-15
