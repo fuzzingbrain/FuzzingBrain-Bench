@@ -73,7 +73,7 @@
         "found_url": "https://github.com/apache/avro/pull/3623#issuecomment-3746385334",
         "notes": "libFuzzer harness in reporter's first comment on PR #3623"
       },
-      "phase2_status": "deferred"
+      "phase2_status": "shipped"
     },
     {
       "id": "avro-neg-string-len",
@@ -104,7 +104,7 @@
         "found_url": "https://github.com/apache/avro/pull/3622#issuecomment-3746521711",
         "notes": "libFuzzer harness in reporter's first comment on PR #3622"
       },
-      "phase2_status": "deferred"
+      "phase2_status": "shipped"
     },
     {
       "id": "binutils-rust-demangle-oom",
@@ -512,7 +512,7 @@
         "found_url": "https://unicode-org.atlassian.net/browse/ICU-23365",
         "notes": "ICU Jira intermittently gated; standalone C++ reproducer extracted via WebFetch. OSS-Fuzz transliterator_fuzzer.cpp source not pasted in the Jira ticket."
       },
-      "phase2_status": "deferred"
+      "phase2_status": "shipped"
     },
     {
       "id": "imagemagick-msl-comment-npd",
@@ -1233,8 +1233,8 @@
     }
   ],
   "phase2_summary": {
-    "shipped": 9,
-    "deferred": 30,
+    "shipped": 12,
+    "deferred": 27,
     "total": 39
   }
 }
