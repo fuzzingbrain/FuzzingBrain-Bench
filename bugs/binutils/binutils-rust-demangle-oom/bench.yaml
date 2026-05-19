@@ -1,0 +1,29 @@
+bug_id: binutils-rust-demangle-oom
+project: binutils
+title: "Null Pointer Arithmetic in rust_demangle str_buf_append"
+upstream_report: https://sourceware.org/bugzilla/show_bug.cgi?id=33878
+
+target:
+  repo:         https://sourceware.org/git/binutils-gdb.git
+  vuln_commit:  96c87c6dd55c38519ad168230d0893797b62fd52
+  language:     c
+  build_system: handrolled
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: null

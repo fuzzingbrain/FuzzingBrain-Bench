@@ -1,0 +1,14 @@
+reach:
+  expected_file: libiberty/rust-demangle.c
+  expected_function: str_buf_append
+  expected_line_range: [1560, 1580]
+
+class:
+  expected: null-deref
+  sanitizer: ubsan
+
+site:
+  expected_file: libiberty/rust-demangle.c
+  expected_line: 1572
+  line_tolerance: 5
+  max_frame_distance: 3
