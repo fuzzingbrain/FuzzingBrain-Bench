@@ -33,7 +33,10 @@ if [ "${cmd}" = "harness" ]; then
         cp /src/deps/*.jar "${LIB}/deps/" 2>/dev/null || true
         # Build classpath glob: avro jar + all deps
         CP="${LIB}/avro-java.jar:${LIB}/deps/*"
-        javac -d "${LIB}/classes" \
+        # Compile to Java 17 bytecode so hosts with JDK 17 (Debian default-jre)
+        # can run the harness; avro's library bytecode is v55 (Java 11) and
+        # works on JDK 17+ anyway.
+        javac --release 17 -d "${LIB}/classes" \
             -cp "${CP}" \
             "${HARNESS_DIR}/DecompressionBombFuzzer.java" \
             "${HARNESS_DIR}/PocRunner.java"
