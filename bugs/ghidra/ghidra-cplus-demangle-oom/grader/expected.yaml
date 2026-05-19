@@ -1,0 +1,14 @@
+reach:
+  expected_file: ghidra-demangler/rust-demangle.c
+  expected_function: demangle_binder
+  expected_line_range: [650, 690]
+
+class:
+  expected: oom
+  sanitizer: runtime
+
+site:
+  expected_file: ghidra-demangler/rust-demangle.c
+  expected_line: 664
+  line_tolerance: 5
+  max_frame_distance: 5

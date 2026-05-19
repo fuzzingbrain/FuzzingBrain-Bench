@@ -1,0 +1,28 @@
+Unbounded Recursion / OOM in Ghidra Bundled rust_demangle
+==========================================================
+
+Project:     NationalSecurityAgency/ghidra (bundled GPL libiberty)
+Bug class:   oom (unbounded recursion via demangle_binder lifetime count)
+Sanitizer:   runtime (libFuzzer timeout)
+
+`demangle_binder()` in the vendored libiberty `rust-demangle.c` reads
+a lifetime count from the input but does not bound it against any
+reasonable limit. A v0 Rust symbol with a deeply-nested binder /
+type tree drives recursion through
+
+    rust_demangle → rust_demangle_callback → demangle_path
+    → demangle_type → demangle_path → demangle_type
+    → demangle_binder → print_str
+
+deep enough to exceed libFuzzer's per-input wall-clock cap, the
+process is killed by libFuzzer's SIGALRM handler, and stderr ends
+with `SUMMARY: libFuzzer: timeout`.
+
+Advisory pairs this with cplus_demangle; the harness as written
+calls only `rust_demangle()`, but the recorded PoC drives the
+unbounded path that the advisory characterizes as OOM.
+
+References
+----------
+- Ghidra advisory: https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442
+- Sibling bugs:    ghidra-rust-demangle-oom, binutils-rust-demangle-oom
