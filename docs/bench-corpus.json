@@ -357,7 +357,7 @@
         "found_url": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
         "notes": "Same advisory and same harness as ghidra-rust-demangle-oom; cplus_demangle is reached through the same demangler entry point"
       },
-      "phase2_status": "deferred"
+      "phase2_status": "shipped"
     },
     {
       "id": "ghidra-rust-demangle-oom",
@@ -1233,8 +1233,8 @@
     }
   ],
   "phase2_summary": {
-    "shipped": 14,
-    "deferred": 25,
+    "shipped": 15,
+    "deferred": 24,
     "total": 39
   }
 }

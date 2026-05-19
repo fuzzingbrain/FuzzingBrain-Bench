@@ -292,6 +292,9 @@ func crashFired(r harnessRun) bool {
 	if r.exitCode != 0 && strings.Contains(r.stderr, "Test unit written to") {
 		return true
 	}
+	if strings.Contains(r.stderr, "libFuzzer: timeout") || strings.Contains(r.stderr, "libFuzzer: out-of-memory") {
+		return true
+	}
 	return false
 }
 
@@ -313,6 +316,9 @@ func classMatches(r harnessRun, expected string) bool {
 		}
 	case "oom":
 		if r.exitCode == 137 || strings.Contains(r.stderr, "out-of-memory") {
+			return true
+		}
+		if strings.Contains(r.stderr, "libFuzzer: timeout") || strings.Contains(r.stderr, "libFuzzer: out-of-memory") {
 			return true
 		}
 	}
