@@ -1,24 +1,32 @@
 # fwupd-cab-mszip-bomb — partial build infra, deferred
 
 Build attempt status (2026-05-19):
-- Dockerfile pulls fwupd 2.0.18 + Debian system deps
-  (glib2, json-glib, libxmlb, libcurl4, libgudev, libgusb, polkit, etc.)
-- meson configures fwupd with most plugins disabled
-- BUT: meson auto-downloads libxmlb as a subproject when the Debian
-  system libxmlb-dev is too old, and the subproject requires
-  gobject-introspection-1.0 which we explicitly disable at fwupd level.
 
-This means a clean build needs one of:
-- newer libxmlb (>= what fwupd 2.0.18 wants) packaged or built from a
-  pinned source
-- gobject-introspection-1.0-dev installed (which then pulls more deps)
-- run fwupd's `contrib/ci/oss-fuzz.py` which builds glib/json-glib/
-  libxmlb from pinned sources (~30 min, large image footprint).
+After resolving many transitive dependencies (gobject-introspection,
+gtk-doc-tools, libgpgme, gnutls-bin, python3-jinja2, python3-cairo,
+python3-gi), `meson setup` for fwupd 2.0.18 still fails because:
 
-For v1 we defer — none of the four fwupd bugs ship. The bench-corpus
-description and the libfwupdplugin template fuzzer (.c.in) are
-adequate for the bench definition; only the binary harness is missing.
+1. fwupd 2.0.18's `meson_options.txt` no longer carries the
+   `plugin_uefi_capsule` / `plugin_thunderbolt` / `plugin_redfish`
+   options that older versions accepted, so we can't disable those
+   plugins individually.
+2. The default build pulls in pango, pangocairo, drm_amdgpu, umockdev,
+   flashrom, and other system libs that aren't in our minimal apt set.
 
-Promotion path: switch to oss-fuzz.py, or install
-`gobject-introspection libgirepository1.0-dev` in the apt list and
-let the libxmlb subproject build go through.
+The fwupd `contrib/ci/oss-fuzz.py` script is the canonical path: it
+clones source for glib, json-glib, libxmlb, libjcat at pinned commits
+and builds everything from scratch. That works but costs ~30 min per
+fresh build and ~10 GB of disk per image — out of scope for v1.
+
+**Promotion path**:
+- Vendor `oss-fuzz.py` directly into the Dockerfile, or
+- Pin fwupd to a slightly older version with simpler meson options, or
+- Apt-install pango/drm/umockdev/etc. and accept the larger image.
+
+The libfwupdplugin template fuzzer (`fu-fuzzer-firmware.c.in`) +
+fwupd's own meson custom_target machinery would then produce
+`cab_fuzzer` automatically; harness/build.sh's `meson compile -j N
+cab_fuzzer` is correct as-is.
+
+The other three fwupd bugs (logitech-oob-read, logitech-stack-overflow,
+sbatlevel-underflow) share the same blocker.

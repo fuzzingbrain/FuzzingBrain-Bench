@@ -15,7 +15,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libglib2.0-dev libjson-glib-dev libxmlb-dev libcurl4-openssl-dev \
         libgudev-1.0-dev libgusb-dev libpolkit-gobject-1-dev \
         libsqlite3-dev libarchive-dev libgnutls28-dev libsmbios-dev \
-        libreadline-dev \
+        libreadline-dev libgirepository1.0-dev gobject-introspection \
+        libcbor-dev libprotobuf-c-dev protobuf-c-compiler libpci-dev \
+        gtk-doc-tools libzstd-dev libusb-1.0-0-dev libelf-dev libgpgme-dev \
+        gnutls-bin python3-jinja2 python3-cairo python3-gi \
     && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 --branch ${VULN_COMMIT} https://github.com/fwupd/fwupd /src/fwupd

@@ -36,7 +36,17 @@ if [ "${cmd}" = "build-libs" ]; then
                 -Dlvfs=disabled \
                 -Dsupported_build=disabled \
                 -Dsystemd=disabled \
-                -Dhsi=disabled || true
+                -Dhsi=disabled \
+                -Dlibjcat:vapi=false -Dlibjcat:gpg=false -Dlibjcat:tests=false \
+                -Dlibxmlb:gtkdoc=false -Dlibxmlb:tests=false \
+                -Dvendor_ids_dir=/usr/share/hwdata \
+                -Dplugin_uefi_capsule=false \
+                -Dplugin_modem_manager=disabled \
+                -Dplugin_thunderbolt=disabled \
+                -Dplugin_msr=disabled \
+                -Dplugin_redfish=disabled \
+                -Dplugin_uefi_pk=disabled \
+                -Dplugin_logitech_bulkcontroller=disabled || true
         meson compile -C build-${CONFIG_LIB} -j ${JOBS} cab_fuzzer || true
         popd >/dev/null
     done
