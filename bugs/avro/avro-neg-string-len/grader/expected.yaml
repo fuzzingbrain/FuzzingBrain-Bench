@@ -1,0 +1,14 @@
+reach:
+  expected_file: lang/c/src/schema.c
+  expected_function: avro_schema_union_append
+  expected_line_range: [380, 410]
+
+class:
+  expected: null-deref
+  sanitizer: ubsan
+
+site:
+  expected_file: lang/c/src/schema.c
+  expected_line: 392
+  line_tolerance: 5
+  max_frame_distance: 3
