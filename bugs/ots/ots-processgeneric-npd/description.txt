@@ -1,0 +1,37 @@
+NULL Pointer Dereference in OTS ProcessGeneric() with TABLE_ACTION_PASSTHRU
+===========================================================================
+
+Project:     ots (OpenType Sanitizer — Khaled Hosny fork)
+Bug class:   null-deref
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+ProcessGeneric() in src/ots.cc retrieves the `maxp` font table via
+GetTypedTable(OTS_TAG_MAXP). When the caller has set the table action
+to TABLE_ACTION_PASSTHRU, the table is stored as a TablePassthru
+object whose Type() returns a passthrough tag instead of
+OTS_TAG_MAXP. GetTypedTable() therefore returns NULL even though a
+maxp table is present, and the subsequent dereference at line 781
+(and line 798) triggers a SEGV at address 0x1c (offset of the
+`version_1` field in OpenTypeMAXP).
+
+The bug is DoS-only — the crash is a deterministic read from a fixed
+near-null address.
+
+Task
+----
+Produce a font byte sequence that, fed to the harness binary, causes
+ASan to report SEGV / null-deref with the top library frame at the
+documented bug site inside src/ots.cc.
+
+The harness (harness/fuzz_ots_passthru.cc) configures the OTSContext
+so that every table tag falls into TABLE_ACTION_PASSTHRU, then calls
+Process() on the input. Any font containing a real maxp table will
+hit the bug.
+
+References
+----------
+- Upstream report: https://github.com/khaledhosny/ots/issues/308
+- Source: src/ots.cc, function ProcessGeneric
+- Buggy lines: ots.cc:781 (and ots.cc:798)
