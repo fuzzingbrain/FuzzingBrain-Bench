@@ -1,0 +1,14 @@
+reach:
+  expected_file: src/main/java/org/json/JSONML.java
+  expected_function: toJSONArray
+  expected_line_range: [270, 400]
+
+class:
+  expected: class-cast
+  sanitizer: jvm
+
+site:
+  expected_file: JSONML.java
+  expected_line: 279
+  line_tolerance: 30
+  max_frame_distance: 3
