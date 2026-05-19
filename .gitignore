@@ -14,7 +14,6 @@ report_poc.md
 *.pdf
 papers/
 references/
-bin/
 
 .venv/
 runs/
