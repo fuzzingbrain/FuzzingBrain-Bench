@@ -1,0 +1,29 @@
+bug_id: freerdp-ntlm-memleak
+project: FreeRDP
+title: "Pre-Auth Memory Leak in FreeRDP NTLM AuthenticateMessage Parser Failure Path"
+upstream_report: https://github.com/FreeRDP/FreeRDP/issues/12603
+
+target:
+  repo:         https://github.com/FreeRDP/FreeRDP
+  vuln_commit:  d0418739c27fe95b0d38fc6aa2e3cb22b7ac1cee
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [reach, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-16
