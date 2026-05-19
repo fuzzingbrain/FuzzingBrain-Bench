@@ -12,9 +12,13 @@ target:
 harness:
   type: libfuzzer
   entrypoint: LLVMFuzzerTestOneInput
-  invocation: ["@@"]
+  # allocator-state dependent: single-input replay is unreliable
+  # (per issue body, only fork-mode + corpus catches it). Repeating the
+  # same input 10000 times in-process makes allocator state diverge
+  # enough that the redzone gets crossed reliably (verified 5/5).
+  invocation: ["-runs=10000", "@@"]
   rss_limit_mb: 2048
-  timeout_s: 30
+  timeout_s: 60
   provenance: fuzzingbrain
 
 capability_set: [reach, crash, class, site]
