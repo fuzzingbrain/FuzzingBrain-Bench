@@ -340,6 +340,8 @@ func mapUBSan(msg string) string {
 	switch {
 	case strings.Contains(low, "null pointer"):
 		return "null-deref"
+	case strings.Contains(low, "applying zero offset to null"):
+		return "null-deref"
 	case strings.Contains(low, "signed integer overflow"):
 		return "integer-overflow"
 	case strings.Contains(low, "unsigned integer overflow"):
