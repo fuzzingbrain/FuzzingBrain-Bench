@@ -1,0 +1,21 @@
+// Adapted from upstream PR #410 Reproduce.java: the bug is a programmatic
+// type confusion in PDInlineImage.getDecode() when the /D entry is an
+// integer instead of an array. A byte[] cannot directly construct this
+// COSDictionary, so the harness ignores its input and instantiates the
+// faulty params unconditionally - any PoC bytes will trigger.
+import org.apache.pdfbox.cos.COSDictionary;
+import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.pdmodel.graphics.image.PDInlineImage;
+
+public class InlineImageFuzzer {
+    public static void fuzzerTestOneInput(byte[] data) throws Exception {
+        COSDictionary params = new COSDictionary();
+        params.setInt(COSName.W, 1);
+        params.setInt(COSName.H, 1);
+        params.setName(COSName.CS, "DeviceRGB");
+        params.setInt(COSName.D, 123);  // wrong type: integer instead of array
+
+        PDInlineImage image = new PDInlineImage(params, new byte[]{0, 0, 0}, null);
+        image.getDecode();  // ClassCastException
+    }
+}
