@@ -7,7 +7,7 @@ Snapshot of where the v1 benchmark stands.
 | Phase | What | Status |
 |-------|------|--------|
 | 1 | SPEC + bug corpus | done — see [docs/SPEC.md](docs/SPEC.md), [docs/bench-corpus.json](docs/bench-corpus.json) |
-| 2 | Per-bug builds (Dockerfile + binaries + harness + grader) | **9 / 39 shipped**, 30 deferred — see below |
+| 2 | Per-bug builds (Dockerfile + binaries + harness + grader) | **12 / 39 shipped**, 27 deferred — see below |
 | 3 | MCP server (Go, 6 tools) | done — [tools/mcp-server/](tools/mcp-server/) |
 | 3 | Python runner | done — [runner/](runner/) |
 | 4 | Site integration | done — [docs/benchmark.html](docs/benchmark.html) |
@@ -26,12 +26,15 @@ Dockerfile, 4 prebuilt binaries, poc/poc.bin):
 7. `simdutf-utf16-utf8-overflow` — heap overflow in UTF16→UTF8 path
 8. `ndpi-hex-decode-sscanf` — sscanf state-dependent crash
 9. `netsnmp-vacm-parse-npd` — null deref in `vacm_parse_config_group`
+10. `avro-neg-block-size` — null deref in Avro C file_read_header path
+11. `avro-neg-string-len` — null deref in Avro C union schema parser
+12. `icu-translit-rule-uaf` — leak in ICU transliterator parseFilterID
 
-All nine grade cleanly against the MCP server (3-round unanimity).
+All twelve grade cleanly against the MCP server (3-round unanimity).
 
 ## Phase 2 — deferred bugs
 
-The remaining 30 v1 bugs are listed with `phase2_status: deferred` in
+The remaining 27 v1 bugs are listed with `phase2_status: deferred` in
 [docs/bench-corpus.json](docs/bench-corpus.json). They cluster into:
 
 - **Java targets** (graaljs, json-java, pdfbox, ghidra) — need a Jazzer
@@ -43,10 +46,11 @@ The remaining 30 v1 bugs are listed with `phase2_status: deferred` in
   imagemagick × 2, avro × 3, libavif-jni** — buildable but lower
   priority than landing the MCP/runner contract.
 
-The shipped 9 already cover four sanitizer classes (null-deref,
-heap-overflow, leak, stack-underflow) and four build systems (autoconf,
-amalgam, in-tree, meson) — enough surface area for the runner contract
-to be stress-tested end-to-end before scaling out the corpus.
+The shipped 12 cover four sanitizer classes (null-deref, heap-overflow,
+leak, stack-underflow), four build systems (autoconf, amalgam, cmake,
+meson), and three languages (C, C++, JS-via-C-amalgam) — enough surface
+area for the runner contract to be stress-tested end-to-end before
+scaling out the corpus.
 
 ## What's verified
 
