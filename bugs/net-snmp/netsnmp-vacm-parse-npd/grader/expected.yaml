@@ -1,0 +1,14 @@
+reach:
+  expected_file: snmplib/vacm.c
+  expected_function: vacm_parse_config_group
+  expected_line_range: [380, 480]
+
+class:
+  expected: null-deref
+  sanitizer: asan
+
+site:
+  expected_file: snmplib/vacm.c
+  expected_line: 412
+  line_tolerance: 30
+  max_frame_distance: 3
