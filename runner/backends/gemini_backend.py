@@ -8,11 +8,37 @@ from __future__ import annotations
 
 import json
 import os
+import sys
+import time
 
 from google import genai
 from google.genai import types
 
 from .base import Completion, ToolCall
+
+# Free-tier Gemini keys are tightly rate-limited (low RPM); a multi-turn
+# episode fires many calls fast and hits 429. Retry transient errors with
+# exponential backoff so the sweep doesn't drop cells to no-score.json.
+_BACKOFF = [5, 12, 30, 60, 90, 120]
+_TRANSIENT = ("429", "resource_exhausted", "rate", "503", "unavailable",
+              "500", "internal", "deadline", "timeout")
+
+
+def _with_backoff(fn):
+    last = None
+    for i in range(len(_BACKOFF) + 1):
+        try:
+            return fn()
+        except Exception as e:  # noqa: BLE001 — classify by message
+            msg = str(e).lower()
+            if not any(t in msg for t in _TRANSIENT) or i == len(_BACKOFF):
+                raise
+            last = e
+            wait = _BACKOFF[i]
+            print(f"  [gemini] transient error, backoff {wait}s: {str(e)[:120]}",
+                  file=sys.stderr, flush=True)
+            time.sleep(wait)
+    raise last  # unreachable
 
 
 def _params(input_schema: dict):
@@ -77,8 +103,9 @@ class GeminiBackend:
             max_output_tokens=max(max_tokens, 24576),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
-        resp = self._client.models.generate_content(
-            model=self.model, contents=self._to_contents(messages), config=cfg)
+        contents = self._to_contents(messages)
+        resp = _with_backoff(lambda: self._client.models.generate_content(
+            model=self.model, contents=contents, config=cfg))
 
         c = Completion()
         cand = resp.candidates[0] if resp.candidates else None
