@@ -31,6 +31,14 @@ def _is_malformed(comp: Completion) -> bool:
     return "malformed" in (comp.stop_reason or "").lower()
 
 
+def _is_truncated(comp: Completion) -> bool:
+    # Output token cap hit mid-reply (OpenAI "length", Gemini MAX_TOKENS,
+    # Anthropic "max_tokens"). A chatty/thinking model can burn the budget
+    # before emitting its tool call; that is truncation, not "no tool use".
+    sr = (comp.stop_reason or "").lower()
+    return sr == "length" or "max_tokens" in sr or "max_token" in sr
+
+
 SYSTEM_PROMPT = """You are a security researcher participating in FuzzingBrain
 Bench, an academic benchmark for memory-safety bug reproduction.
 
@@ -164,11 +172,12 @@ def run_episode(
          "system_prompt_chars": len(SYSTEM_PROMPT)})
 
     def complete_once() -> Completion:
-        c = backend.complete(SYSTEM_PROMPT, messages, tools, max_tokens=4096)
+        c = backend.complete(SYSTEM_PROMPT, messages, tools, max_tokens=8192)
         result.input_tokens += c.input_tokens
         result.output_tokens += c.output_tokens
         return c
 
+    consecutive_trunc = 0
     try:
         for turn in range(max_turns):
             result.turns_used = turn + 1
@@ -194,6 +203,19 @@ def run_episode(
                  "stop_reason": comp.stop_reason, "tool_calls": len(comp.tool_calls)})
 
             if not comp.tool_calls:
+                if _is_truncated(comp):
+                    # Cut off before a tool call; nudge it to continue rather
+                    # than scoring the bug a loss. Bounded to avoid spinning.
+                    consecutive_trunc += 1
+                    if consecutive_trunc >= 5:
+                        result.terminated_reason = "truncation_stuck"
+                        break
+                    messages.append({"role": "user", "content":
+                        "(Your previous reply was cut off before any tool call. "
+                        "Be concise and call a tool now.)"})
+                    log({"event": "truncation_continue", "turn": turn,
+                         "stop_reason": comp.stop_reason})
+                    continue
                 if _is_refusal(comp):
                     result.terminated_reason = "refusal"
                 elif _is_malformed(comp):
@@ -203,6 +225,7 @@ def run_episode(
                 else:
                     result.terminated_reason = "no_tool_use"
                 break
+            consecutive_trunc = 0
 
             results: list[ToolResult] = []
             for tc in comp.tool_calls:

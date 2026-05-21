@@ -72,7 +72,9 @@ class GeminiBackend:
             system_instruction=system,
             tools=[types.Tool(function_declarations=decls)],
             temperature=1.0,
-            max_output_tokens=max(max_tokens, 8192),
+            # Thinking tokens share this budget; a chatty/thinking model can
+            # otherwise hit MAX_TOKENS before emitting its function call.
+            max_output_tokens=max(max_tokens, 24576),
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
         )
         resp = self._client.models.generate_content(
