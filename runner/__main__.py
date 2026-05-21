@@ -131,6 +131,7 @@ def main() -> int:
         "tier_score": sum(1 for v in result.capabilities.values() if v == "fired"),
         "terminated_reason": result.terminated_reason,
         "refusal_retries": result.refusal_retries,
+        "malformed_retries": result.malformed_retries,
         "turns_used": result.turns_used,
         "duration_s": result.duration_s,
     }
