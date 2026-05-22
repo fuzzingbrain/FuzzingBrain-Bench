@@ -10,9 +10,11 @@
     table.bugs td.num, table.bugs th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
     table.bugs td.rank { color: var(--muted); width: 32px; }
     table.bugs td.model { font-weight: 600; white-space: nowrap; }
+    table.bugs th.solved, table.bugs td.solved { text-align: left; white-space: nowrap; font-variant-numeric: tabular-nums; }
     .bar { display:inline-block; height:8px; background:var(--accent); border-radius:999px; vertical-align:middle; margin-right:8px; }
     .refus { color: var(--accent); font-weight: 600; }
     .zero { color: var(--muted); }
+    .dag { color: var(--link); font-weight: 700; cursor: help; }
   </style>
 </head>
 <body>
@@ -39,9 +41,9 @@
 
   <div class="stats">
     <div class="stat"><div class="n">37</div><div class="lbl">bugs</div></div>
-    <div class="stat"><div class="n">10</div><div class="lbl">models</div></div>
+    <div class="stat"><div class="n">13</div><div class="lbl">models</div></div>
     <div class="stat"><div class="n">gpt-5.5</div><div class="lbl">top &middot; 35/37</div></div>
-    <div class="stat"><div class="n">1</div><div class="lbl">seed</div></div>
+    <div class="stat"><div class="n">40</div><div class="lbl">turns / episode</div></div>
   </div>
 
   <table class="bugs">
@@ -50,40 +52,53 @@
         <th class="rank">#</th>
         <th>Model</th>
         <th>Provider</th>
-        <th class="num">Solved</th>
+        <th class="solved">Solved</th>
         <th class="num">Refused</th>
         <th class="num">PoCs tested</th>
         <th class="num">Cost&nbsp;$</th>
       </tr>
     </thead>
     <tbody>
-      <tr><td class="rank">1</td><td class="model">gpt-5.5</td><td>OpenAI</td><td class="num"><span class="bar" style="width:88px"></span>35/37</td><td class="num zero">0</td><td class="num">79</td><td class="num">24.56</td></tr>
-      <tr><td class="rank">2</td><td class="model">claude-sonnet-4-6</td><td>Anthropic</td><td class="num"><span class="bar" style="width:78px"></span>31/37</td><td class="num zero">0</td><td class="num">109</td><td class="num">28.74</td></tr>
-      <tr><td class="rank">3</td><td class="model">gemini-3.5-flash</td><td>Google</td><td class="num"><span class="bar" style="width:68px"></span>27/37</td><td class="num zero">0</td><td class="num">38</td><td class="num">16.54</td></tr>
-      <tr><td class="rank">4</td><td class="model">gpt-5.4</td><td>OpenAI</td><td class="num"><span class="bar" style="width:60px"></span>24/37</td><td class="num zero">0</td><td class="num">198</td><td class="num">5.18</td></tr>
-      <tr><td class="rank">4</td><td class="model">gpt-5</td><td>OpenAI</td><td class="num"><span class="bar" style="width:60px"></span>24/37</td><td class="num zero">0</td><td class="num">296</td><td class="num">16.25</td></tr>
-      <tr><td class="rank">6</td><td class="model">claude-haiku-4-5</td><td>Anthropic</td><td class="num"><span class="bar" style="width:55px"></span>22/37</td><td class="num zero">0</td><td class="num">226</td><td class="num">10.67</td></tr>
-      <tr><td class="rank">7</td><td class="model">claude-opus-4-7</td><td>Anthropic</td><td class="num"><span class="bar" style="width:50px"></span>20/37</td><td class="num refus">15</td><td class="num">38</td><td class="num">27.24</td></tr>
-      <tr><td class="rank">8</td><td class="model">gpt-5.4-mini</td><td>OpenAI</td><td class="num"><span class="bar" style="width:35px"></span>14/37</td><td class="num zero">0</td><td class="num">115</td><td class="num">1.60</td></tr>
-      <tr><td class="rank">8</td><td class="model">gemini-2.5-flash</td><td>Google</td><td class="num"><span class="bar" style="width:35px"></span>14/37</td><td class="num zero">0</td><td class="num">150</td><td class="num">2.76</td></tr>
-      <tr><td class="rank">10</td><td class="model">gemini-2.5-flash-lite</td><td>Google</td><td class="num"><span class="bar" style="width:20px"></span>8/37</td><td class="num zero">0</td><td class="num">213</td><td class="num">0.79</td></tr>
+      <tr><td class="rank">1</td><td class="model">gpt-5.5</td><td>OpenAI</td><td class="solved"><span class="bar" style="width:83px"></span>35/37</td><td class="num zero">0</td><td class="num">79</td><td class="num">24.56</td></tr>
+      <tr><td class="rank">2</td><td class="model">claude-sonnet-4-6</td><td>Anthropic</td><td class="solved"><span class="bar" style="width:74px"></span>31/37</td><td class="num zero">0</td><td class="num">109</td><td class="num">28.74</td></tr>
+      <tr><td class="rank">2</td><td class="model">gemini-3-pro-preview <span class="dag" title="new grade feedback — see note">&dagger;</span></td><td>Google</td><td class="solved"><span class="bar" style="width:74px"></span>31/37</td><td class="num zero">0</td><td class="num">117</td><td class="num">19.01</td></tr>
+      <tr><td class="rank">4</td><td class="model">gemini-3.1-pro-preview <span class="dag" title="new grade feedback — see note">&dagger;</span></td><td>Google</td><td class="solved"><span class="bar" style="width:71px"></span>30/37</td><td class="num zero">0</td><td class="num">116</td><td class="num">17.46</td></tr>
+      <tr><td class="rank">5</td><td class="model">gemini-3.5-flash</td><td>Google</td><td class="solved"><span class="bar" style="width:64px"></span>27/37</td><td class="num zero">0</td><td class="num">38</td><td class="num">16.54</td></tr>
+      <tr><td class="rank">6</td><td class="model">gpt-5.4</td><td>OpenAI</td><td class="solved"><span class="bar" style="width:57px"></span>24/37</td><td class="num zero">0</td><td class="num">198</td><td class="num">5.18</td></tr>
+      <tr><td class="rank">6</td><td class="model">gpt-5</td><td>OpenAI</td><td class="solved"><span class="bar" style="width:57px"></span>24/37</td><td class="num zero">0</td><td class="num">296</td><td class="num">16.25</td></tr>
+      <tr><td class="rank">8</td><td class="model">claude-haiku-4-5</td><td>Anthropic</td><td class="solved"><span class="bar" style="width:52px"></span>22/37</td><td class="num zero">0</td><td class="num">226</td><td class="num">10.67</td></tr>
+      <tr><td class="rank">9</td><td class="model">claude-opus-4-7</td><td>Anthropic</td><td class="solved"><span class="bar" style="width:48px"></span>20/37</td><td class="num refus">15</td><td class="num">38</td><td class="num">27.24</td></tr>
+      <tr><td class="rank">10</td><td class="model">gemini-2.5-flash</td><td>Google</td><td class="solved"><span class="bar" style="width:33px"></span>14/37</td><td class="num zero">0</td><td class="num">150</td><td class="num">2.76</td></tr>
+      <tr><td class="rank">10</td><td class="model">gpt-5.4-mini</td><td>OpenAI</td><td class="solved"><span class="bar" style="width:33px"></span>14/37</td><td class="num zero">0</td><td class="num">115</td><td class="num">1.60</td></tr>
+      <tr><td class="rank">12</td><td class="model">gemini-2.5-pro <span class="dag" title="new grade feedback — see note">&dagger;</span></td><td>Google</td><td class="solved"><span class="bar" style="width:31px"></span>13/37</td><td class="num zero">0</td><td class="num">278</td><td class="num">12.44</td></tr>
+      <tr><td class="rank">13</td><td class="model">gemini-2.5-flash-lite</td><td>Google</td><td class="solved"><span class="bar" style="width:19px"></span>8/37</td><td class="num zero">0</td><td class="num">213</td><td class="num">0.79</td></tr>
     </tbody>
   </table>
 
+  <p class="note">
+    <span class="dag">&dagger;</span> <strong>Different feedback regime &mdash; not directly comparable.</strong>
+    The three daggered Gemini <em>pro</em> models ran under an improved grade()
+    that returns the <em>raw harness output</em> (the sanitizer crash report of
+    the model&rsquo;s own input), like a fuzzer; the other ten ran under the
+    earlier blind capability-bitmap feedback. Raw output lets a model iterate,
+    so daggered scores are likely a touch higher than they would be under the
+    old feedback. A consistent v2 will re-run all 13 under the new feedback.
+  </p>
+
   <h2>Reading the board</h2>
   <ul class="checklist">
-    <li><strong>gpt-5.5 leads at 35/37</strong>, and is also the most efficient &mdash; it solves with only ~2 candidate PoCs per bug, vs ~12 for gpt-5.</li>
-    <li><strong>opus-4-7 is held back by refusals, not capability.</strong> It declined 15/37 episodes of this authorized, already-disclosed-bug reproduction task; same-family sonnet-4-6 refused 0 and scored 31. We record refusals separately so &ldquo;won&rsquo;t&rdquo; is never scored as &ldquo;can&rsquo;t&rdquo;.</li>
+    <li><strong>gpt-5.5 leads at 35/37</strong>, and is the most efficient &mdash; ~2 candidate PoCs per solve, vs ~12 for gpt-5.</li>
+    <li><strong>Gemini 3 pro is strong</strong> (31 / 30), level with sonnet-4-6; but the older <strong>gemini-2.5-pro lands at just 13</strong> &mdash; &ldquo;pro&rdquo; doesn&rsquo;t mean newer, and a current flash beats a last-gen pro.</li>
+    <li><strong>opus-4-7 is held back by refusals, not capability:</strong> it declined 15/37 episodes of this authorized, already-disclosed-bug reproduction task; same-family sonnet refused 0 and scored 31. We log refusals separately so &ldquo;won&rsquo;t&rdquo; is never scored as &ldquo;can&rsquo;t&rdquo;.</li>
     <li><strong>Best value: gpt-5.4</strong> &mdash; 24/37 at $5.18.</li>
-    <li><strong>Hardest bug:</strong> the ICU transliterator memory-leak was solved by no model (its reference PoC reproduces &mdash; it&rsquo;s genuinely hard: a leak detected only at exit, with no crash to guide the agent).</li>
+    <li><strong>Hardest bug:</strong> the ICU transliterator memory-leak was solved by no model (its reference PoC reproduces &mdash; genuinely hard: a leak detected only at exit, with no crash to guide the agent).</li>
   </ul>
 
   <p class="note">
     <strong>Pilot, single seed.</strong> Per-cell results vary run-to-run at
     temperature 1.0 (a re-run flipped ~13/37 cells), so treat each number as
-    &plusmn;several &mdash; robust ranking needs multi-seed best-of-N. The three
-    Gemini <em>pro</em> models are not yet included. Full method, per-bug detail,
-    and the harness fixes made during this run are in
+    &plusmn;several &mdash; robust ranking needs multi-seed best-of-N. Full
+    method, per-bug detail, and the harness fixes made during this run are in
     <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench/blob/main/docs/RESULTS-v1.md" target="_blank" rel="noopener">RESULTS-v1.md</a>.
   </p>
 </main>

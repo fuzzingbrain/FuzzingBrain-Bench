@@ -12,21 +12,30 @@ unanimous. R/C/Cl/S = bugs where reach / crash / class / site fired. `refus` =
 episodes the model refused (recorded distinctly from failure). `blobs` =
 candidate PoCs tested (grade() calls). Cost is USD at May-2026 list prices.
 
-| # | model | provider | solved | R | C | Cl | S | refus | blobs | cost $ |
-|--:|---|---|--:|--:|--:|--:|--:|--:|--:|--:|
-| 1 | gpt-5.5 | OpenAI | **35/37** | 23 | 33 | 34 | 29 | 0 | 79 | 24.56 |
-| 2 | claude-sonnet-4-6 | Anthropic | 31/37 | 23 | 28 | 30 | 28 | 0 | 109 | 28.74 |
-| 3 | gemini-3.5-flash | Google | 27/37 | 19 | 28 | 27 | 24 | 0 | 38 | 16.54 |
-| 4 | gpt-5.4 | OpenAI | 24/37 | 16 | 25 | 24 | 22 | 0 | 198 | **5.18** |
-| 4 | gpt-5 | OpenAI | 24/37 | 16 | 23 | 23 | 22 | 0 | 296 | 16.25 |
-| 6 | claude-haiku-4-5 | Anthropic | 22/37 | 15 | 21 | 21 | 20 | 0 | 226 | 10.67 |
-| 7 | claude-opus-4-7 | Anthropic | 20/37 | 14 | 19 | 19 | 17 | **15** | 38 | 27.24 |
-| 8 | gpt-5.4-mini | OpenAI | 14/37 | 10 | 15 | 14 | 14 | 0 | 115 | 1.60 |
-| 8 | gemini-2.5-flash | Google | 14/37 | 12 | 16 | 13 | 16 | 0 | 150 | 2.76 |
-| 10 | gemini-2.5-flash-lite | Google | 8/37 | 6 | 10 | 7 | 8 | 0 | 213 | 0.79 |
+`†` = ran under the **new** grade feedback (raw harness output); all others
+under the original blind capability-bitmap feedback. **Daggered scores are not
+directly comparable** to the rest (see *Caveats*).
 
-Total spend for the 10-model sweep: **~$134**. The 3 Gemini *pro* models are
-pending (run on a separate key).
+| # | model | provider | solved | refus | blobs | cost $ |
+|--:|---|---|--:|--:|--:|--:|
+| 1 | gpt-5.5 | OpenAI | **35/37** | 0 | 79 | 24.56 |
+| 2 | claude-sonnet-4-6 | Anthropic | 31/37 | 0 | 109 | 28.74 |
+| 2 | gemini-3-pro-preview † | Google | 31/37 | 0 | 117 | 19.01 |
+| 4 | gemini-3.1-pro-preview † | Google | 30/37 | 0 | 116 | 17.46 |
+| 5 | gemini-3.5-flash | Google | 27/37 | 0 | 38 | 16.54 |
+| 6 | gpt-5.4 | OpenAI | 24/37 | 0 | 198 | **5.18** |
+| 6 | gpt-5 | OpenAI | 24/37 | 0 | 296 | 16.25 |
+| 8 | claude-haiku-4-5 | Anthropic | 22/37 | 0 | 226 | 10.67 |
+| 9 | claude-opus-4-7 | Anthropic | 20/37 | **15** | 38 | 27.24 |
+| 10 | gemini-2.5-flash | Google | 14/37 | 0 | 150 | 2.76 |
+| 10 | gpt-5.4-mini | OpenAI | 14/37 | 0 | 115 | 1.60 |
+| 12 | gemini-2.5-pro † | Google | 13/37 | 0 | 278 | 12.44 |
+| 13 | gemini-2.5-flash-lite | Google | 8/37 | 0 | 213 | 0.79 |
+
+All 13 catalogue models now run. Total spend ~$183. The 3 Gemini *pro* models
+(†) ran under the new raw-output feedback and graded 37/37 each (the new
+feedback eliminated the explore-instead-of-test pattern seen on Gemini flash
+under the old blind feedback).
 
 ## Method
 
@@ -76,7 +85,12 @@ pending (run on a separate key).
   ran under the new prompt; the rest under the old one. The change is near-neutral
   for models that already grade reliably (OpenAI/Anthropic) but lifted Gemini
   flash (which otherwise burned turns exploring instead of testing).
-- **Gemini pro tier not included** here (separate key).
+- **Mixed feedback regime (†).** The 3 Gemini pro models ran under an improved
+  grade() that returns the raw harness output (sanitizer report of the model's
+  own input), like a fuzzer; the other 10 ran under the earlier blind
+  capability-bitmap feedback. Raw output aids iteration, so the daggered scores
+  are likely slightly higher than they'd be under the old feedback. A clean v2
+  re-runs all 13 under the new feedback for a comparable board.
 
 ## Harness artifacts found & fixed during the run
 
