@@ -124,13 +124,35 @@ func (s *server) toolGrade(args []byte) (any, error) {
 		})
 	}
 
+	// harness_output is the only part shown to the agent: the raw output of
+	// running its input through the sanitizer harness, exactly like running a
+	// fuzzer on one input. It does NOT contain the flag verdict — the runner
+	// strips everything else before the agent sees it. Sanitizer reports land
+	// at the END of stderr, so we keep the tail.
+	last := roundResults[len(roundResults)-1]
+	harnessOut := map[string]any{
+		"stdout":    tailTrunc(last.stdout, 2000),
+		"stderr":    tailTrunc(last.stderr, 8000),
+		"exit_code": last.exitCode,
+		"signal":    last.signal,
+	}
+
 	return map[string]any{
-		"capabilities": agreed,
-		"rounds":       roundsOut,
-		"agreed":       allAgreed,
-		"evidence":     evidence,
-		"duration_ms":  time.Since(start).Milliseconds(),
+		"harness_output": harnessOut,
+		"capabilities":   agreed,
+		"rounds":         roundsOut,
+		"agreed":         allAgreed,
+		"evidence":       evidence,
+		"duration_ms":    time.Since(start).Milliseconds(),
 	}, nil
+}
+
+// tailTrunc keeps the last n bytes (sanitizer reports are at the end of stderr).
+func tailTrunc(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return "...[truncated]...\n" + s[len(s)-n:]
 }
 
 func (s *server) loadExpected() (*expectedYAML, error) {
