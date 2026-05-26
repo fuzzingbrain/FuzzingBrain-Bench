@@ -37,6 +37,37 @@ All 13 catalogue models now run. Total spend ~$183. The 3 Gemini *pro* models
 feedback eliminated the explore-instead-of-test pattern seen on Gemini flash
 under the old blind feedback).
 
+## Product CLI arm (secondary)
+
+Mirroring ExploitBench's `⟨model, env, CLI⟩` arm: same 37 bugs, same MCP
+`bench:grade()`, but the agent is the full vendor CLI product instead of a
+model wired through our six-tool scaffold. This isolates *scaffold* effects
+from *model* capability.
+
+| Product | Underlying model | Solved | Refused | PoCs tested | Cost | Cheat-block |
+|---|---|--:|--:|--:|---|---|
+| codex CLI | gpt-5.5 | **24/37** | 0 | 1,229 | $0 (ChatGPT bundled) / 3.2M tokens | 0 web-search after disabling shell_tool / browser_use / apps / in_app_browser / tool_search |
+
+**Scaffold lift was negative on this task.** Codex (gpt-5.5 + OpenAI's product
+scaffold) scored 24/37 under the new raw-output feedback; the same underlying
+model in the bare-model arm scored 35/37 even under the older blind-bitmap
+feedback. The product's planning, TodoWrite, and broader tool catalogue did
+not help on tightly-defined reproduction — consistent with ExploitBench's
+small/negative reported scaffold lift on vendor CLIs.
+
+**Cheat surface caught and blocked.** In an initial unrestricted spike on
+mongoose, Codex web-searched the upstream GitHub issue and got 4/4 PASS in
+2.5 min — discarded as invalid. With the disables above (and an explicit
+"no web" task nudge), the locked-down rerun is the result we report; 0 web
+cheats observed across all 37 cells. Codex's `workspace-write` sandbox
+does NOT restrict filesystem reads outside cwd, so disabling its shell and
+web tools is essential; the bench MCP server's `read_file` deny-list catches
+oracle paths from the MCP side.
+
+ChatGPT subscription hit its usage cap twice during the sweep (~15 bugs per
+hit before reset); the orchestrator (`scripts/sweep_codex.py`) is resumable
+and was relaunched after each reset.
+
 ## Method
 
 - Same scaffold for every model: 6 MCP tools (`setup`, `exec`,
