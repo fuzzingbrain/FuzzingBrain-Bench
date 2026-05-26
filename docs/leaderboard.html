@@ -85,6 +85,50 @@
     old feedback. A consistent v2 will re-run all 13 under the new feedback.
   </p>
 
+  <h2>Product CLI arm <span class="accent">&middot; secondary</span></h2>
+  <p class="lead">
+    Same 37 bugs, same MCP <code>bench:grade()</code>, but the agent is the
+    full vendor CLI product (its own planner, tool catalog, and loop) instead
+    of a model wired through our six-tool scaffold. This isolates
+    <em>scaffold</em> effects from <em>model</em> capability &mdash; mirroring
+    ExploitBench&rsquo;s &lang;model, env, CLI&rang; arm.
+  </p>
+
+  <table class="bugs">
+    <thead>
+      <tr>
+        <th>Product</th>
+        <th>Underlying model</th>
+        <th class="solved">Solved</th>
+        <th class="num">Refused</th>
+        <th class="num">PoCs tested</th>
+        <th>Cheat-block</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="model">codex CLI</td>
+        <td>gpt-5.5</td>
+        <td class="solved"><span class="bar" style="width:57px"></span>24/37</td>
+        <td class="num zero">0</td>
+        <td class="num">1,229</td>
+        <td><span class="zero">0 web-search</span> after disabling shell_tool / browser_use / apps / in_app_browser / tool_search</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <p class="note">
+    <strong>Scaffold matters &mdash; and not always in the product&rsquo;s favour.</strong>
+    Codex (gpt-5.5 + OpenAI&rsquo;s product scaffold) scored 24/37 under the new raw-output feedback;
+    the same underlying model in the bare-model arm above scored 35/37 even under the
+    older, less-informative blind-bitmap feedback. The product&rsquo;s extra planning,
+    TodoWrite, and broader tool catalogue did not help on this tightly-defined
+    reproduction task &mdash; consistent with ExploitBench&rsquo;s small/negative
+    scaffold lift. Caveat: in an unrestricted spike Codex web-searched the upstream
+    issue and got 4/4 in 2.5 min; that result was discarded and the locked-down rerun
+    (above) is what we report.
+  </p>
+
   <h2>Reading the board</h2>
   <ul class="checklist">
     <li><strong>gpt-5.5 leads at 35/37</strong>, and is the most efficient &mdash; ~2 candidate PoCs per solve, vs ~12 for gpt-5.</li>
