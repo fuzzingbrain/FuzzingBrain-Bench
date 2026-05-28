@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 """Batch orchestrator for FuzzingBrain Bench.
 
-Runs a (models x bugs x seeds) matrix through `python -m runner`, one episode
-per subprocess (isolated + per-episode timeout), resumable (skips cells whose
-score.json already exists), with a live cost tally and a final leaderboard.
+Runs a (models x bugs x samples) matrix through `python -m runner`, one
+episode per subprocess (isolated + per-episode timeout), resumable (skips
+cells whose score.json already exists), with a live cost tally and a final
+leaderboard. Each cell lands at runs/<bug>/<model>/seed-N/ where N is the
+sample index (kept named `seed-N` for back-compat with the legacy 518-row
+dataset; the runner itself has no --seed arg).
 
 Examples:
-  # cost probe: opus on 5 bugs, 1 seed
+  # cost probe: opus on 5 bugs, 1 sample
   python scripts/sweep.py --models claude-opus-4-7 \\
       --bugs mongoose-mg-match-overflow,netsnmp-vacm-parse-npd,jsonjava-jsonml-classcast,simdutf-utf16-utf8-overflow,openldap-parse-whsp
 
-  # full sweep, default lineup
-  python scripts/sweep.py --models sweep --bugs all --seeds 1
+  # full sweep, default lineup, 2 samples per (model, bug) for best-of-2 union
+  python scripts/sweep.py --models sweep --bugs all --samples 0,1
+
+  # keep every graded blob (bucketed by solved/failed)
+  python scripts/sweep.py --models sweep --bugs all --samples 0 --preserve-pocs
 
   # just re-aggregate the leaderboard from existing runs/
   python scripts/sweep.py --report-only
@@ -54,8 +60,13 @@ def resolve_bugs(spec: str) -> list[str]:
     return want
 
 
-def cell_dir(out: Path, bug: str, model: str, seed: int) -> Path:
-    return out / bug / model / f"seed-{seed}"
+def cell_dir(out: Path, bug: str, model: str, sample: int) -> Path:
+    """Per-cell output dir. `sample` indexes repeat runs of (bug, model).
+
+    Keeps the legacy `seed-N` directory naming for back-compat with the
+    518 existing data points; the integer no longer drives sampling
+    (runner has no --seed arg) — it is purely a directory label."""
+    return out / bug / model / f"seed-{sample}"
 
 
 def bug_kb(bug: str) -> list[str]:
@@ -68,16 +79,20 @@ def bug_kb(bug: str) -> list[str]:
     return ["reach", "crash", "class", "site"]
 
 
-def run_cell(model: str, bug: str, seed: int, max_turns: int, out: Path,
-             timeout: int) -> dict | None:
-    cmd = RUNNER + ["--bug", bug, "--model", model, "--seed", str(seed),
-                    "--max-turns", str(max_turns), "--output", str(out)]
+def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
+             timeout: int, preserve_pocs: bool = False) -> dict | None:
+    cd = cell_dir(out, bug, model, sample)
+    cmd = RUNNER + ["--bug", bug, "--model", model,
+                    "--max-turns", str(max_turns),
+                    "--out-dir", str(cd)]
+    if preserve_pocs:
+        cmd.append("--preserve-pocs")
     try:
         subprocess.run(cmd, cwd=REPO, timeout=timeout,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     except subprocess.TimeoutExpired:
         return {"error": "timeout"}
-    sj = cell_dir(out, bug, model, seed) / "score.json"
+    sj = cd / "score.json"
     return json.loads(sj.read_text()) if sj.is_file() else {"error": "no score.json"}
 
 
@@ -126,8 +141,12 @@ def main() -> int:
     ap.add_argument("--models", default="claude-opus-4-7",
                     help="'sweep' | 'all' | comma list of model ids")
     ap.add_argument("--bugs", default="all", help="'all' | comma list of bug ids")
-    ap.add_argument("--seeds", default="0", help="comma list, e.g. 0,1,2")
-    ap.add_argument("--max-turns", type=int, default=40)
+    ap.add_argument("--samples", "--seeds", dest="samples", default="0",
+                    help="comma list of repeat indices, e.g. 0,1,2 — each sample is one independent run")
+    ap.add_argument("--preserve-pocs", action="store_true",
+                    help="forward --preserve-pocs to runner (save every graded blob)")
+    ap.add_argument("--max-turns", type=int, default=300,
+                    help="turn budget per episode (default 300, matches ExploitBench)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-episode seconds")
     ap.add_argument("--output", default=str(REPO / "runs"))
     ap.add_argument("--report-only", action="store_true",
@@ -137,25 +156,26 @@ def main() -> int:
     out = Path(args.output)
     models = resolve_models(args.models)
     bugs = resolve_bugs(args.bugs)
-    seeds = [int(s) for s in args.seeds.split(",") if s.strip() != ""]
+    samples = [int(s) for s in args.samples.split(",") if s.strip() != ""]
 
     if args.report_only:
-        aggregate(out, models, bugs, seeds)
+        aggregate(out, models, bugs, samples)
         return 0
 
-    cells = [(m, b, s) for m in models for b in bugs for s in seeds]
+    cells = [(m, b, s) for m in models for b in bugs for s in samples]
     done = sum(1 for m, b, s in cells if (cell_dir(out, b, m, s) / "score.json").is_file())
-    print(f"  sweep: {len(models)} models x {len(bugs)} bugs x {len(seeds)} seeds "
+    print(f"  sweep: {len(models)} models x {len(bugs)} bugs x {len(samples)} samples "
           f"= {len(cells)} cells ({done} already done, {len(cells)-done} to run)")
 
     total_cost = 0.0
     t0 = time.time()
-    for i, (model, bug, seed) in enumerate(cells, 1):
-        if (cell_dir(out, bug, model, seed) / "score.json").is_file():
+    for i, (model, bug, sample) in enumerate(cells, 1):
+        if (cell_dir(out, bug, model, sample) / "score.json").is_file():
             continue
-        tag = f"[{i}/{len(cells)}] {model} / {bug} / s{seed}"
+        tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
         print(f"  {tag} ...", flush=True)
-        r = run_cell(model, bug, seed, args.max_turns, out, args.timeout)
+        r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
+                     preserve_pocs=args.preserve_pocs)
         if r and "error" not in r:
             c = r.get("total_usd") or 0.0
             total_cost += c
@@ -166,7 +186,7 @@ def main() -> int:
             print(f"      -> FAILED: {r.get('error') if r else 'unknown'}", flush=True)
 
     print(f"\n  done in {time.time()-t0:.0f}s, spent ~${total_cost:.2f} this run")
-    aggregate(out, models, bugs, seeds)
+    aggregate(out, models, bugs, samples)
     return 0
 
 

@@ -50,9 +50,8 @@ def _params(input_schema: dict):
 
 
 class GeminiBackend:
-    def __init__(self, model: str, api_key: str | None = None, seed: int = 0):
+    def __init__(self, model: str, api_key: str | None = None):
         self.model = model
-        self.seed = seed
         self._client = genai.Client(
             api_key=api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
         self._n = 0  # synthetic call-id counter

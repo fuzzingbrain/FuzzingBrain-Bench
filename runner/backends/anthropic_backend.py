@@ -9,9 +9,8 @@ from .base import Completion, ToolCall
 
 
 class AnthropicBackend:
-    def __init__(self, model: str, api_key: str | None = None, seed: int = 0):
+    def __init__(self, model: str, api_key: str | None = None):
         self.model = model
-        self.seed = seed
         self._client = anthropic.Anthropic(
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
 
@@ -48,7 +47,7 @@ class AnthropicBackend:
             tools=api_tools,
             messages=self._to_blocks(messages),
             temperature=1.0,
-            metadata={"user_id": f"fbbench-seed-{self.seed}"},
+            metadata={"user_id": "fbbench"},
         )
         c = Completion(stop_reason=resp.stop_reason or "")
         for block in resp.content:

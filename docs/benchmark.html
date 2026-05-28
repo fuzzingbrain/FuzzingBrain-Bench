@@ -112,23 +112,19 @@
 <pre><code>git clone https://github.com/OwenSanzas/FuzzingBrain-Bench
 cd FuzzingBrain-Bench
 
-# Build the MCP server (Go 1.22+)
-go -C tools/mcp-server build -o ../../bin/mcp-server
+# One-liner: auto-builds MCP server, auto-detects provider key from .env
+echo 'ANTHROPIC_API_KEY=sk-ant-...' &gt; .env    # or OPENAI_API_KEY / GEMINI_API_KEY
+./fb-bench run netsnmp-vacm-parse-npd
 
-# Install runner deps
-pip install -r runner/requirements.txt
-export ANTHROPIC_API_KEY=...
-
-# Drive one episode
-python -m runner \
-  --bug netsnmp-vacm-parse-npd \
-  --model claude-opus-4-7 \
-  --seed 0 \
-  --max-turns 60 \
-  --output runs/</code></pre>
+# Other models / custom output dir:
+./fb-bench run mongoose-mg-match-overflow --model gpt-5.5
+./fb-bench run icu-translit-rule-uaf --model gemini-3-pro-preview -o /tmp/my-run</code></pre>
   <p>
-    Produces <code>runs/&lt;bug&gt;/&lt;model&gt;/seed-&lt;n&gt;/{episode.jsonl,score.json,cost.json}</code>.
-    To run all bugs / all seeds, drive the same command with <code>xargs</code>.
+    Produces <code>&lt;output-dir&gt;/{episode.jsonl,score.json,cost.json}</code>.
+    No <code>--output</code>? <code>fb-bench</code> auto-picks the next unused
+    <code>runs/&lt;bug&gt;/&lt;model&gt;/run-N/</code> so reruns never collide.
+    To run all bugs in parallel, drive <code>./fb-bench run</code> with
+    <code>xargs -P</code>.
   </p>
 
   <h2>Reproducing a bug by hand</h2>

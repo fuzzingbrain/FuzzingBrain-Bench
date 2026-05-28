@@ -19,9 +19,8 @@ def _is_reasoning(model: str) -> bool:
 
 
 class OpenAIBackend:
-    def __init__(self, model: str, api_key: str | None = None, seed: int = 0):
+    def __init__(self, model: str, api_key: str | None = None):
         self.model = model
-        self.seed = seed
         self._client = openai.OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
 
     def _to_messages(self, system: str, messages: list[dict]) -> list[dict]:

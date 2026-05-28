@@ -6,6 +6,7 @@ Usage:
     fb-bench show  <bug>                 print bug description + K_b
     fb-bench grade <bug> [<blob>]        grade <blob> (default: bug's poc.bin)
     fb-bench grade-all [--include-slow]  grade every bug's reference poc, table
+    fb-bench run   <bug> [--model M]     drive an LLM agent through one bug
 
 Exit code: 0 if every required flag fired unanimously; 1 otherwise.
 """
@@ -215,6 +216,183 @@ def cmd_grade(args) -> int:
     return 0 if kb_ok else 1
 
 
+# Default model per provider, chosen when the user did not pass --model.
+# Picks the cheapest flagship/mid tier per provider — sane "just works"
+# starting point that you can override with --model.
+_PROVIDER_DEFAULT = {
+    "anthropic": "claude-opus-4-7",
+    "openai":    "gpt-5.5",
+    "gemini":    "gemini-3-pro-preview",
+}
+_PROVIDER_KEY_ENV = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "openai":    "OPENAI_API_KEY",
+    "gemini":    "GEMINI_API_KEY",
+}
+
+
+def _load_dotenv() -> dict:
+    """Best-effort .env reader. Returns {key: value} found in ./.env."""
+    env_path = REPO / ".env"
+    out: dict[str, str] = {}
+    if env_path.is_file():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            k, v = line.split("=", 1)
+            out[k.strip()] = v.strip().strip('"\'')
+    return out
+
+
+def _detect_provider() -> tuple[str | None, list[str]]:
+    """Return (chosen_provider, providers_with_keys)."""
+    env_combined = {**_load_dotenv(), **os.environ}
+    have = [p for p, key in _PROVIDER_KEY_ENV.items() if env_combined.get(key)]
+    # Prefer Anthropic if available (matches the SPEC's headline default), then
+    # OpenAI, then Gemini — chosen for cost/quality balance, not arbitrary.
+    for p in ("anthropic", "openai", "gemini"):
+        if p in have:
+            return p, have
+    return None, have
+
+
+def _route_provider(model_id: str) -> str:
+    m = model_id.lower()
+    if m.startswith("claude"):   return "anthropic"
+    if m.startswith(("gpt-", "gpt5", "o1", "o3", "o4", "chatgpt")):
+        return "openai"
+    if m.startswith(("gemini", "gemma")):
+        return "gemini"
+    return "unknown"
+
+
+def cmd_run(args) -> int:
+    """Drive an LLM agent through one bug. Wraps `python -m runner`.
+
+    Auto-builds bin/mcp-server, provisions .venv on first use, loads
+    provider API key from .env, and — if --model is omitted — picks a sane
+    default model based on which provider's key you have.
+    """
+    find_bug(args.bug_id)  # validate bug exists before any setup work
+
+    # ---- model + key resolution -------------------------------------------
+    env_combined = {**_load_dotenv(), **os.environ}
+
+    if args.model is None:
+        provider, have = _detect_provider()
+        if provider is None:
+            sys.exit(_red(
+                "  no provider API key found.\n"
+                "  put one into ./.env (or export it):\n"
+                "    ANTHROPIC_API_KEY=sk-ant-...   # claude-* models\n"
+                "    OPENAI_API_KEY=sk-...          # gpt-* models\n"
+                "    GEMINI_API_KEY=...             # gemini-* models\n"
+                "  see `./fb-bench models` for the full list."))
+        model = _PROVIDER_DEFAULT[provider]
+        print(_dim(f"  no --model given; using {model} "
+                   f"(detected {_PROVIDER_KEY_ENV[provider]} in .env)"))
+        if len(have) > 1:
+            others = ", ".join(_PROVIDER_DEFAULT[p] for p in have if p != provider)
+            print(_dim(f"  other providers available too: {others}"))
+    else:
+        model = args.model
+        provider = _route_provider(model)
+        if provider == "unknown":
+            sys.exit(_red(f"  cannot route model {model!r} to a provider "
+                          "(expected claude*/gpt*/gemini*)"))
+        if not args.api_key and not env_combined.get(_PROVIDER_KEY_ENV[provider]):
+            sys.exit(_red(
+                f"  model {model!r} needs ${_PROVIDER_KEY_ENV[provider]} "
+                f"but it is not set in ./.env or env.\n"
+                f"  add it to ./.env or pass --api-key."))
+
+    # ---- build + venv -----------------------------------------------------
+    if not SERVER.exists():
+        print(_dim("  bin/mcp-server missing — building (requires go ≥ 1.22)…"))
+        if subprocess.call(["make", "mcp-server"], cwd=str(REPO)) != 0:
+            sys.exit(_red("  build failed; run `make mcp-server` manually"))
+
+    venv_py = REPO / ".venv" / "bin" / "python"
+    if not venv_py.is_file():
+        print(_dim("  .venv missing — running `make setup` (one-time)…"))
+        if subprocess.call(["make", "setup"], cwd=str(REPO)) != 0:
+            sys.exit(_red("  setup failed; run `make setup` manually"))
+
+    # ---- pick output dir --------------------------------------------------
+    if args.output:
+        out_dir = Path(args.output)
+    else:
+        # No --output: drop the result in the next unused
+        # runs/<bug>/<model>/run-N/ — N is the smallest int that doesn't
+        # collide. Past data lives at runs/<bug>/<model>/seed-N/, so we use
+        # run-N to avoid mixing two naming conventions in one directory.
+        base = REPO / "runs" / args.bug_id / model
+        base.mkdir(parents=True, exist_ok=True)
+        n = 0
+        while (base / f"run-{n}").exists():
+            n += 1
+        out_dir = base / f"run-{n}"
+
+    # ---- invoke runner ----------------------------------------------------
+    cmd = [str(venv_py), "-m", "runner",
+           "--bug", args.bug_id,
+           "--model", model,
+           "--max-turns", str(args.max_turns),
+           "--out-dir", str(out_dir)]
+    if args.api_key:
+        cmd += ["--api-key", args.api_key]
+    if args.preserve_pocs:
+        cmd.append("--preserve-pocs")
+
+    print()
+    print(_bold("  fb-bench run  ") + _cyan(args.bug_id) +
+          _dim(f"  model={model}  max-turns={args.max_turns}"))
+    print(_dim(f"  output:    {out_dir}"))
+    print()
+    return subprocess.call(cmd, cwd=str(REPO))
+
+
+def _load_catalog() -> tuple[list[tuple[str, str, str]], dict[str, tuple[float, float]]]:
+    """Read CATALOG + PRICES from runner/{registry,pricing}.py — single source
+    of truth. Both modules are stdlib-only and import without the venv."""
+    sys.path.insert(0, str(REPO / "runner"))
+    try:
+        from registry import CATALOG          # type: ignore
+        from pricing  import PRICES           # type: ignore
+    finally:
+        sys.path.pop(0)
+    return CATALOG, PRICES
+
+
+def cmd_models(_args) -> int:
+    """List supported models per provider with prices and key-availability."""
+    catalog, prices = _load_catalog()
+    env_combined = {**_load_dotenv(), **os.environ}
+    have = {p: bool(env_combined.get(k)) for p, k in _PROVIDER_KEY_ENV.items()}
+
+    print()
+    print(_bold(f"  fb-bench models  — {len(catalog)} supported"))
+    print()
+    print(f"  {'model':<26s} {'provider':<10s} {'tier':<9s} "
+          f"{'in $/M':>7s} {'out $/M':>8s}  key?  default")
+    print(_dim(f"  {'-'*26} {'-'*10} {'-'*9} {'-'*7} {'-'*8}  ----  -------"))
+    for m, prov, tier in catalog:
+        rate = prices.get(m)
+        ins  = f"{rate[0]:.2f}" if rate else "?"
+        outs = f"{rate[1]:.2f}" if rate else "?"
+        keyc = _green("yes") if have[prov] else _red("no ")
+        is_default = _cyan(" ✓") if _PROVIDER_DEFAULT[prov] == m else ""
+        print(f"  {m:<26s} {prov:<10s} {tier:<9s} "
+              f"{ins:>7s} {outs:>8s}  {keyc}   {is_default}")
+    print()
+    print(_dim("  `./fb-bench run <bug>` (no --model) auto-picks a default "
+               "for the provider whose key you have."))
+    print(_dim("  prices = USD per 1M tokens (input / output, list rate)."))
+    print()
+    return 0
+
+
 SLOW_BUGS = {
     "openssl-des-ofb-cfb-overread",
     "imagemagick-msl-comment-npd",
@@ -311,6 +489,25 @@ def main() -> int:
     sp_grade.add_argument("-v", "--verbose", action="store_true",
                           help="print oracle evidence")
     sp_grade.set_defaults(fn=cmd_grade)
+
+    sp_run = sub.add_parser("run",
+                            help="drive an LLM agent through one bug (one-liner)")
+    sp_run.add_argument("bug_id")
+    sp_run.add_argument("--model", default=None,
+                        help="model id (default: auto-pick from provider key in .env)")
+    sp_run.add_argument("--max-turns", type=int, default=300,
+                        help="turn budget (default: 300, matches ExploitBench)")
+    sp_run.add_argument("--output", "-o", default=None,
+                        help="output dir (default: auto-pick runs/<bug>/<model>/run-N/)")
+    sp_run.add_argument("--preserve-pocs", action="store_true",
+                        help="save every graded blob into <out>/pocs/{solved,failed}/")
+    sp_run.add_argument("--api-key", default=None,
+                        help="provider API key; default reads ./.env")
+    sp_run.set_defaults(fn=cmd_run)
+
+    sub.add_parser("models",
+                   help="list supported models + show which provider keys are loaded"
+                   ).set_defaults(fn=cmd_models)
 
     sp_all = sub.add_parser("grade-all",
                             help="grade every bug's reference poc (smoke test for the install)")
