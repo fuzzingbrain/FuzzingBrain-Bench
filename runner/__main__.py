@@ -3,11 +3,15 @@
 Usage:
   python -m runner --bug netsnmp-vacm-parse-npd \\
                    --model claude-opus-4-7 \\
-                   --seed 0 \\
                    --max-turns 60 \\
-                   --output runs/
+                   --out-dir runs/my-experiment/
 
-Each (model, bug, seed) run becomes runs/<bug_id>/<model>/seed-<n>/.
+Or with the legacy nesting (kept for batch sweep scripts):
+  python -m runner --bug X --model Y --output runs/   # -> runs/X/Y/
+
+For most workflows use `./fb-bench run <bug>` from the repo root — it
+wraps this entry, picks a model from your .env, and auto-creates a
+unique output dir.
 """
 from __future__ import annotations
 
@@ -68,13 +72,29 @@ def print_models() -> None:
     print()
 
 
+def _read_capability_set(bug_dir: Path) -> list[str]:
+    """Pull capability_set from bench.yaml (single line, no full YAML lib)."""
+    text = (bug_dir / "bench.yaml").read_text()
+    for line in text.splitlines():
+        s = line.split("#", 1)[0].strip()
+        if s.startswith("capability_set:"):
+            v = s.split(":", 1)[1].strip()
+            if v.startswith("[") and v.endswith("]"):
+                return [t.strip().strip('"\'') for t in v[1:-1].split(",") if t.strip()]
+    return []
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="FuzzingBrain Bench runner")
     ap.add_argument("--bug", help="bug_id (e.g. netsnmp-vacm-parse-npd)")
     ap.add_argument("--model", default="claude-opus-4-7", help="model id (claude*/gpt*/gemini*)")
-    ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--max-turns", type=int, default=60)
-    ap.add_argument("--output", default="runs", help="output directory root")
+    ap.add_argument("--max-turns", type=int, default=300,
+                    help="turn budget per episode (default 300, matches ExploitBench v8.yaml)")
+    ap.add_argument("--output", default="runs", help="output root (legacy nesting <output>/<bug>/<model>/)")
+    ap.add_argument("--out-dir", default=None,
+                    help="literal output dir; takes precedence over --output")
+    ap.add_argument("--preserve-pocs", action="store_true",
+                    help="save every graded candidate blob into pocs/{solved,failed}/")
     ap.add_argument("--server-bin", default=None,
                     help="path to mcp-server binary (default: ./bin/mcp-server)")
     ap.add_argument("--repo-root", default=None,
@@ -99,14 +119,16 @@ def main() -> int:
         return 2
 
     bug_dir = find_bug_dir(repo_root, args.bug)
-    out_dir = Path(args.output) / args.bug / args.model / f"seed-{args.seed}"
+    out_dir = (Path(args.out_dir) if args.out_dir
+               else Path(args.output) / args.bug / args.model)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     workspace = tempfile.mkdtemp(prefix=f"fbbench-{args.bug}-")
     # Agent sees a staged sandbox (no grader/, poc/, binaries/); the grader
     # reads the answer key + ground-truth binaries from the real bug dir.
     bug_view = stage_bug_view(str(bug_dir))
-    backend = make_backend(args.model, api_key=args.api_key, seed=args.seed)
+    backend = make_backend(args.model, api_key=args.api_key)
+    pocs_dir = (out_dir / "pocs") if args.preserve_pocs else None
     try:
         result = run_episode(
             backend=backend,
@@ -115,9 +137,10 @@ def main() -> int:
             oracle_dir=str(bug_dir),
             workspace=workspace,
             server_bin=server_bin,
-            seed=args.seed,
             max_turns=args.max_turns,
             episode_log=str(out_dir / "episode.jsonl"),
+            capability_set=_read_capability_set(bug_dir),
+            pocs_dir=str(pocs_dir) if pocs_dir else None,
         )
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
@@ -126,7 +149,6 @@ def main() -> int:
     score = {
         "bug_id": result.bug_id,
         "model": result.model,
-        "seed": result.seed,
         "capabilities": result.capabilities,
         "tier_score": sum(1 for v in result.capabilities.values() if v == "fired"),
         "terminated_reason": result.terminated_reason,
