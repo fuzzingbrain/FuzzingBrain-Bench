@@ -55,9 +55,14 @@ def provider_for(model_id: str) -> str:
         return "openai"
     if m.startswith(("gemini", "gemma")):
         return "gemini"
+    # Open models served via an OpenAI-compatible endpoint (e.g. a local Ollama
+    # at http://localhost:11434/v1). The OpenAI backend detects these by prefix
+    # and points the client at OLLAMA_BASE_URL instead of api.openai.com.
+    if m.startswith(("llama", "codellama", "ollama")):
+        return "openai"
     raise ValueError(
         f"cannot route model id {model_id!r} to a provider "
-        "(expected claude*/gpt*/o3*/o4*/gemini*/gemma*)"
+        "(expected claude*/gpt*/o3*/o4*/gemini*/gemma*/llama*)"
     )
 
 

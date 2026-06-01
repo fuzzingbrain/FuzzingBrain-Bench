@@ -42,6 +42,12 @@ func agentEnv() []string {
 	return out
 }
 
+// shSingleQuote wraps s in single quotes for safe interpolation into a shell
+// command (escaping any embedded single quote).
+func shSingleQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
 type execParams struct {
 	Cmd      string `json:"cmd"`
 	TimeoutS int    `json:"timeout_s,omitempty"`
@@ -70,18 +76,30 @@ func (s *server) toolExec(args []byte) (any, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	// When isolation is on, wrap the shell in a fresh user+network namespace
-	// (`unshare -r -n`): the command sees only a down loopback, so it cannot
-	// reach the network (DNS/TCP fail) — blocking upstream-issue/source/PoC
-	// fetches. Falls through to a bare shell only under BENCH_ALLOW_NET=1.
+	// When isolation is on, wrap the shell in a fresh user + mount + network
+	// namespace (`unshare -r -m -n`):
+	//   -n : no network route (only a down loopback) — blocks upstream fetches.
+	//   -m : private mount namespace; inside it we tmpfs-mask the oracle dir so
+	//        exec cannot read the reference poc / grader / ground-truth binaries
+	//        (an agent disassembled the oracle binary to reverse the bug).
+	// The agent's command is passed via env (BENCH_USER_CMD) so the masked oracle
+	// path is never interpolated into — nor leaked through — the child command.
+	// Falls through to a bare shell only under BENCH_ALLOW_NET=1.
 	name, argv := "/bin/bash", []string{"-c", p.Cmd}
+	useEnv := agentEnv()
 	if s.netIsolate {
+		inner := `exec /bin/bash -c "$BENCH_USER_CMD"`
+		if s.oracleDir != "" && s.oracleDir != s.bugDir {
+			inner = "mount -t tmpfs none " + shSingleQuote(s.oracleDir) +
+				" 2>/dev/null || true; " + inner
+		}
 		name = "unshare"
-		argv = []string{"-r", "-n", "--", "/bin/bash", "-c", p.Cmd}
+		argv = []string{"-r", "-m", "-n", "--", "/bin/bash", "-c", inner}
+		useEnv = append(useEnv, "BENCH_USER_CMD="+p.Cmd)
 	}
 	cmd := exec.CommandContext(ctx, name, argv...)
 	cmd.Dir = s.bugDir
-	cmd.Env = agentEnv()
+	cmd.Env = useEnv
 
 	// Run the command in its own process group (Setpgid) so that on timeout we
 	// can kill the *whole* tree, not just the bash parent. Without this, a
