@@ -29,6 +29,5 @@ from the input.
 
 References
 ----------
-- Upstream report: https://issues.chromium.org/issues/501657371
 - Fix: aomedia-review.googlesource.com/c/aom/+/210741 (fixed 2026-04-23)
 - Source: av1 rate control, av1_alloc_layer_context / av1_restore_layer_context

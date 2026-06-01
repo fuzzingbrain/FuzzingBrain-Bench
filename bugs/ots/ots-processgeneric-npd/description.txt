@@ -32,6 +32,4 @@ hit the bug.
 
 References
 ----------
-- Upstream report: https://github.com/khaledhosny/ots/issues/308
 - Source: src/ots.cc, function ProcessGeneric
-- Buggy lines: ots.cc:781 (and ots.cc:798)

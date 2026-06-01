@@ -20,5 +20,4 @@ fuzz input.
 
 References
 ----------
-- Ghidra advisory: https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442
 - Sibling bug:     binutils-rust-demangle-oom (same root cause)

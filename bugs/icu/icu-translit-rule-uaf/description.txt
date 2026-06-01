@@ -22,5 +22,4 @@ rules string:
 
 References
 ----------
-- Upstream ticket: https://unicode-org.atlassian.net/browse/ICU-23365
 - Harness:         libFuzzer wrapper around the upstream repro.cpp

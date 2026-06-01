@@ -34,6 +34,5 @@ offset. The misaligned read happens during this traversal.
 
 References
 ----------
-- Upstream report: https://github.com/dgibson/dtc/issues/178
 - libfdt internal: scripts/dtc/libfdt/fdt.c:173 (the misaligned load)
 - Affected function: fdt_next_tag

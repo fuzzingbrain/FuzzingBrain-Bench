@@ -25,8 +25,3 @@ Produce a byte sequence that the harness binary
 (fuzz_ndpi_decode_tls_blocks.c) feeds into ndpi_decode_tls_blocks
 without a trailing NUL, causing ASan to report a heap-buffer-overflow
 read inside ndpi_hex_decode at src/lib/ndpi_utils.c.
-
-References
-----------
-- Upstream report: https://github.com/ntop/nDPI/issues/3159
-- Buggy line: src/lib/ndpi_utils.c:1144 in ndpi_hex_decode

@@ -27,5 +27,4 @@ remaining bytes are the JSON message.
 
 References
 ----------
-- Upstream fix: https://github.com/open62541/open62541/pull/7680
 - Source: open62541 PubSub JSON decoder, lookAheadForKey()

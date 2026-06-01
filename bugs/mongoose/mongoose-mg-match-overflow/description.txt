@@ -36,6 +36,5 @@ past the end of `p.buf`.
 
 References
 ----------
-- Upstream report: https://github.com/cesanta/mongoose/issues/3393
 - Fix PR (informational, not consumed by grader): #3394
 - Bug site: src/str.c, mg_match() function, around line 91

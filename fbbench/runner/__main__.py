@@ -51,6 +51,9 @@ def main() -> int:
                     help="literal output dir; takes precedence over --output")
     ap.add_argument("--preserve-pocs", action="store_true",
                     help="save every graded candidate blob into pocs/{solved,failed}/")
+    ap.add_argument("--force-full", action="store_true",
+                    help="ignore voluntary/no-tool-use early stops; run the full "
+                         "--max-turns budget (nudges the model to keep iterating)")
     ap.add_argument("--server-bin", default=None,
                     help="path to mcp-server binary (default: ./bin/mcp-server)")
     ap.add_argument("--repo-root", default=None,
@@ -100,6 +103,7 @@ def main() -> int:
             episode_log=str(out_dir / "episode.jsonl"),
             capability_set=capability_set(bug_dir),
             pocs_dir=str(pocs_dir) if pocs_dir else None,
+            force_full=args.force_full,
         )
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

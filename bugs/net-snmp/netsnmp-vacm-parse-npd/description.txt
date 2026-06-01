@@ -9,8 +9,3 @@ vacm_parse_config_group() in snmplib/vacm.c does not validate that
 its `line` argument has enough tokens before calling helper parsers
 that dereference internal pointers. Malformed config lines (missing
 trailing fields) cause a NULL dereference.
-
-References
-----------
-- Upstream report: https://github.com/net-snmp/net-snmp/issues/1052
-- Buggy line: snmplib/vacm.c around line 412

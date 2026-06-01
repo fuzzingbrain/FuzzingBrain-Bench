@@ -12,7 +12,3 @@ ImageMagick during `image.read(blob)`.
 
 The harness drives `Magick::Image::read(blob)` with `magick("MSL")`
 and `fileName("MSL:")` — the standard OSS-Fuzz MSL harness pattern.
-
-References
-----------
-- Advisory: https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-5vx3-wx4q-6cj8

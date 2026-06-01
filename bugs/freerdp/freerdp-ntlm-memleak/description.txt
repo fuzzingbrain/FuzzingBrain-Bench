@@ -15,9 +15,3 @@ NTLM context allocated at `ntlm.c:244` inside `ntlm_ContextNew()`.
 
 The leak is reachable pre-auth and triggers on any RDP server using
 WinPR's NTLM SSPI to verify client tokens.
-
-References
-----------
-- Upstream issue: https://github.com/FreeRDP/FreeRDP/issues/12603
-- PR with fix:    https://github.com/FreeRDP/FreeRDP/pull/12609
-- Custom harness: https://github.com/FreeRDP/FreeRDP/pull/12610

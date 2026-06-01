@@ -19,6 +19,5 @@ Call chain on a 4-byte malformed input:
 
 References
 ----------
-- Upstream PR:   https://github.com/apache/avro/pull/3623
 - Harness:       libFuzzer over avro_file_reader_fp() +
                  avro_file_reader_read_value()

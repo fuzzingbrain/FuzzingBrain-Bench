@@ -24,5 +24,4 @@ unbounded path that the advisory characterizes as OOM.
 
 References
 ----------
-- Ghidra advisory: https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442
 - Sibling bugs:    ghidra-rust-demangle-oom, binutils-rust-demangle-oom

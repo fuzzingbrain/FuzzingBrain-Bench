@@ -29,5 +29,4 @@ passes it to MagickCore::AcquireKernelInfo().
 
 References
 ----------
-- Upstream advisory: https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-q62c-h75r-2xhc
 - Source: MagickCore/morphology.c, function AcquireKernelInfo

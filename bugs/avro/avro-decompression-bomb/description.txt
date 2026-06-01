@@ -20,6 +20,4 @@ deterministically trigger OOM.
 References
 ----------
 - Upstream PR (vuln_commit picked from its first parent):
-  https://github.com/apache/avro/pull/3625
 - Fix (AVRO-4247) merged via #3745:
-  https://github.com/apache/avro/pull/3745

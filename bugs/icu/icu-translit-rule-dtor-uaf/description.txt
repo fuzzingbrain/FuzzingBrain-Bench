@@ -29,5 +29,4 @@ the rule string (UTF-16) passed to Transliterator::createFromRules().
 
 References
 ----------
-- Upstream report: https://unicode-org.atlassian.net/browse/ICU-23365
 - Source: icu4c/source/i18n/rbt_rule.cpp, TransliterationRule::~TransliterationRule
