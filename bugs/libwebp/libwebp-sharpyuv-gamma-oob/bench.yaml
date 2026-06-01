@@ -1,0 +1,29 @@
+bug_id: libwebp-sharpyuv-gamma-oob
+project: libwebp
+title: "OOB Read in libsharpyuv gamma-to-linear LUT via unclamped high-bit-depth pixel"
+upstream_report: https://github.com/webmproject/libwebp/security/advisories/GHSA-6gpr-h4hq-vh57
+
+target:
+  repo:         https://github.com/webmproject/libwebp
+  vuln_commit:  b8814a57f0e010969b0d9352d86fa30b855d3fa0
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # sharpyuv_convert_fuzzer.cc (public SharpYuvConvert API)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-24
