@@ -1,0 +1,31 @@
+Assertion Failure in open62541 PubSub JSON NetworkMessage Decoder
+=================================================================
+
+Project:     open62541 (OPC UA stack — PubSub JSON decoding)
+Bug class:   assertion-failure (reachable assertion / SIGABRT)
+Sanitizer:   none (plain C assert -> abort)
+
+Summary
+-------
+The PubSub JSON NetworkMessage decoder uses an assertion where it should
+do input validation. When decoding malformed JSON whose top-level value
+is not an object (for example an empty array "[]"), the look-ahead helper
+asserts that the current token is a JSON object. The assertion fails and
+the process aborts via SIGABRT. Untrusted network input must never be
+able to reach an assertion.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, makes the
+PubSub JSON decoder hit the failing assertion and abort, with the
+faulting library frame in open62541's JSON decoding code.
+
+The harness (harness/fuzz_pubsub_json.cc) calls the public
+UA_NetworkMessage_decodeJson() on the input. The last 4 bytes are
+consumed as a memory-limit marker (open62541's fuzz convention), and the
+remaining bytes are the JSON message.
+
+References
+----------
+- Upstream fix: https://github.com/open62541/open62541/pull/7680
+- Source: open62541 PubSub JSON decoder, lookAheadForKey()

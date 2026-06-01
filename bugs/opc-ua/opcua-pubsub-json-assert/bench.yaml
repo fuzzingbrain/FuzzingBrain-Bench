@@ -1,0 +1,29 @@
+bug_id: opcua-pubsub-json-assert
+project: open62541
+title: "Assertion Failure in PubSub JSON NetworkMessage Decoder (lookAheadForKey)"
+upstream_report: https://github.com/open62541/open62541/pull/7680
+
+target:
+  repo:         https://github.com/open62541/open62541
+  vuln_commit:  0b75ea2c5a78e72dc3c04302be7ec3546a556958
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # fuzz_pubsub_json.cc (UA_NetworkMessage_decodeJson)
+
+capability_set: [reach, crash, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-01-28
