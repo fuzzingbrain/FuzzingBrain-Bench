@@ -1,0 +1,33 @@
+Excessive Memory Allocation in AcquireKernelInfo
+================================================
+
+Project:     ImageMagick (MagickCore morphology)
+Bug class:   allocation-size-too-big (excessive allocation)
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+AcquireKernelInfo() parses a morphology kernel specification string.
+For a built-in kernel whose radius is taken directly from the input
+string, the kernel allocation is sized from the attacker-controlled
+radius without an upper bound. A crafted kernel string with a huge
+radius makes the allocation request reach AcquireAlignedMemory with a
+multi-gigabyte size, which AddressSanitizer reports as
+allocation-size-too-big and aborts.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, drives
+AcquireKernelInfo to request an oversized allocation, causing the
+sanitizer to abort with the faulting library frame in MagickCore's
+memory allocator on the kernel-parsing path.
+
+The harness (harness/profile_fuzzer.cc) builds a morphology kernel
+specification string from the input bytes (several encodings: named
+kernel list, old-style kernel, user kernel list, raw string) and
+passes it to MagickCore::AcquireKernelInfo().
+
+References
+----------
+- Upstream advisory: https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-q62c-h75r-2xhc
+- Source: MagickCore/morphology.c, function AcquireKernelInfo
