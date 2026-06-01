@@ -2,10 +2,17 @@
 from __future__ import annotations
 
 import os
+import re
 
 import anthropic
 
 from .base import Completion, ToolCall
+
+# Anthropic rejects max_tokens above a model's per-model output ceiling with a
+# 400 (e.g. Haiku caps at 64000, below episode.py's generous 65536 default).
+# Rather than hardcode every model's limit, learn it from the error the first
+# time we trip it and cache it for the rest of the episode.
+_MAX_TOKENS_LIMIT_RE = re.compile(r"max_tokens:\s*\d+\s*>\s*(\d+)")
 
 
 class AnthropicBackend:
@@ -13,6 +20,8 @@ class AnthropicBackend:
         self.model = model
         self._client = anthropic.Anthropic(
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
+        # Discovered per-model output ceiling (None until a 400 reveals it).
+        self._max_tokens_cap: int | None = None
 
     def _to_blocks(self, messages: list[dict]) -> list[dict]:
         out = []
@@ -37,19 +46,33 @@ class AnthropicBackend:
                 out.append({"role": "user", "content": content})
         return out
 
-    def complete(self, system, messages, tools, max_tokens) -> Completion:
-        api_tools = [{"name": t["name"], "description": t["description"],
-                      "input_schema": t["input_schema"]} for t in tools]
+    def _stream_once(self, system, api_tools, blocks, max_tokens):
         with self._client.messages.stream(
             model=self.model,
             max_tokens=max_tokens,
             system=system,
             tools=api_tools,
-            messages=self._to_blocks(messages),
+            messages=blocks,
             temperature=1.0,
             metadata={"user_id": "fbbench"},
         ) as stream:
-            resp = stream.get_final_message()
+            return stream.get_final_message()
+
+    def complete(self, system, messages, tools, max_tokens) -> Completion:
+        api_tools = [{"name": t["name"], "description": t["description"],
+                      "input_schema": t["input_schema"]} for t in tools]
+        blocks = self._to_blocks(messages)
+        if self._max_tokens_cap is not None:
+            max_tokens = min(max_tokens, self._max_tokens_cap)
+        try:
+            resp = self._stream_once(system, api_tools, blocks, max_tokens)
+        except anthropic.BadRequestError as e:
+            m = _MAX_TOKENS_LIMIT_RE.search(str(getattr(e, "message", "") or e))
+            cap = int(m.group(1)) if m else None
+            if cap is None or cap >= max_tokens:
+                raise  # not a max_tokens-ceiling error, or no headroom to gain
+            self._max_tokens_cap = cap
+            resp = self._stream_once(system, api_tools, blocks, cap)
         c = Completion(stop_reason=resp.stop_reason or "")
         for block in resp.content:
             if block.type == "text":
