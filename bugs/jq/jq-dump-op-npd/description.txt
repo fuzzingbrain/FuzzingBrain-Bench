@@ -26,6 +26,4 @@ exercises the compile/disasm pipeline.
 
 References
 ----------
-- Upstream report: https://github.com/jqlang/jq/issues/3458
 - Source: src/bytecode.c, function dump_operation
-- Buggy line: bytecode.c:109

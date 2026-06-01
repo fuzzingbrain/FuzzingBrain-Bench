@@ -18,7 +18,5 @@ boundary.
 
 References
 ----------
-- Upstream issue: https://github.com/stleary/JSON-java/issues/1036
-- Fix PR:         https://github.com/stleary/JSON-java/pull/1038
 - Sister bug:     jsonjava-unescape-strindex (same harness, same function,
                   different exception type)

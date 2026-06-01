@@ -60,17 +60,51 @@ func (s *server) toolExec(args []byte) (any, error) {
 		timeout = 60
 	}
 
+	// Refuse to run if we cannot guarantee no internet access (unless the
+	// operator explicitly opted in). This closes the network cheat vector.
+	if !s.netIsolate && !s.allowNet {
+		return nil, fmt.Errorf("exec refused: network isolation unavailable on this host " +
+			"(no user+net namespace). Set BENCH_ALLOW_NET=1 to allow networked exec.")
+	}
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "/bin/bash", "-c", p.Cmd)
+	// When isolation is on, wrap the shell in a fresh user+network namespace
+	// (`unshare -r -n`): the command sees only a down loopback, so it cannot
+	// reach the network (DNS/TCP fail) — blocking upstream-issue/source/PoC
+	// fetches. Falls through to a bare shell only under BENCH_ALLOW_NET=1.
+	name, argv := "/bin/bash", []string{"-c", p.Cmd}
+	if s.netIsolate {
+		name = "unshare"
+		argv = []string{"-r", "-n", "--", "/bin/bash", "-c", p.Cmd}
+	}
+	cmd := exec.CommandContext(ctx, name, argv...)
 	cmd.Dir = s.bugDir
 	cmd.Env = agentEnv()
+
+	// Run the command in its own process group (Setpgid) so that on timeout we
+	// can kill the *whole* tree, not just the bash parent. Without this, a
+	// command like `find /` that bash backgrounds or that outlives bash gets
+	// orphaned (reparented to init) and keeps the stdout/stderr pipe open,
+	// wedging cmd.Run() forever waiting for pipe EOF.
+	sysAttr := &syscall.SysProcAttr{Setpgid: true}
 	if s.dropPrivs {
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{Uid: s.agentUID, Gid: s.agentGID},
-		}
+		sysAttr.Credential = &syscall.Credential{Uid: s.agentUID, Gid: s.agentGID}
 	}
+	cmd.SysProcAttr = sysAttr
+
+	// On context cancellation/timeout, SIGKILL the entire process group
+	// (negative PID targets the group) instead of just the bash leader.
+	cmd.Cancel = func() error {
+		return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+	// Backstop: if a descendant keeps the pipe open after the group is killed
+	// — e.g. a process stuck in uninterruptible D-state that SIGKILL can't
+	// reap — don't block Run() indefinitely. After WaitDelay, the pipes are
+	// force-closed and Run() returns.
+	cmd.WaitDelay = 5 * time.Second
+
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr

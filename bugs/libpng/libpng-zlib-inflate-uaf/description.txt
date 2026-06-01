@@ -33,5 +33,4 @@ signature is required for the bytes to reach chunk handling.
 
 References
 ----------
-- Upstream advisory: https://github.com/pnggroup/libpng/security/advisories/GHSA-qvg3-h654-xq3j
 - Source: pngrutil.c, function png_zlib_inflate

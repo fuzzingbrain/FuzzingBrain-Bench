@@ -34,7 +34,3 @@ K_b is [crash, class, site] — reach is dropped because the LLVM
 profile dump doesn't survive an SIGABRT and the call graph through
 the Rust FFI boundary doesn't produce a "buggy function" frame we
 could match against an expected_function name.
-
-References
-----------
-- Upstream issue: https://github.com/harfbuzz/harfbuzz/issues/5946

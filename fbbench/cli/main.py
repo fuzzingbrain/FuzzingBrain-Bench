@@ -44,6 +44,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="literal output dir; overrides --exp")
     sp_run.add_argument("--preserve-pocs", action="store_true",
                         help="save every graded blob into <out>/pocs/{solved,failed}/")
+    sp_run.add_argument("--force-full", action="store_true",
+                        help="ignore early stops; run the full --max-turns budget")
     sp_run.add_argument("--api-key", default=None,
                         help="provider API key; default reads ./.env")
     sp_run.set_defaults(fn=commands.cmd_run)

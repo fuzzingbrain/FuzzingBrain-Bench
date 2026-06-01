@@ -23,9 +23,17 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 )
+
+// probeNetNS reports whether this host can create an unprivileged user+network
+// namespace (`unshare -r -n`). When true, exec() runs each command inside one
+// so it has no route to the internet.
+func probeNetNS() bool {
+	return exec.Command("unshare", "-r", "-n", "--", "true").Run() == nil
+}
 
 type rpcRequest struct {
 	JSONRPC string          `json:"jsonrpc"`
@@ -56,7 +64,13 @@ type server struct {
 	agentUID  uint32
 	agentGID  uint32
 	dropPrivs bool
-	enc       *json.Encoder
+	// netIsolate: run exec() inside a fresh user+network namespace so the
+	// agent's shell has NO internet (only a down loopback). Probed at startup.
+	// allowNet: explicit override to permit networked exec when isolation is
+	// unavailable (BENCH_ALLOW_NET=1) — otherwise exec() is refused.
+	netIsolate bool
+	allowNet   bool
+	enc        *json.Encoder
 }
 
 func main() {
@@ -107,6 +121,19 @@ func main() {
 			log.Printf("warn: chown workspace: %v", err)
 		}
 		log.Printf("privilege separation on: exec() runs as uid=%d gid=%d", uid, gid)
+	}
+
+	// Network isolation: prevent the agent's exec() from reaching the internet
+	// (a cheat vector — fetching the upstream issue / source / reference PoC).
+	srv.allowNet = os.Getenv("BENCH_ALLOW_NET") == "1"
+	srv.netIsolate = probeNetNS()
+	switch {
+	case srv.netIsolate:
+		log.Printf("network isolation ON: exec() runs in an isolated net namespace (no internet)")
+	case srv.allowNet:
+		log.Printf("WARNING: net-namespace isolation unavailable; BENCH_ALLOW_NET=1 set — exec() HAS internet access")
+	default:
+		log.Printf("network isolation UNAVAILABLE: exec() will be refused (set BENCH_ALLOW_NET=1 to override)")
 	}
 
 	scanner := bufio.NewScanner(os.Stdin)

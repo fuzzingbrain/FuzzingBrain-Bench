@@ -27,6 +27,4 @@ exercised by all of them.
 
 References
 ----------
-- Upstream report: https://bugs.openldap.org/show_bug.cgi?id=10430
 - Source: libraries/libldap/schema.c, function parse_whsp
-- Buggy line: schema.c:1090

@@ -30,5 +30,4 @@ yuv_bit_depth, bytes 8.. are the raw RGB pixel plane.
 
 References
 ----------
-- Upstream advisory: https://github.com/webmproject/libwebp/security/advisories/GHSA-6gpr-h4hq-vh57
 - Source: sharpyuv/sharpyuv_gamma.c (FixedPointInterpolation / ToLinearSrgb)

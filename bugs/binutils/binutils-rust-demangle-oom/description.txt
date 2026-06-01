@@ -19,8 +19,3 @@ Reached via:
              └─ print_str
                 └─ str_buf_demangle_callback
                    └─ str_buf_append          ← UBSan fires here
-
-References
-----------
-- Sourceware bugzilla: https://sourceware.org/bugzilla/show_bug.cgi?id=33878
-- Linked advisory:     https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442

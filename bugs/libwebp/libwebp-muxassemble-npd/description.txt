@@ -26,5 +26,4 @@ frames/chunks, sets a chunk, and finally calls WebPMuxAssemble().
 
 References
 ----------
-- Upstream report: https://issues.webmproject.org/issues/497882857
 - Source: src/mux/muxedit.c, GetFrameInfo / WebPMuxAssemble

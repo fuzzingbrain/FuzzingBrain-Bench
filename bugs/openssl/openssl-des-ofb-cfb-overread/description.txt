@@ -17,5 +17,4 @@ The bug fires whenever `num >= 8`.
 
 References
 ----------
-- Upstream report: https://github.com/openssl/openssl/issues/30284
 - Fix commit:      134342e (master); 76e891f (stable backport)

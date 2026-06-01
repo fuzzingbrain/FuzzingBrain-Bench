@@ -17,6 +17,5 @@ during the pack pass.
 
 References
 ----------
-- Upstream issue: https://github.com/upx/upx/issues/947
 - Vulnerable code: src/p_lx_elf.cpp:4261 (write past end of file_image)
 - Harness:        FuzzingBrain custom (not in upstream oss-fuzz)

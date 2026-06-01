@@ -28,5 +28,4 @@ a VP9 encoder, then loops applying vpx_codec_enc_config_set() with mutated
 
 References
 ----------
-- Upstream report: https://issues.webmproject.org/issues/501696590
 - Source: vp9/encoder/vp9_encodeframe.c (init_encode_frame_mb_context), vp9_change_config

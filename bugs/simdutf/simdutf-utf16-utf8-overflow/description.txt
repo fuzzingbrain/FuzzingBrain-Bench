@@ -22,5 +22,4 @@ scalar UTF-16-to-UTF-8 converter.
 
 References
 ----------
-- Upstream report: https://github.com/simdutf/simdutf/issues/911
 - Bug class: heap-buffer-overflow (write-before-check pattern)

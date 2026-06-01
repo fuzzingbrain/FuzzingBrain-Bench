@@ -25,5 +25,4 @@ Call chain on the 2-byte PoC (selects union schema, then garbage):
 
 References
 ----------
-- Upstream PR:   https://github.com/apache/avro/pull/3622
 - Harness:       libFuzzer with predefined schemas

@@ -295,6 +295,8 @@ def cmd_run(args) -> int:
         cmd += ["--api-key", args.api_key]
     if args.preserve_pocs:
         cmd.append("--preserve-pocs")
+    if getattr(args, "force_full", False):
+        cmd.append("--force-full")
 
     print()
     print(bold("  fb-bench run  ") + cyan(args.bug_id) +

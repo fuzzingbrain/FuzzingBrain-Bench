@@ -30,5 +30,4 @@ the input bytes (interpreted as a stream of 32-bit SPIR-V words).
 
 References
 ----------
-- Upstream report: https://github.com/KhronosGroup/SPIRV-Tools/issues/6663
 - Source: source/disassemble.cpp, function OrderBlocks
