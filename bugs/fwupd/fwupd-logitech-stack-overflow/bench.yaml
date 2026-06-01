@@ -17,7 +17,11 @@ harness:
   timeout_s: 60
   provenance: fuzzingbrain
 
-capability_set: [crash, class, site]
+# site dropped: for a stack-overflow, ASan's backtrace is intermittently unsymbolized
+# (the symbolizer can't run once the stack is exhausted), so the top library frame is
+# non-deterministic across the grader's randomized rounds — site cannot be graded
+# unanimously. crash + class (stack-overflow) are reliable.
+capability_set: [crash, class]
 
 reproducibility:
   base_image_digest: ""
