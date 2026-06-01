@@ -1,0 +1,29 @@
+bug_id: imagemagick-kernelinfo-alloc
+project: imagemagick
+title: "Excessive memory allocation in AcquireKernelInfo parsing a large-radius kernel string"
+upstream_report: https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-q62c-h75r-2xhc
+
+target:
+  repo:         https://github.com/ImageMagick/ImageMagick
+  vuln_commit:  3c45ab0bfb4d630f61d071ad05c451e55cb4f00e
+  language:     c
+  build_system: autoconf
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # profile_fuzzer.cc (morphology kernel parsing)
+
+capability_set: [reach, crash, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-28
