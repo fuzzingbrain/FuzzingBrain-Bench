@@ -1,0 +1,29 @@
+bug_id: libvpx-vp9-reconfig-overflow
+project: libvpx
+title: "Heap Buffer Overflow in VP9 Encoder via vpx_codec_enc_config_set when increasing resolution"
+upstream_report: https://issues.webmproject.org/issues/501696590
+
+target:
+  repo:         https://github.com/webmproject/libvpx
+  vuln_commit:  a5e2e6528374c8ae7cfe8ef6b7aad4fc327c8688
+  language:     cpp
+  build_system: configure
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # vp9_encoder_midstream_reconfig_fuzzer.cc (vpx_codec_enc_config_set)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-14
