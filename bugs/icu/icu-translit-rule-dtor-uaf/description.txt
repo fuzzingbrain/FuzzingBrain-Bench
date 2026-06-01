@@ -1,0 +1,33 @@
+Use-After-Free in ICU TransliterationRule Destructor
+=====================================================
+
+Project:     ICU (unicode-org/icu — International Components for Unicode)
+Bug class:   use-after-free
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+When the transliterator rule parser fails partway through constructing
+a TransliterationRule, the rule object is destroyed while some of its
+member pointers are still uninitialized or dangling. The constructor
+populates context fields with raw clone() calls without null-checking;
+if a clone fails or the source fields are only partially built, the
+destructor then calls delete on garbage pointers — a use-after-free /
+invalid free.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, makes
+ICU parse a transliterator rule string that fails mid-construction,
+so the sanitizer reports a use-after-free / heap error whose faulting
+library frame is in ICU's rule-based transliterator
+(icu4c/source/i18n/rbt_rule.cpp).
+
+The harness (harness/translit_uaf_fuzzer.cpp) uses the public API:
+the first input byte selects the direction, the remaining bytes are
+the rule string (UTF-16) passed to Transliterator::createFromRules().
+
+References
+----------
+- Upstream report: https://unicode-org.atlassian.net/browse/ICU-23365
+- Source: icu4c/source/i18n/rbt_rule.cpp, TransliterationRule::~TransliterationRule
