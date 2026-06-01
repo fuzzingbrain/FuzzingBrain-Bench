@@ -1,0 +1,34 @@
+Heap Buffer Overflow in AV1RateControlRTC (av1_restore_layer_context)
+=====================================================================
+
+Project:     libaom (AOMedia AV1 codec — real-time rate controller)
+Bug class:   heap-buffer-overflow
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+libaom's standalone real-time rate controller (AV1RateControlRTC, used
+by WebRTC without a full encoder) allocates per-layer context buffers
+based on the spatial/temporal layer configuration. For certain layer
+combinations the allocation in av1_alloc_layer_context is smaller than
+what av1_restore_layer_context later copies back, so a memcpy reads/writes
+past the end of the layer-context buffer — a heap buffer overflow.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, drives the
+rate controller through a layer configuration that makes
+av1_restore_layer_context overflow the layer-context allocation, so ASan
+reports a heap-buffer-overflow.
+
+The harness (harness/libaom_ratectrl_rtc_interface_fuzzer.cc) mirrors the
+real WebRTC caller: it builds an AV1RateControlRtcConfig from the input,
+calls Create / UpdateRateControl / ComputeQP / PostEncodeUpdate in order.
+The last bytes set a memory limit; layer counts and per-layer arrays come
+from the input.
+
+References
+----------
+- Upstream report: https://issues.chromium.org/issues/501657371
+- Fix: aomedia-review.googlesource.com/c/aom/+/210741 (fixed 2026-04-23)
+- Source: av1 rate control, av1_alloc_layer_context / av1_restore_layer_context

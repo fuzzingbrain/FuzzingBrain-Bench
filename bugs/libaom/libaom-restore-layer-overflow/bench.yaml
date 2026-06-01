@@ -1,0 +1,29 @@
+bug_id: libaom-restore-layer-overflow
+project: libaom
+title: "Heap Buffer Overflow in AV1RateControlRTC via av1_restore_layer_context"
+upstream_report: https://issues.chromium.org/issues/501657371
+
+target:
+  repo:         https://aomedia.googlesource.com/aom
+  vuln_commit:  f23c9437a
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # libaom_ratectrl_rtc_interface_fuzzer.cc (AV1RateControlRTC public iface)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-23
