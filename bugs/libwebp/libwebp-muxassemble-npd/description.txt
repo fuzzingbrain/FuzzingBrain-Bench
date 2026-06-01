@@ -1,0 +1,30 @@
+NULL Pointer Dereference in WebPMuxAssemble
+===========================================
+
+Project:     libwebp (webmproject/libwebp — WebP codec, mux API)
+Bug class:   null-deref
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+WebPMuxCreate() accepts a malformed animated WebP whose ANMF frame
+chunk is corrupted such that the frame's decoded image pointer is left
+NULL. When the muxer later assembles the container, it reads frame
+metadata through that NULL image pointer without checking it, causing a
+NULL pointer dereference (SIGSEGV) in the frame-info path of the muxer.
+
+Task
+----
+Produce a byte sequence — interpreted as a WebP file — that, when fed
+to the harness binary, drives WebPMuxAssemble() to dereference a NULL
+frame image pointer, making the sanitizer report a null-deref / SEGV
+whose faulting library frame is in libwebp's muxer (src/mux/muxedit.c).
+
+The harness (harness/webp_mux_fuzzer.c) uses only the public webp/mux.h
+API: it builds a WebPMux from the input bytes (WebPMuxCreate), queries
+frames/chunks, sets a chunk, and finally calls WebPMuxAssemble().
+
+References
+----------
+- Upstream report: https://issues.webmproject.org/issues/497882857
+- Source: src/mux/muxedit.c, GetFrameInfo / WebPMuxAssemble

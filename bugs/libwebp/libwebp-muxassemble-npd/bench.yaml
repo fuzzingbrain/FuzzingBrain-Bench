@@ -1,0 +1,29 @@
+bug_id: libwebp-muxassemble-npd
+project: libwebp
+title: "NULL Pointer Dereference in WebPMuxAssemble (GetFrameInfo) on malformed animated WebP"
+upstream_report: https://issues.webmproject.org/issues/497882857
+
+target:
+  repo:         https://github.com/webmproject/libwebp
+  vuln_commit:  b8814a57f0e010969b0d9352d86fa30b855d3fa0
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # webp_mux_fuzzer.c (public webp/mux.h API)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-01
