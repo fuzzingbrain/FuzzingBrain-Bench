@@ -15,6 +15,7 @@ dist/
 # Local-only working notes (kept out of the public repo)
 背景.md
 report_poc.md
+workflow.md
 
 # Reference papers / PDFs kept locally for research, not for the public repo
 *.pdf
