@@ -1,6 +1,6 @@
-# Bug catalog (37)
+# Bug catalog (48)
 
-The 37 end-to-end gradeable bugs. Browse the same data from the CLI:
+The 48 end-to-end gradeable bugs. Browse the same data from the CLI:
 
 ```bash
 ./fb-bench list                 # 37 bugs + K_b
@@ -49,6 +49,17 @@ The 37 end-to-end gradeable bugs. Browse the same data from the CLI:
 | 35 | [`simdutf-utf16-utf8-overflow`](https://github.com/simdutf/simdutf/issues/911) | simdutf | C++ | heap-buffer-overflow | ✅ | ✅ | ✅ | ✅ |
 | 36 | [`upx-elf32-pack2-memleak`](https://github.com/upx/upx/issues/945) | upx | C++ | memory-leak | ✅ | · | ✅ | ✅ |
 | 37 | [`upx-elf64-generate-overflow`](https://github.com/upx/upx/issues/947) | upx | C++ | heap-buffer-overflow | ✅ | ✅ | ✅ | ✅ |
+| 38 | [`libpng-zlib-inflate-uaf`](https://github.com/pnggroup/libpng/security/advisories/GHSA-qvg3-h654-xq3j) | libpng | C | use-after-free | ✅ | ✅ | ✅ | ✅ |
+| 39 | [`libheif-image-crop-overflow`](https://github.com/strukturag/libheif/issues/1746) | libheif | C++ | heap-buffer-overflow | ✅ | ✅ | ✅ | ✅ |
+| 40 | [`imagemagick-kernelinfo-alloc`](https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-q62c-h75r-2xhc) | imagemagick | C | allocation-size-too-big | ✅ | ✅ | · | ✅ |
+| 41 | [`spirv-orderblocks-segv`](https://github.com/KhronosGroup/SPIRV-Tools/issues/6663) | spirv-tools | C++ | segv / oob-write | ✅ | ✅ | ✅ | ✅ |
+| 42 | [`libwebp-muxassemble-npd`](https://issues.webmproject.org/issues/497882857) | libwebp | C | null-deref | ✅ | ✅ | ✅ | ✅ |
+| 43 | [`libwebp-sharpyuv-gamma-oob`](https://github.com/webmproject/libwebp/security/advisories/GHSA-6gpr-h4hq-vh57) | libwebp | C | oob-read | ✅ | ✅ | ✅ | ✅ |
+| 44 | [`icu-translit-rule-dtor-uaf`](https://unicode-org.atlassian.net/browse/ICU-23365) | icu | C++ | use-after-free | ✅ | ✅ | ✅ | ✅ |
+| 45 | [`libaom-restore-layer-overflow`](https://issues.chromium.org/issues/501657371) | libaom | C++ | heap-buffer-overflow | ✅ | ✅ | ✅ | ✅ |
+| 46 | [`libaom-av1-config-assert`](https://aomedia.googlesource.com/aom/) | libaom | C++ | assertion-failure | ✅ | ✅ | · | ✅ |
+| 47 | [`opcua-pubsub-json-assert`](https://github.com/open62541/open62541/pull/7680) | open62541 | C | assertion-failure | ✅ | ✅ | · | ✅ |
+| 48 | [`libvpx-vp9-reconfig-overflow`](https://issues.webmproject.org/issues/501696590) | libvpx | C++ | heap-buffer-overflow | ✅ | ✅ | ✅ | ✅ |
 
 Capability sets (`K_b`) vary per bug — e.g. `icu-translit-rule-uaf` is
 `[reach, class, site]` (LeakSanitizer fires at exit, not at a crashing site).

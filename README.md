@@ -1,7 +1,7 @@
 # FuzzingBrain Bench
 
 **A 4-tier capability-ladder benchmark for LLM-driven vulnerability
-reproduction on 37 real zero-day bugs across C / C++ / Java.**
+reproduction on 48 real zero-day bugs across C / C++ / Java.**
 
 The agent sees only a bug description — no patch, no fix commit, no target
 line — and must craft an input that re-triggers the bug. Every grade is a
@@ -10,7 +10,7 @@ deterministic oracle (no LLM-as-judge), run over three randomized rounds
 
 | Bugs | Languages | Providers | Grader |
 |---|---|---|---|
-| **37** end-to-end | C · C++ · Java | Anthropic · OpenAI · Google | deterministic, 3-round unanimity |
+| **48** end-to-end | C · C++ · Java | Anthropic · OpenAI · Google | deterministic, 3-round unanimity |
 
 **Website:** https://owensanzas.github.io/FuzzingBrain-Bench/ ·
 **Spec:** [docs/SPEC.md](docs/SPEC.md) ·
@@ -36,7 +36,7 @@ and picks a default model from your `.env`. Results land in
 ## The commands
 
 ```bash
-./fb-bench list                        # the 37 bugs + their required flags (K_b)
+./fb-bench list                        # the 48 bugs + their required flags (K_b)
 ./fb-bench show  <bug_id>              # description + upstream link
 ./fb-bench grade <bug_id> [blob]       # grade a PoC — no API key needed
 ./fb-bench run   <bug_id> [--model M]  # drive an LLM agent through one bug
@@ -70,7 +70,7 @@ Exit code `0` iff every flag in the bug's `K_b` fired unanimously.
 ## Run the full matrix
 
 ```bash
-# 6 models × 37 bugs, resumable (re-run with the same --exp to skip done cells)
+# 6 models × 48 bugs, resumable (re-run with the same --exp to skip done cells)
 python -m fbbench.sweep.orchestrator --models sweep --bugs all --exp paper-v2
 
 # re-aggregate the leaderboard without re-running
@@ -107,7 +107,7 @@ Full mechanism: [docs/SPEC.md](docs/SPEC.md) — §2 (ladder), §4 (MCP),
 ```
 fb-bench              thin launcher (runs `python -m fbbench`)
 pyproject.toml        installable package (pip install -e .)
-bugs/<proj>/<id>/     37 bug bundles: bench.yaml, description.txt, harness/,
+bugs/<proj>/<id>/     48 bug bundles: bench.yaml, description.txt, harness/,
                       binaries/, poc/poc.bin, grader/expected.yaml (oracle), Dockerfile
 tools/mcp-server/     Go MCP server (6 tools, stdio JSON-RPC 2.0)
 fbbench/              cli · models · grading · runner · sweep · prompts

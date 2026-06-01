@@ -1,7 +1,7 @@
 bug_id: libaom-av1-config-assert
 project: libaom
 title: "Reachable assertion in aom_rb_read_literal via AV1 config (av1C) parser"
-upstream_report: https://issues.chromium.org/issues/libaom-av1-config-aom-rb-read-literal
+upstream_report: https://aomedia.googlesource.com/aom/
 
 target:
   repo:         https://aomedia.googlesource.com/aom
