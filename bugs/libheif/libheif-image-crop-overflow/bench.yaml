@@ -1,0 +1,29 @@
+bug_id: libheif-image-crop-overflow
+project: libheif
+title: "Heap Buffer Overflow in heif_image_crop via integer underflow in crop margins"
+upstream_report: https://github.com/strukturag/libheif/issues/1746
+
+target:
+  repo:         https://github.com/strukturag/libheif
+  vuln_commit:  62f1b8c76ed4d8305071fdacbe74ef9717bacac5
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # image_transform_fuzzer.cc
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-15

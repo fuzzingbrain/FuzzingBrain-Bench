@@ -1,0 +1,34 @@
+Heap Buffer Overflow in heif_image_crop
+=======================================
+
+Project:     libheif (strukturag/libheif — HEIF/AVIF image codec)
+Bug class:   heap-buffer-overflow
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+An integer underflow in libheif's crop implementation makes the
+cropped plane width/height wrap to a huge unsigned value, driving a
+massive out-of-bounds read during the subsequent pixel copy. The bug
+is reachable through the public heif_image_crop() API, which does not
+fully validate the caller-supplied crop margins against the decoded
+image dimensions for sub-sampled chroma planes.
+
+Task
+----
+Produce a byte sequence — interpreted as a HEIF image file — that,
+when fed to the harness binary, causes ASan to report a
+heap-buffer-overflow whose faulting library frame is inside the crop
+routine in libheif/pixelimage.cc.
+
+The harness (harness/image_transform_fuzzer.cc) decodes the primary
+image via the public C API (heif_context_read_from_memory →
+heif_decode_image) and then exercises the transform APIs — pixel
+aspect ratio, scaling, and crop. It reserves the last 8 input bytes
+as transform parameters and feeds the rest as the HEIF stream. The
+image must decode successfully (HEVC) for the crop path to run.
+
+References
+----------
+- Upstream report: https://github.com/strukturag/libheif/issues/1746
+- Source: libheif/pixelimage.cc, the crop routine
