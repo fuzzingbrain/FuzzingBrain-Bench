@@ -1,0 +1,34 @@
+SEGV in spirv-tools OrderBlocks (empty CFG)
+===========================================
+
+Project:     SPIRV-Tools (KhronosGroup — SPIR-V disassembler)
+Bug class:   SEGV / out-of-bounds write
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+When the SPIR-V disassembler runs with block reordering enabled, it
+defers per-instruction emission and drives a small control-flow-graph
+state machine: each OpLabel pushes a block, and each OpFunctionEnd
+finalizes the function by ordering its blocks. The block-ordering
+routine unconditionally writes to the first element of the block
+vector without first checking that any block was collected. A module
+that emits OpFunctionEnd with no preceding OpLabel leaves the vector
+empty, so the write lands past the end of an empty container — a wild
+write that crashes with SIGSEGV.
+
+Task
+----
+Produce a SPIR-V binary that, when disassembled by the harness with
+block reordering, drives the OpFunctionEnd-without-OpLabel path and
+makes the sanitizer report a SEGV whose faulting library frame is in
+source/disassemble.cpp.
+
+The harness (harness/spirv_disasm_fuzzer.cc) calls the public C API
+spvBinaryToText() with SPV_BINARY_TO_TEXT_OPTION_REORDER_BLOCKS set on
+the input bytes (interpreted as a stream of 32-bit SPIR-V words).
+
+References
+----------
+- Upstream report: https://github.com/KhronosGroup/SPIRV-Tools/issues/6663
+- Source: source/disassemble.cpp, function OrderBlocks

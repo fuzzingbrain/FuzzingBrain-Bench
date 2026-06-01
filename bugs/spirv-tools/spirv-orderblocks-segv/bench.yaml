@@ -1,0 +1,29 @@
+bug_id: spirv-orderblocks-segv
+project: spirv-tools
+title: "SEGV in OrderBlocks via empty CFG when OpFunctionEnd precedes any OpLabel"
+upstream_report: https://github.com/KhronosGroup/SPIRV-Tools/issues/6663
+
+target:
+  repo:         https://github.com/KhronosGroup/SPIRV-Tools
+  vuln_commit:  ff5c50339cc1e9f34f04cb440a3e5fe89db0161d
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # spirv_disasm_fuzzer.cc (public spvBinaryToText API)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-30
