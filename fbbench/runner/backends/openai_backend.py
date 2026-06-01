@@ -18,10 +18,21 @@ def _is_reasoning(model: str) -> bool:
     return m.startswith(("gpt-5", "o1", "o3", "o4"))
 
 
+def _is_local(model: str) -> bool:
+    # Open models served via an OpenAI-compatible local endpoint (Ollama/vLLM).
+    return model.lower().startswith(("llama", "codellama", "ollama"))
+
+
 class OpenAIBackend:
     def __init__(self, model: str, api_key: str | None = None):
         self.model = model
-        self._client = openai.OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
+        self.local = _is_local(model) or bool(os.environ.get("OLLAMA_BASE_URL"))
+        if self.local:
+            base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
+            # Ollama ignores the key but the SDK requires a non-empty string.
+            self._client = openai.OpenAI(base_url=base, api_key=api_key or "ollama")
+        else:
+            self._client = openai.OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
 
     def _to_messages(self, system: str, messages: list[dict]) -> list[dict]:
         out: list[dict] = [{"role": "system", "content": system}]
@@ -54,6 +65,13 @@ class OpenAIBackend:
         if _is_reasoning(self.model):
             # Reasoning tokens count against the completion budget; give room.
             kwargs["max_completion_tokens"] = max(max_tokens, 16384)
+        elif self.local:
+            # Local open models (Ollama): a 65k output cap is nonsensical for an
+            # 8B and the default 8k context overflows fast on long episodes.
+            # Cap the reply and request a larger KV context window.
+            kwargs["max_tokens"] = min(max_tokens, 4096)
+            kwargs["temperature"] = 1.0
+            kwargs["extra_body"] = {"options": {"num_ctx": 32768}}
         else:
             kwargs["max_tokens"] = max_tokens
             kwargs["temperature"] = 1.0
