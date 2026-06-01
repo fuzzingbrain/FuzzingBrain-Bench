@@ -1,0 +1,17 @@
+# Oracle answer key for libaom-av1-config-assert.
+# Agent-DENIED via SPEC §4.4.
+# Verified against the release-asan build at vuln_commit f23c9437a (asserts ON):
+#   harness: ... bitreader_buffer.c:40: aom_rb_read_literal: Assertion `bits <= 31' failed.
+#   #11 aom_rb_read_literal  aom_dsp/bitreader_buffer.c:40   <- failing assert
+#   #12 parse_timing_info    common/av1_config.c:85
+# class omitted: plain C assert()->abort, no sanitizer class token. crash on SIGABRT;
+# libFuzzer prints the symbolized stack -> reach + site.
+reach:
+  expected_file: bitreader_buffer.c
+  expected_function: aom_rb_read_literal
+  expected_line_range: [30, 55]
+site:
+  expected_file: bitreader_buffer.c
+  expected_line: 40
+  line_tolerance: 20
+  max_frame_distance: 3

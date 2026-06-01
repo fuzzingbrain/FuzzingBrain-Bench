@@ -1,0 +1,29 @@
+bug_id: libaom-av1-config-assert
+project: libaom
+title: "Reachable assertion in aom_rb_read_literal via AV1 config (av1C) parser"
+upstream_report: https://issues.chromium.org/issues/libaom-av1-config-aom-rb-read-literal
+
+target:
+  repo:         https://aomedia.googlesource.com/aom
+  vuln_commit:  f23c9437a
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # av1_config_fuzzer.cc (get_av1config_from_obu / read_av1config)
+
+capability_set: [reach, crash, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-23
