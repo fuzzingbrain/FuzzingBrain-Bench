@@ -54,6 +54,10 @@ def main() -> int:
     ap.add_argument("--force-full", action="store_true",
                     help="ignore voluntary/no-tool-use early stops; run the full "
                          "--max-turns budget (nudges the model to keep iterating)")
+    ap.add_argument("--full-scan", action="store_true",
+                    help="harder mode: withhold the bug description (and bench.yaml "
+                         "title). The agent gets only the harness and must discover "
+                         "a crashing input. Grading/oracle are unchanged.")
     ap.add_argument("--server-bin", default=None,
                     help="path to mcp-server binary (default: ./bin/mcp-server)")
     ap.add_argument("--repo-root", default=None,
@@ -88,7 +92,7 @@ def main() -> int:
     workspace = tempfile.mkdtemp(prefix=f"fbbench-{args.bug}-")
     # Agent sees a staged sandbox (no grader/, poc/, binaries/); the grader
     # reads the answer key + ground-truth binaries from the real bug dir.
-    bug_view = stage_bug_view(str(bug_dir))
+    bug_view = stage_bug_view(str(bug_dir), full_scan=args.full_scan)
     backend = make_backend(args.model, api_key=args.api_key)
     pocs_dir = (out_dir / "pocs") if args.preserve_pocs else None
     try:
@@ -104,6 +108,7 @@ def main() -> int:
             capability_set=capability_set(bug_dir),
             pocs_dir=str(pocs_dir) if pocs_dir else None,
             force_full=args.force_full,
+            full_scan=args.full_scan,
         )
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

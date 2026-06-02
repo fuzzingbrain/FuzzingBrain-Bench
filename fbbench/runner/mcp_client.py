@@ -66,11 +66,19 @@ def _redact_urls_in_tree(root: str) -> None:
                     fp.write(new)
 
 
-def _stage_bench_yaml(src: str, dst: str) -> None:
-    """Copy bench.yaml with upstream/repo/commit identifiers stripped."""
+def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False) -> None:
+    """Copy bench.yaml with upstream/repo/commit identifiers stripped.
+
+    In full_scan mode the human-readable `title` (which names the bug class and
+    function, e.g. "Heap Use-After-Free in png_zlib_inflate") is also stripped —
+    otherwise it would hand back the very description full_scan is meant to withhold.
+    """
     data = yaml.safe_load(open(src)) or {}
     for k in _BENCH_SCRUB_TOP:
         data.pop(k, None)
+    if full_scan:
+        for k in ("title", "disclosed"):
+            data.pop(k, None)
     tgt = data.get("target")
     if isinstance(tgt, dict):
         for k in _BENCH_SCRUB_TARGET:
@@ -79,24 +87,31 @@ def _stage_bench_yaml(src: str, dst: str) -> None:
         yaml.safe_dump(data, fp, sort_keys=False)
 
 
-def stage_bug_view(real_bug_dir: str) -> str:
+def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
     """Build a per-episode sandbox dir holding only agent-safe entries.
 
     Returns the sandbox path; the caller passes it as BENCH_BUG_DIR and the
     real bug dir as BENCH_ORACLE_DIR. Withheld: grader/, poc/, binaries/,
     PROVENANCE.md, Dockerfile, and upstream/repo/commit fields of bench.yaml.
+
+    full_scan mode additionally withholds description.txt and the bench.yaml
+    `title` — the agent gets only the harness (the fuzz target) and must discover
+    a crashing input with no statement of what or where the bug is.
     """
     sandbox = tempfile.mkdtemp(prefix="fbbench-bugview-")
     # mkdtemp is 0700; the agent's exec() may run under a different uid
     # (Tier 2 privsep), so make the view traversable/readable.
     os.chmod(sandbox, 0o755)
-    for name in SANDBOX_ENTRIES:
+    entries = SANDBOX_ENTRIES
+    if full_scan:
+        entries = tuple(e for e in entries if e != "description.txt")
+    for name in entries:
         src = os.path.join(real_bug_dir, name)
         if not os.path.exists(src):
             continue
         dst = os.path.join(sandbox, name)
         if name == "bench.yaml":
-            _stage_bench_yaml(src, dst)
+            _stage_bench_yaml(src, dst, full_scan=full_scan)
         elif os.path.isdir(src):
             shutil.copytree(src, dst, ignore=_ignore_leaky)
             _redact_urls_in_tree(dst)
