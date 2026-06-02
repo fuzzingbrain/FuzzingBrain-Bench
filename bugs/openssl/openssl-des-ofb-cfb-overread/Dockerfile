@@ -13,8 +13,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # OpenSSL repo is medium-sized; shallow clone of master then fetch the
 # vuln SHA at extended depth.
 ENV GIT_TERMINAL_PROMPT=0
-RUN git clone --depth 1 --no-tags https://github.com/openssl/openssl /src/openssl \
- && git -C /src/openssl fetch --depth 500 origin master \
+RUN git init /src/openssl \
+ && git -C /src/openssl remote add origin https://github.com/openssl/openssl \
+ && git -C /src/openssl fetch --depth 1 origin ${VULN_COMMIT} \
  && git -C /src/openssl checkout ${VULN_COMMIT}
 
 COPY harness/des_ofb_fuzzer.c /src/harness/des_ofb_fuzzer.c

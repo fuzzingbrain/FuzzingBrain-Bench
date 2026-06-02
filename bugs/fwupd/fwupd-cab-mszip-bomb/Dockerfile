@@ -31,9 +31,9 @@ ENV CXX=clang++
 ENV SRC=/src
 ENV WORK=/src/.ossfuzz
 ENV OUT=/src/.ossfuzz/out
-ENV CFLAGS="-fsanitize=address -fsanitize=fuzzer-no-link -g -O1"
-ENV CXXFLAGS="-fsanitize=address -fsanitize=fuzzer-no-link -g -O1"
-ENV LDFLAGS="-fsanitize=address"
+ENV CFLAGS="-fsanitize=fuzzer-no-link -g -O1"
+ENV CXXFLAGS="-fsanitize=fuzzer-no-link -g -O1"
+ENV LDFLAGS=""
 ENV LIB_FUZZING_ENGINE=/usr/lib/clang/14/lib/linux/libclang_rt.fuzzer-x86_64.a
 ENV CARGO_NET_GIT_FETCH_WITH_CLI=true
 

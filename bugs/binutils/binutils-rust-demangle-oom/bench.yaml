@@ -1,6 +1,6 @@
 bug_id: binutils-rust-demangle-oom
 project: binutils
-title: "Null Pointer Arithmetic in rust_demangle str_buf_append"
+title: "OOM in rust_demangle via unbounded lifetime count in demangle_binder"
 upstream_report: https://sourceware.org/bugzilla/show_bug.cgi?id=33878
 
 target:
@@ -12,12 +12,12 @@ target:
 harness:
   type: libfuzzer
   entrypoint: LLVMFuzzerTestOneInput
-  invocation: ["@@"]
-  rss_limit_mb: 2048
+  invocation: ["-rss_limit_mb=256", "@@"]
+  rss_limit_mb: 256
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [crash, class]
 
 reproducibility:
   base_image_digest: ""

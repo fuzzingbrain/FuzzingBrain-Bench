@@ -1,21 +1,23 @@
-NULL Pointer Member Access in Avro C File Reader
+Uncontrolled Allocation Size in Avro C File Reader
 ==================================================
 
 Project:     apache/avro (lang/c)
-Bug class:   null-deref (UBSan: member access within null pointer)
-Sanitizer:   UBSan
+Bug class:   allocation-size-too-big
+Sanitizer:   AddressSanitizer
 
-The Avro C data-file reader's header-reading path does not validate
-that the file header is well-formed before chasing the reader's
-internal pointers. A short or malformed file causes `avro_read()` to
-deref a null `struct _avro_reader_file_t*` while still inside
-`file_read_header()` during `avro_file_reader_fp()` setup.
+The Avro C data-file reader reads a per-block size field from an Avro
+object-container file using zigzag-encoded varints, which can represent
+negative numbers. The decoded size is used as an allocation size without
+validating that it is non-negative. A crafted file whose block-size field
+decodes to a negative value (e.g. -1) turns into an enormous unsigned
+allocation request (~18 EB), which AddressSanitizer rejects as
+allocation-size-too-big.
 
-Call chain on a 4-byte malformed input:
+Call chain on a malformed Avro container file:
 
-    avro_file_reader_fp        lang/c/src/datafile.c:516
-    └─ file_read_header        lang/c/src/datafile.c:256
-       └─ avro_read            lang/c/src/io.c:270   ← UBSan fires here
+    avro_file_reader_fp        lang/c/src/datafile.c:529
+    └─ file_read_block_count   lang/c/src/datafile.c (block-size alloc)
+       └─ allocator            <- requested allocation size 0xffffffffffffffff
 
 References
 ----------

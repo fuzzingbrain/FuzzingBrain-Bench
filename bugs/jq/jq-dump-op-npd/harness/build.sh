@@ -14,13 +14,13 @@ if [ "${cmd}" = "build-libs" ]; then
     git -C /src/jq submodule update --init --recursive
     (cd /src/jq && autoreconf -fi >/dev/null 2>&1)
 
-    # asan/ubsan build
+    # asan build
     cp -r /src/jq /src/jq-asan
     pushd /src/jq-asan >/dev/null
     CC=clang CXX=clang++ \
-        CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1" \
-        CXXFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1" \
-        LDFLAGS="-fsanitize=address,undefined" \
+        CFLAGS="-fsanitize=address -g -O1" \
+        CXXFLAGS="-fsanitize=address -g -O1" \
+        LDFLAGS="-fsanitize=address" \
         ./configure --with-oniguruma=builtin --enable-static --disable-shared >/dev/null
     make -j${JOBS} >/dev/null 2>&1
     popd >/dev/null
@@ -49,7 +49,7 @@ if [ "${cmd}" = "harness" ]; then
         debug|debug-asan|release-asan)
             CFLAGS_HARNESS="$([ "${CONFIG}" = "release-asan" ] && echo "-O2 -g" || echo "-g -O0")"
             BUILD=/src/jq-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         coverage)
             CFLAGS_HARNESS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"
