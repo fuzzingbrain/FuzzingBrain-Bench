@@ -103,6 +103,7 @@ def run_episode(
     capability_set: list[str] | None = None,
     pocs_dir: str | None = None,
     force_full: bool = False,
+    full_scan: bool = False,
 ) -> EpisodeResult:
     mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace, oracle_dir=oracle_dir)
     mcp.initialize()
@@ -112,7 +113,9 @@ def run_episode(
 
     setup_resp = mcp.call("setup", {})
     bug_desc = setup_resp.get("bug_desc", "")
-    user_text = build_initial_user_message(bug_desc, setup_resp)
+    # full_scan: description.txt is not staged, so bug_desc is empty; the message
+    # builder switches to the no-description "find a crash" prompt.
+    user_text = build_initial_user_message(bug_desc, setup_resp, full_scan=full_scan)
 
     messages: list[dict] = [{"role": "user", "content": user_text}]
     tools = tool_schemas()

@@ -46,6 +46,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="save every graded blob into <out>/pocs/{solved,failed}/")
     sp_run.add_argument("--force-full", action="store_true",
                         help="ignore early stops; run the full --max-turns budget")
+    sp_run.add_argument("--full-scan", action="store_true",
+                        help="harder mode: withhold the bug description; the agent "
+                             "gets only the harness and must find a crashing input")
     sp_run.add_argument("--api-key", default=None,
                         help="provider API key; default reads ./.env")
     sp_run.set_defaults(fn=commands.cmd_run)
