@@ -297,6 +297,8 @@ def cmd_run(args) -> int:
         cmd.append("--preserve-pocs")
     if getattr(args, "force_full", False):
         cmd.append("--force-full")
+    if getattr(args, "full_scan", False):
+        cmd.append("--full-scan")
 
     print()
     print(bold("  fb-bench run  ") + cyan(args.bug_id) +
