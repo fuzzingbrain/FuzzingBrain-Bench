@@ -2,7 +2,7 @@
 # Build script for openldap-ldif-stack-underflow.
 #
 # Strategy: build openldap (just liblber + libldap) twice —
-#   - /src/build-asan/   compiled with -fsanitize=address,undefined
+#   - /src/build-asan/   compiled with -fsanitize=address
 #   - /src/build-cov/    compiled with coverage instrumentation
 # Then link the harness in four configs, reusing those two library
 # builds. This is roughly 2× the openldap configure-make cost (~5 min
@@ -19,12 +19,12 @@ cmd="${1:?usage: build.sh openldap-libs | harness <config>}"
 if [ "${cmd}" = "openldap-libs" ]; then
     JOBS=$(nproc)
 
-    # asan/ubsan-instrumented build
+    # asan-instrumented build
     cp -r /src/openldap /src/build-asan
     pushd /src/build-asan >/dev/null
     CC=clang \
-        CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1" \
-        LDFLAGS="-fsanitize=address,undefined" \
+        CFLAGS="-fsanitize=address -g -O1" \
+        LDFLAGS="-fsanitize=address" \
         ./configure --without-tls --without-cyrus-sasl --without-systemd \
                     --disable-slapd --disable-overlays --disable-modules \
                     --enable-static=yes --enable-shared=no >/dev/null
@@ -61,17 +61,17 @@ if [ "${cmd}" = "harness" ]; then
         debug)
             CFLAGS="-g -O0"
             LIBS_DIR=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         debug-asan)
             CFLAGS="-g -O0"
             LIBS_DIR=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         release-asan)
             CFLAGS="-O2 -g"
             LIBS_DIR=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         coverage)
             CFLAGS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"

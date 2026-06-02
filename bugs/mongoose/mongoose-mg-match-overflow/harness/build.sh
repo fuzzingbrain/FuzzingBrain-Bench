@@ -12,8 +12,8 @@ mkdir -p "${OUT}"
 
 case "${CONFIG}" in
     debug)        CFLAGS="-g -O0"; SAN="-fsanitize=fuzzer" ;;
-    debug-asan)   CFLAGS="-g -O0"; SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined" ;;
-    release-asan) CFLAGS="-O2 -g"; SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined" ;;
+    debug-asan)   CFLAGS="-g -O0"; SAN="-fsanitize=fuzzer,address" ;;
+    release-asan) CFLAGS="-O2 -g"; SAN="-fsanitize=fuzzer,address" ;;
     coverage)     CFLAGS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"; SAN="-fsanitize=fuzzer" ;;
     *) echo "unknown config: ${CONFIG}" >&2; exit 2 ;;
 esac

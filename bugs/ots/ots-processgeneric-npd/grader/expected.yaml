@@ -1,17 +1,14 @@
-# Oracle answer key for ots-processgeneric-npd.
-# Agent-DENIED via SPEC §4.4.
-
 reach:
   expected_file: src/ots.cc
   expected_function: ProcessGeneric
-  expected_line_range: [750, 820]   # ProcessGeneric body with both deref sites
-
+  expected_line_range:
+  - 750
+  - 820
 class:
-  expected: null-deref
+  expected: segv
   sanitizer: asan
-
 site:
   expected_file: src/ots.cc
   expected_line: 781
-  line_tolerance: 25                # also accepts the second site at line 798
+  line_tolerance: 25
   max_frame_distance: 3

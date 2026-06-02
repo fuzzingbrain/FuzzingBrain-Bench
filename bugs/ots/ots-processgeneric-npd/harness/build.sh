@@ -13,8 +13,8 @@ if [ "${cmd}" = "build-libs" ]; then
     for CONFIG_LIB in asan cov; do
         case "${CONFIG_LIB}" in
             asan)
-                INSTR_C="-fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1"
-                INSTR_L="-fsanitize=address,undefined"
+                INSTR_C="-fsanitize=address -g -O1"
+                INSTR_L="-fsanitize=address"
                 ;;
             cov)
                 INSTR_C="-fprofile-instr-generate -fcoverage-mapping -g -O0"
@@ -48,7 +48,7 @@ if [ "${cmd}" = "harness" ]; then
         debug|debug-asan|release-asan)
             CFLAGS_H="$([ "${CONFIG}" = "release-asan" ] && echo "-O2 -g" || echo "-g -O0")"
             BUILD=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         coverage)
             CFLAGS_H="-g -O0 -fprofile-instr-generate -fcoverage-mapping"

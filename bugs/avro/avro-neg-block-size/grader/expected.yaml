@@ -1,14 +1,14 @@
 reach:
   expected_file: lang/c/src/datafile.c
-  expected_function: file_read_header
-  expected_line_range: [240, 280]
+  expected_function: file_read_block_count
+  expected_line_range: [437, 470]
 
 class:
-  expected: null-deref
-  sanitizer: ubsan
+  expected: allocation-size-too-big
+  sanitizer: asan
 
 site:
-  expected_file: lang/c/src/io.c
-  expected_line: 270
+  expected_file: lang/c/src/datafile.c
+  expected_line: 529
   line_tolerance: 5
   max_frame_distance: 3

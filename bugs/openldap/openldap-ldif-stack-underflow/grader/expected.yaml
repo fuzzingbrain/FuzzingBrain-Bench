@@ -7,13 +7,12 @@ reach:
   expected_line_range: [700, 900]   # ldif_read_record body in libldap/ldif.c
 
 class:
-  expected: oob-read
-  sanitizer: ubsan
-# Real bug class is stack-buffer-underflow (an underflowed index
-# reads below a stack array). UBSan's array-bounds check reports it
-# as "index <SIZE_MAX> out of bounds for type 'char[4096]'" — the
-# grader canonicalizes that to oob-read. ASan would label this
-# stack-buffer-underflow but UBSan's vocabulary is coarser.
+  expected: stack-buffer-underflow
+  sanitizer: asan
+# Original upstream bug was found and verified with AddressSanitizer
+# only. ASan reports the loop-increment access line[len-1] (len==0 =>
+# line[-1]) as a stack-buffer-underflow READ of size 1 below the
+# 4096-byte 'line' stack array in ldif_read_record.
 
 site:
   expected_file: ldif.c
@@ -21,7 +20,12 @@ site:
   line_tolerance: 5
   max_frame_distance: 3
 
+# Note on line number: the original issue cited ldif.c:803 against
+# 2.6.x master; our pinned vuln_commit places the loop-increment
+# access (last_ch = line[len-1]) at ldif.c:811. Same statement, same
+# root cause; ASan reports the underflow at this line.
+#
 # Note on file path: openldap's makefile uses relative paths during
-# compilation, so UBSan's __FILE__ resolves to bare "ldif.c" rather
-# than the repo-relative "libraries/libldap/ldif.c". The site oracle's
-# suffix-match (SPEC §2.2.4) handles this without modification.
+# compilation, so ASan's frame resolves to a build-tree path ending
+# in libraries/libldap/ldif.c. The site oracle's suffix-match
+# (SPEC §2.2.4) handles this without modification.

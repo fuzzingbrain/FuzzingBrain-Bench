@@ -7,12 +7,12 @@ reach:
   expected_line_range: [80, 140]
 
 class:
-  expected: null-deref
-  sanitizer: ubsan
-# UBSan catches "applying zero offset to null pointer" at bytecode.c:109:40
-# before ASan would report SEGV. Both are valid signals for null-deref;
-# we grade against the UBSan output which arrives first under
-# -fno-sanitize-recover=undefined.
+  expected: segv
+  sanitizer: asan
+# AddressSanitizer reports "SEGV on unknown address 0x000000000000"
+# (READ memory access) at bytecode.c:109:40 in dump_operation: a NULL
+# pointer dereference of subfunctions[idx]->debuginfo. This matches the
+# original upstream report exactly (ASan-only SEGV, no UBSan diagnostic).
 
 site:
   expected_file: src/bytecode.c

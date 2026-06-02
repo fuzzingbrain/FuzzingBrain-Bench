@@ -1,14 +1,34 @@
-reach:
-  expected_file: lang/c/src/schema.c
-  expected_function: avro_schema_union_append
-  expected_line_range: [380, 410]
+# Oracle answer key for avro-neg-string-len.
+# Re-baselined to the ORIGINAL upstream bug (apache/avro PR#3622):
+#   ASan allocation-size-too-big on a negative varint string length, in the
+#   read_string() -> avro_malloc() path of the Avro C binary value reader.
+#
+# Original crash banner (vuln.yaml / ISSUE.md, AddressSanitizer-only build):
+#   ==PID==ERROR: AddressSanitizer: requested allocation size 0xffffffffffffffe9
+#     ... exceeds maximum supported size ...  SUMMARY: allocation-size-too-big in realloc
+#
+# Verified release-asan stack at vuln_commit f7dfbc0 with the original 4-byte poc
+# (34 01 00 2f), built -fsanitize=address only:
+#   #1 avro_default_allocator   lang/c/src/allocation.c:36     <- realloc(huge size)
+#   #2 read_map_value           lang/c/src/value-read.c:103    <- read_string() call site (inlined)
+#   #3 read_value               lang/c/src/value-read.c:368
+#   #4 avro_value_read          lang/c/src/value-read.c:391
+# read_string() (encoding_binary.c:172-186, root cause per the upstream report) is
+# inlined into read_map_value at its call site, so the closest library frame the
+# sanitizer reports is value-read.c:103.
+#
+# class is intentionally omitted: ASan's ERROR line is "requested allocation size
+# ... exceeds maximum", which the oracle's class regex reads as the token
+# "requested"; "allocation-size-too-big" is not in the oracle's class vocabulary.
+# Grades on reach + crash + site (same convention as imagemagick-kernelinfo-alloc).
 
-class:
-  expected: null-deref
-  sanitizer: ubsan
+reach:
+  expected_file: lang/c/src/value-read.c
+  expected_function: read_map_value
+  expected_line_range: [79, 128]
 
 site:
-  expected_file: lang/c/src/schema.c
-  expected_line: 392
+  expected_file: lang/c/src/value-read.c
+  expected_line: 103
   line_tolerance: 5
   max_frame_distance: 3
