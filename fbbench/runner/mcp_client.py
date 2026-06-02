@@ -66,19 +66,42 @@ def _redact_urls_in_tree(root: str) -> None:
                     fp.write(new)
 
 
-def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False) -> None:
+def _full_scan_alias(real_bug_dir: str) -> str:
+    """A neutral `<project>-NN` handle for full-scan, replacing the descriptive
+    bug_id (e.g. `libpng-zlib-inflate-uaf` -> `libpng-03`) so the identifier no
+    longer names the bug. NN is the bug's stable 1-based position among its
+    project's bundles (sorted). The project name is not a leak — the harness
+    source reveals it anyway."""
+    real = os.path.abspath(real_bug_dir)
+    proj_dir = os.path.dirname(real)
+    project = os.path.basename(proj_dir)
+    me = os.path.basename(real)
+    siblings = sorted(n for n in os.listdir(proj_dir)
+                      if os.path.isfile(os.path.join(proj_dir, n, "bench.yaml")))
+    idx = (siblings.index(me) + 1) if me in siblings else 1
+    return f"{project}-{idx:02d}"
+
+
+def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
+                      alias: str | None = None) -> None:
     """Copy bench.yaml with upstream/repo/commit identifiers stripped.
 
-    In full_scan mode the human-readable `title` (which names the bug class and
-    function, e.g. "Heap Use-After-Free in png_zlib_inflate") is also stripped —
-    otherwise it would hand back the very description full_scan is meant to withhold.
+    In full_scan mode the fields that name or categorize the bug are also removed:
+    `title` (names the class + function), `capability_set` (reveals the fault
+    class — e.g. no `crash` => a leak), and the descriptive `bug_id` is replaced
+    by a neutral `<project>-NN` alias. Otherwise these would hand back the very
+    description full_scan is meant to withhold.
     """
     data = yaml.safe_load(open(src)) or {}
     for k in _BENCH_SCRUB_TOP:
         data.pop(k, None)
     if full_scan:
-        for k in ("title", "disclosed"):
+        for k in ("title", "disclosed", "capability_set", "notes"):
             data.pop(k, None)
+        if alias:
+            data["bug_id"] = alias
+        else:
+            data.pop("bug_id", None)
     tgt = data.get("target")
     if isinstance(tgt, dict):
         for k in _BENCH_SCRUB_TARGET:
@@ -94,14 +117,16 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
     real bug dir as BENCH_ORACLE_DIR. Withheld: grader/, poc/, binaries/,
     PROVENANCE.md, Dockerfile, and upstream/repo/commit fields of bench.yaml.
 
-    full_scan mode additionally withholds description.txt and the bench.yaml
-    `title` — the agent gets only the harness (the fuzz target) and must discover
-    a crashing input with no statement of what or where the bug is.
+    full_scan mode additionally withholds description.txt and, from bench.yaml,
+    the title / capability_set / notes, and replaces the descriptive bug_id with
+    a neutral `<project>-NN` alias — the agent gets only the harness (the fuzz
+    target) and must discover the fault with no statement of what or where it is.
     """
     sandbox = tempfile.mkdtemp(prefix="fbbench-bugview-")
     # mkdtemp is 0700; the agent's exec() may run under a different uid
     # (Tier 2 privsep), so make the view traversable/readable.
     os.chmod(sandbox, 0o755)
+    alias = _full_scan_alias(real_bug_dir) if full_scan else None
     entries = SANDBOX_ENTRIES
     if full_scan:
         entries = tuple(e for e in entries if e != "description.txt")
@@ -111,7 +136,7 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
             continue
         dst = os.path.join(sandbox, name)
         if name == "bench.yaml":
-            _stage_bench_yaml(src, dst, full_scan=full_scan)
+            _stage_bench_yaml(src, dst, full_scan=full_scan, alias=alias)
         elif os.path.isdir(src):
             shutil.copytree(src, dst, ignore=_ignore_leaky)
             _redact_urls_in_tree(dst)
