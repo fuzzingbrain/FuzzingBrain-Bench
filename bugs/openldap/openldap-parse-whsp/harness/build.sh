@@ -2,7 +2,7 @@
 # Build script for openldap-ldif-stack-underflow.
 #
 # Strategy: build openldap (just liblber + libldap) twice —
-#   - /src/build-asan/   compiled with -fsanitize=address,undefined
+#   - /src/build-asan/   compiled with -fsanitize=address
 #   - /src/build-cov/    compiled with coverage instrumentation
 # Then link the harness in four configs, reusing those two library
 # builds. This is roughly 2× the openldap configure-make cost (~5 min
