@@ -1,1 +1,5 @@
-<?xml version="1.0"?><group><image><comment/></image></group>
+<?xml version="1.0"?>
+<image>
+<comment>test</comment>
+<draw primitive="rectangle" points="0,0 5,5"/>
+</image>

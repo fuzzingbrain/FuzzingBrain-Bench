@@ -28,6 +28,7 @@ status: fixed
 cve: null
 disclosed: 2026-01-27
 notes: |
-  Detected by UBSan's array-bounds check, not ASan. Builds with
-  -fsanitize=address,undefined; the array-bounds reports come from
-  the undefined arm.
+  Detected by AddressSanitizer (stack-buffer-underflow). Builds with
+  -fsanitize=address (fuzzer,address for the harness link). The
+  loop-increment access line[len-1] reads line[-1] when len==0,
+  underflowing the 4096-byte stack 'line' buffer in ldif_read_record.

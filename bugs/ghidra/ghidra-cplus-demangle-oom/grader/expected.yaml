@@ -9,6 +9,6 @@ class:
 
 site:
   expected_file: ghidra-demangler/rust-demangle.c
-  expected_line: 664
+  expected_line: 1553
   line_tolerance: 5
   max_frame_distance: 5

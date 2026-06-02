@@ -1,23 +1,30 @@
-OOM / UB in Ghidra Bundled libiberty rust_demangle
-===================================================
+OOM in Ghidra Bundled libiberty rust_demangle
+=============================================
 
 Project:     NationalSecurityAgency/ghidra (bundled GPL libiberty)
-Bug class:   null-deref / oom (UBSan/ASan dependent on input)
-Sanitizer:   UBSan (primary)
+Bug class:   oom (unbounded output-buffer growth)
+Sanitizer:   libFuzzer out-of-memory (built with -fsanitize=fuzzer,address)
 
 Ghidra bundles a copy of GNU libiberty at
 `GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/`. The vendored
-`rust_demangle()` shares its bugs with the upstream binutils/GCC copy:
-`str_buf_append()` does pointer arithmetic on a `str_buf_t` whose
-`buf` field can be NULL, and the v0 binder parser has an unbounded
-lifetime-count allocation path.
+`rust_demangle()` grows its output buffer with no maximum-size
+limit. `str_buf_reserve()` doubles the capacity in a loop until it
+covers the requested length and then calls `realloc()` with no cap.
 
-UBSan catches the null-pointer offset before the OOM path on most
-malformed inputs.
+A small (~61-byte) malformed Rust v0 mangled symbol with nested
+generic / lifetime parameters drives ~35-million-times output
+amplification through
+
+    demangle_type -> demangle_binder -> print_lifetime_from_index
+    -> str_buf_append -> str_buf_reserve -> realloc
+
+The single realloc request reaches 2 GB, libFuzzer's malloc hook
+trips, and stderr ends with
+`SUMMARY: libFuzzer: out-of-memory`.
 
 The harness drives `rust_demangle()` on a NUL-terminated copy of the
 fuzz input.
 
 References
 ----------
-- Sibling bug:     binutils-rust-demangle-oom (same root cause)
+- Sibling bugs:    ghidra-cplus-demangle-oom, binutils-rust-demangle-oom

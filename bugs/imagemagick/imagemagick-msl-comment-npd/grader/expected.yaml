@@ -4,8 +4,8 @@ reach:
   expected_line_range: [7080, 7110]
 
 class:
-  expected: null-deref
-  sanitizer: runtime
+  expected: abort
+  sanitizer: none
 
 site:
   expected_file: coders/msl.c

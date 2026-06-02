@@ -131,10 +131,24 @@ func reachFromBacktrace(stderr string, expected *expectedYAML) bool {
 type llvmCovExport struct {
 	Data []struct {
 		Files []struct {
-			Filename string          `json:"filename"`
-			Segments [][]json.Number `json:"segments"`
+			Filename string `json:"filename"`
+			// llvm-cov segments are heterogeneous tuples
+			// [line, col, count, hasCount, isRegionEntry, isGapRegion]:
+			// the first three are integers, the rest are JSON booleans.
+			// Decode each element as RawMessage so the boolean trailers
+			// don't break unmarshalling (json.Number cannot hold true/false).
+			Segments [][]json.RawMessage `json:"segments"`
 		} `json:"files"`
 	} `json:"data"`
+}
+
+// segInt extracts an integer element from an llvm-cov segment tuple.
+func segInt(seg []json.RawMessage, i int) (int64, error) {
+	var n json.Number
+	if err := json.Unmarshal(seg[i], &n); err != nil {
+		return 0, err
+	}
+	return n.Int64()
 }
 
 func llvmCovHit(raw []byte, expected *expectedYAML) bool {
@@ -156,11 +170,11 @@ func llvmCovHit(raw []byte, expected *expectedYAML) bool {
 				if len(seg) < 4 {
 					continue
 				}
-				line, err := seg[0].Int64()
+				line, err := segInt(seg, 0)
 				if err != nil {
 					continue
 				}
-				count, err := seg[2].Int64()
+				count, err := segInt(seg, 2)
 				if err != nil {
 					continue
 				}

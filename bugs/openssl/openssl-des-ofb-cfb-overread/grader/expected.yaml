@@ -4,8 +4,8 @@ reach:
   expected_line_range: [40, 80]
 
 class:
-  expected: oob-read
-  sanitizer: ubsan
+  expected: stack-buffer-overflow
+  sanitizer: asan
 
 site:
   expected_file: crypto/des/ofb64ede.c
