@@ -301,12 +301,6 @@ func toolSchemas() []map[string]any {
 				"type": "object",
 				"properties": map[string]any{
 					"path": map[string]any{"type": "string"},
-					"options": map[string]any{
-						"type": "object",
-						"properties": map[string]any{
-							"round_count": map[string]any{"type": "integer"},
-						},
-					},
 				},
 				"required": []string{"path"},
 			},
