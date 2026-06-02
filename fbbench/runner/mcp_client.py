@@ -82,6 +82,74 @@ def _full_scan_alias(real_bug_dir: str) -> str:
     return f"{project}-{idx:02d}"
 
 
+# Source files whose leading block comment is stripped in full-scan (it often
+# names the bug region / CVE cluster). Inline comments that explain the INPUT
+# FORMAT are kept — the agent legitimately needs them to craft an input.
+_SRC_EXTS = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".java")
+_ENTRYPOINT_MARKERS = ("LLVMFuzzerTestOneInput", "fuzzerTestOneInput")
+
+
+def _strip_leading_comment(text: str) -> str:
+    """Drop a leading run of blank lines / // lines / /* ... */ blocks (the
+    license + descriptive header) up to the first real code line. Comments
+    further down (e.g. input-layout notes next to the parsing code) are kept."""
+    lines = text.split("\n")
+    i, n = 0, len(lines)
+    while i < n:
+        s = lines[i].strip()
+        if s == "" or s.startswith("//"):
+            i += 1
+            continue
+        if s.startswith("/*"):
+            while i < n and "*/" not in lines[i]:
+                i += 1
+            i += 1  # consume the line containing */
+            continue
+        break
+    return "\n".join(lines[i:]).lstrip("\n")
+
+
+def _neutralize_harness(harness_dir: str) -> None:
+    """full-scan: strip leading header comments from staged harness sources and
+    rename the entrypoint file to a neutral `harness.<ext>` (e.g.
+    `vp9_encoder_midstream_reconfig_fuzzer.cc` -> `harness.cc`). The filename and
+    header are pure hints; the code itself (the fuzzed API) is left intact because
+    the agent needs it to know the input shape. build.sh and helper files keep
+    their names; only their header comment is stripped."""
+    if not os.path.isdir(harness_dir):
+        return
+    for root, _, files in os.walk(harness_dir):
+        for fn in files:
+            if fn == "build.sh" or os.path.splitext(fn)[1] not in _SRC_EXTS:
+                continue
+            p = os.path.join(root, fn)
+            try:
+                txt = open(p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            stripped = _strip_leading_comment(txt)
+            if stripped != txt:
+                with open(p, "w") as fp:
+                    fp.write(stripped)
+    # Rename the single entrypoint source to harness.<ext>.
+    for root, _, files in os.walk(harness_dir):
+        for fn in sorted(files):
+            ext = os.path.splitext(fn)[1]
+            if ext not in (".c", ".cc", ".cpp", ".cxx", ".java"):
+                continue
+            p = os.path.join(root, fn)
+            try:
+                txt = open(p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            if any(m in txt for m in _ENTRYPOINT_MARKERS):
+                new = os.path.join(root, "harness" + ext)
+                if os.path.abspath(new) != os.path.abspath(p) \
+                        and not os.path.exists(new):
+                    os.rename(p, new)
+                return
+
+
 def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
                       alias: str | None = None) -> None:
     """Copy bench.yaml with upstream/repo/commit identifiers stripped.
@@ -140,6 +208,8 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
         elif os.path.isdir(src):
             shutil.copytree(src, dst, ignore=_ignore_leaky)
             _redact_urls_in_tree(dst)
+            if full_scan and name == "harness":
+                _neutralize_harness(dst)
         else:
             shutil.copy2(src, dst)
     return sandbox
