@@ -77,13 +77,16 @@ def bug_kb(bug: str) -> list[str]:
 
 
 def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
-             timeout: int, preserve_pocs: bool = False) -> dict | None:
+             timeout: int, preserve_pocs: bool = False,
+             full_scan: bool = False) -> dict | None:
     cd = cell_dir(out, bug, model, sample)
     cmd = RUNNER + ["--bug", bug, "--model", model,
                     "--max-turns", str(max_turns),
                     "--out-dir", str(cd)]
     if preserve_pocs:
         cmd.append("--preserve-pocs")
+    if full_scan:
+        cmd.append("--full-scan")
     try:
         subprocess.run(cmd, cwd=REPO, timeout=timeout,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -142,6 +145,9 @@ def main() -> int:
                     help="comma list of repeat indices, e.g. 0,1,2 — each sample is one independent run")
     ap.add_argument("--preserve-pocs", action="store_true",
                     help="forward --preserve-pocs to runner (save every graded blob)")
+    ap.add_argument("--full-scan", action="store_true",
+                    help="harder mode: withhold bug descriptions; agents get only "
+                         "the harness and must discover crashing inputs")
     ap.add_argument("--max-turns", type=int, default=300,
                     help="turn budget per episode (default 300, matches ExploitBench)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-episode seconds")
@@ -182,7 +188,7 @@ def main() -> int:
         tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
         print(f"  {tag} ...", flush=True)
         r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
-                     preserve_pocs=args.preserve_pocs)
+                     preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
         if r and "error" not in r:
             c = r.get("total_usd") or 0.0
             total_cost += c

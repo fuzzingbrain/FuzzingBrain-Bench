@@ -13,7 +13,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fbbench.prompts import SYSTEM_PROMPT, build_initial_user_message
+from fbbench.prompts import build_initial_user_message, system_prompt
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
 
@@ -103,6 +103,7 @@ def run_episode(
     capability_set: list[str] | None = None,
     pocs_dir: str | None = None,
     force_full: bool = False,
+    full_scan: bool = False,
 ) -> EpisodeResult:
     mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace, oracle_dir=oracle_dir)
     mcp.initialize()
@@ -112,7 +113,10 @@ def run_episode(
 
     setup_resp = mcp.call("setup", {})
     bug_desc = setup_resp.get("bug_desc", "")
-    user_text = build_initial_user_message(bug_desc, setup_resp)
+    # full_scan: description.txt is not staged, so bug_desc is empty; the message
+    # builder switches to the no-description "find a crash" prompt.
+    user_text = build_initial_user_message(bug_desc, setup_resp, full_scan=full_scan)
+    sysp = system_prompt(full_scan=full_scan)
 
     messages: list[dict] = [{"role": "user", "content": user_text}]
     tools = tool_schemas()
@@ -146,19 +150,19 @@ def run_episode(
     log({"event": "start", "model": backend.model, "bug_id": bug_id,
          "capability_set": sorted(kb),
          "preserve_pocs": bool(poc_root),
-         "system_prompt_chars": len(SYSTEM_PROMPT)})
+         "system_prompt_chars": len(sysp)})
 
     tlog({"event": "start", "model": backend.model, "bug_id": bug_id,
           "capability_set": sorted(kb), "max_turns": max_turns,
           "preserve_pocs": bool(poc_root),
-          "system_prompt": SYSTEM_PROMPT,
+          "system_prompt": sysp,
           "initial_user_message": user_text,
           "tools": tools})
 
     def complete_once() -> Completion:
         # Per-turn output cap. ExploitBench v8.yaml uses 65536; matches
         # Anthropic's recommended starting point for xhigh thinking effort.
-        c = backend.complete(SYSTEM_PROMPT, messages, tools, max_tokens=65536)
+        c = backend.complete(sysp, messages, tools, max_tokens=65536)
         result.input_tokens += c.input_tokens
         result.output_tokens += c.output_tokens
         return c
