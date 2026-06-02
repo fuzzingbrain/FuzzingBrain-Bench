@@ -1,21 +1,24 @@
-Null Pointer Arithmetic in rust_demangle str_buf_append
-========================================================
+OOM in rust_demangle via unbounded lifetime count in demangle_binder
+====================================================================
 
 Project:     sourceware/binutils-gdb (libiberty)
-Bug class:   null-deref (UBSan: applying zero offset to null pointer)
-Sanitizer:   UBSan
+Bug class:   out-of-memory (CWE-400, Uncontrolled Resource Consumption)
+Sanitizer:   libFuzzer out-of-memory (rss_limit_mb)
 
-`str_buf_append()` in `libiberty/rust-demangle.c` performs pointer
-arithmetic on a `str_buf_t` whose `buf` field can still be NULL when
-the buffer has zero capacity. UBSan flags this as undefined behavior
-(applying offset to null pointer) at line 1572.
+`demangle_binder()` in `libiberty/rust-demangle.c` parses a bound
+lifetime count from the Rust v0 mangled symbol via parse_opt_integer_62()
+as a base-62 integer, with no upper bound, then loops that many times
+appending lifetime text to an output buffer. `str_buf_reserve()` doubles
+the output buffer capacity without any maximum size, so a crafted symbol
+with a 13-digit base-62 lifetime count drives ~35,000,000x output
+amplification (61 bytes -> >2 GB) until the process exhausts memory and
+libFuzzer aborts with an out-of-memory report.
 
 Reached via:
 
-    rust_demangle              libiberty/rust-demangle.c:1593
-    └─ rust_demangle_callback  libiberty/rust-demangle.c:1482
-       └─ demangle_path        libiberty/rust-demangle.c:695
-          └─ print_ident       libiberty/rust-demangle.c:451
-             └─ print_str
-                └─ str_buf_demangle_callback
-                   └─ str_buf_append          ← UBSan fires here
+    rust_demangle              libiberty/rust-demangle.c
+    └─ demangle_type / demangle_path
+       └─ demangle_binder      libiberty/rust-demangle.c:646  (unbounded loop)
+          └─ print_lifetime_from_index
+             └─ str_buf_append
+                └─ str_buf_reserve   libiberty/rust-demangle.c:1553  ← OOM realloc

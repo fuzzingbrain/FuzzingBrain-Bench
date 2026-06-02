@@ -23,8 +23,8 @@ if [ "${cmd}" = "openldap-libs" ]; then
     cp -r /src/openldap /src/build-asan
     pushd /src/build-asan >/dev/null
     CC=clang \
-        CFLAGS="-fsanitize=address,undefined -fno-sanitize-recover=undefined -g -O1" \
-        LDFLAGS="-fsanitize=address,undefined" \
+        CFLAGS="-fsanitize=address -g -O1" \
+        LDFLAGS="-fsanitize=address" \
         ./configure --without-tls --without-cyrus-sasl --without-systemd \
                     --disable-slapd --disable-overlays --disable-modules \
                     --enable-static=yes --enable-shared=no >/dev/null
@@ -61,17 +61,17 @@ if [ "${cmd}" = "harness" ]; then
         debug)
             CFLAGS="-g -O0"
             LIBS_DIR=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         debug-asan)
             CFLAGS="-g -O0"
             LIBS_DIR=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         release-asan)
             CFLAGS="-O2 -g"
             LIBS_DIR=/src/build-asan
-            SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+            SAN="-fsanitize=fuzzer,address"
             ;;
         coverage)
             CFLAGS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"

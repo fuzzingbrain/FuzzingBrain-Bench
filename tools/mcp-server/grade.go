@@ -78,9 +78,13 @@ func (s *server) toolGrade(args []byte) (any, error) {
 	// ample. The round count is fixed server-side and NOT agent-controllable:
 	// an agent passing a huge round_count (e.g. 1000) would re-run a heavy
 	// harness that many times and blow its own episode timeout — a self-DoS.
+	// Operators may lower it via BENCH_GRADE_ROUNDS (1..3) for very heavy
+	// harnesses (e.g. libvpx) where 3 runs/grade is too slow; never raised.
 	rounds := 3
-	if p.Options.RoundCount > 0 && p.Options.RoundCount < rounds {
-		rounds = p.Options.RoundCount // allow a smaller count (faster), never larger
+	if v := os.Getenv("BENCH_GRADE_ROUNDS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n < rounds {
+			rounds = n
+		}
 	}
 
 	start := time.Now()
@@ -380,8 +384,25 @@ func classMatches(r harnessRun, expected string) bool {
 		return false
 	}
 	switch expected {
+	case "allocation-size-too-big":
+		// ASan prints "AddressSanitizer: requested allocation size 0x... exceeds
+		// maximum supported size" on the ERROR line and the canonical class name
+		// "allocation-size-too-big" only on the SUMMARY line, so the generic
+		// asanErrorLine token below resolves to "requested". Match either form.
+		if strings.Contains(r.stderr, "allocation-size-too-big") ||
+			strings.Contains(r.stderr, "requested allocation size") {
+			return true
+		}
 	case "memory-leak":
 		if lsanLeakLine.MatchString(r.stderr) {
+			return true
+		}
+	case "stack-overflow":
+		// A stack-exhaustion SIGSEGV is reported as "...: stack-overflow on
+		// address ..." by ASan, by UBSan, and by libFuzzer's own deadly-signal
+		// handler (even in a no-sanitizer, fuzzer-driver-only build). Match the
+		// canonical token regardless of which runtime printed it.
+		if strings.Contains(r.stderr, "stack-overflow") {
 			return true
 		}
 	case "oom":

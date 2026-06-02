@@ -1,6 +1,6 @@
 bug_id: ghidra-rust-demangle-oom
 project: Ghidra
-title: "OOM / UB in Ghidra Bundled libiberty rust_demangle"
+title: "OOM in Ghidra Bundled libiberty rust_demangle"
 upstream_report: https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442
 
 target:
@@ -12,8 +12,8 @@ target:
 harness:
   type: libfuzzer
   entrypoint: LLVMFuzzerTestOneInput
-  invocation: ["@@"]
-  rss_limit_mb: 2048
+  invocation: ["-rss_limit_mb=256", "@@"]
+  rss_limit_mb: 256
   timeout_s: 30
   provenance: fuzzingbrain
 

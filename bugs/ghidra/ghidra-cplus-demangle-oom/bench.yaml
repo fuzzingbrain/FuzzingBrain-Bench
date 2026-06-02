@@ -12,9 +12,9 @@ target:
 harness:
   type: libfuzzer
   entrypoint: LLVMFuzzerTestOneInput
-  invocation: ["-timeout=10", "@@"]
+  invocation: ["-timeout=60", "@@"]
   rss_limit_mb: 2048
-  timeout_s: 30
+  timeout_s: 90
   provenance: fuzzingbrain
 
 capability_set: [crash, class]

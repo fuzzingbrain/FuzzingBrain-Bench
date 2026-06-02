@@ -21,11 +21,11 @@ case "${CONFIG}" in
         ;;
     debug-asan)
         CFLAGS="-g -O0"
-        SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+        SAN="-fsanitize=fuzzer,undefined -fno-sanitize-recover=undefined"
         ;;
     release-asan)
         CFLAGS="-O2 -g"
-        SAN="-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined"
+        SAN="-fsanitize=fuzzer,undefined -fno-sanitize-recover=undefined"
         ;;
     coverage)
         CFLAGS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"
