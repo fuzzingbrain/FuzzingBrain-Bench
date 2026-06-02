@@ -74,9 +74,13 @@ func (s *server) toolGrade(args []byte) (any, error) {
 		return nil, err
 	}
 
-	rounds := p.Options.RoundCount
-	if rounds <= 0 {
-		rounds = 3
+	// Crashes in this bench are deterministic, so 3 rounds of unanimity is
+	// ample. The round count is fixed server-side and NOT agent-controllable:
+	// an agent passing a huge round_count (e.g. 1000) would re-run a heavy
+	// harness that many times and blow its own episode timeout — a self-DoS.
+	rounds := 3
+	if p.Options.RoundCount > 0 && p.Options.RoundCount < rounds {
+		rounds = p.Options.RoundCount // allow a smaller count (faster), never larger
 	}
 
 	start := time.Now()
