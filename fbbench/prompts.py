@@ -110,6 +110,17 @@ def system_prompt(full_scan: bool = False) -> str:
             "assertion, a memory leak, or an out-of-memory / oversized allocation.\n\n") + s
 
 
+# setup() fields safe to show in full-scan. Dropped: bug_desc (a synthesized
+# description), capability_set (reveals the fault class), notes. bug_id is kept
+# but is already the neutral <project>-NN alias (see mcp_client.stage_bug_view).
+_FULLSCAN_SETUP_KEYS = ("bug_id", "harness", "build_configs",
+                        "workspace_path", "bug_dir")
+
+
+def _fullscan_safe_setup(setup_resp: dict) -> dict:
+    return {k: setup_resp[k] for k in _FULLSCAN_SETUP_KEYS if k in setup_resp}
+
+
 def build_initial_user_message(bug_desc: str, setup_resp: dict,
                                full_scan: bool = False) -> str:
     """First user turn: the bug's description.txt plus the setup() payload.
@@ -132,8 +143,9 @@ def build_initial_user_message(bug_desc: str, setup_resp: dict,
             "  - excessive memory allocation / out-of-memory (allocation-size-too-big "
             "or OOM).\n"
             "You are not told which of these applies here — discover it.\n\n"
-            "The MCP `setup()` you just queried returned:\n\n"
-            + json.dumps(setup_resp, indent=2)
+            "The MCP `setup()` you just queried returned (description-bearing "
+            "fields withheld in this mode):\n\n"
+            + json.dumps(_fullscan_safe_setup(setup_resp), indent=2)
             + "\n\nProduce a triggering input and call `grade()` to test it; read "
             "the raw harness output (sanitizer report / exit / signal) as feedback."
         )
