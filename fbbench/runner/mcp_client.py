@@ -74,7 +74,13 @@ def _ensure_source_cache(repo: str, commit: str) -> str | None:
         subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout",
                         "--quiet", repo, tmp], check=True,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
-        subprocess.run(["git", "-C", tmp, "checkout", "--quiet", "--detach", commit],
+        # vuln_commit is not always a sha: it can be a fork branch name
+        # (fwupd -> origin/<branch>) or a release/version label (graaljs
+        # "24.1.2" -> tag graal-24.1.2). Resolve to something checkout-able.
+        ref = _resolve_ref(tmp, commit)
+        if ref is None:
+            raise ValueError(f"ref {commit!r} not found (not a sha/branch/tag)")
+        subprocess.run(["git", "-C", tmp, "checkout", "--quiet", "--detach", ref],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                        timeout=600)
         shutil.rmtree(os.path.join(tmp, ".git"), ignore_errors=True)
@@ -86,10 +92,29 @@ def _ensure_source_cache(repo: str, commit: str) -> str | None:
             # (many bugs share a repo). Theirs is fine — drop ours.
             shutil.rmtree(tmp, ignore_errors=True)
         return str(cache) if (cache / ".ready").exists() else None
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError,
+            ValueError) as e:
         shutil.rmtree(tmp, ignore_errors=True)
         print(f"[stage_source] could not fetch {repo}@{commit}: {e}", flush=True)
         return None
+
+
+def _resolve_ref(repo_dir: str, commit: str) -> str | None:
+    """Resolve vuln_commit to a checkout-able ref: a sha/tag as-is, else a fork
+    branch (origin/<name>), else a tag whose name ends with the version label
+    (e.g. "24.1.2" -> "graal-24.1.2")."""
+    def ok(r: str) -> bool:
+        return subprocess.run(
+            ["git", "-C", repo_dir, "rev-parse", "--verify", "--quiet", r + "^{commit}"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+    if ok(commit):
+        return commit
+    if ok("origin/" + commit):
+        return "origin/" + commit
+    tags = subprocess.run(["git", "-C", repo_dir, "tag", "--list"],
+                          capture_output=True, text=True).stdout.split()
+    matches = [t for t in tags if t.endswith(commit)]
+    return matches[0] if matches else None
 
 
 def _stage_source(real_bug_dir: str, sandbox: str) -> None:
