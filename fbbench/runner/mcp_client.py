@@ -79,8 +79,13 @@ def _ensure_source_cache(repo: str, commit: str) -> str | None:
                        timeout=600)
         shutil.rmtree(os.path.join(tmp, ".git"), ignore_errors=True)
         open(os.path.join(tmp, ".ready"), "w").close()
-        os.replace(tmp, cache)   # atomic same-fs move into place
-        return str(cache)
+        try:
+            os.replace(tmp, cache)   # atomic same-fs move into place
+        except OSError:
+            # Another worker populated this same (repo, commit) concurrently
+            # (many bugs share a repo). Theirs is fine — drop ours.
+            shutil.rmtree(tmp, ignore_errors=True)
+        return str(cache) if (cache / ".ready").exists() else None
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
         shutil.rmtree(tmp, ignore_errors=True)
         print(f"[stage_source] could not fetch {repo}@{commit}: {e}", flush=True)
