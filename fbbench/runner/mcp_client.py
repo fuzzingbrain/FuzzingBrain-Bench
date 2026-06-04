@@ -272,10 +272,12 @@ def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
     if full_scan:
         for k in ("title", "disclosed", "capability_set", "notes"):
             data.pop(k, None)
-        if alias:
-            data["bug_id"] = alias
-        else:
-            data.pop("bug_id", None)
+    # Neutral bug_id alias in ALL modes (the descriptive id would otherwise name
+    # the bug; the real id is kept in the run records, not the agent's view).
+    if alias:
+        data["bug_id"] = alias
+    elif full_scan:
+        data.pop("bug_id", None)
     tgt = data.get("target")
     if isinstance(tgt, dict):
         for k in _BENCH_SCRUB_TARGET:
@@ -300,7 +302,7 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
     # mkdtemp is 0700; the agent's exec() may run under a different uid
     # (Tier 2 privsep), so make the view traversable/readable.
     os.chmod(sandbox, 0o755)
-    alias = _full_scan_alias(real_bug_dir) if full_scan else None
+    alias = _full_scan_alias(real_bug_dir)   # neutral bug_id in all modes
     entries = SANDBOX_ENTRIES
     if full_scan:
         entries = tuple(e for e in entries if e != "description.txt")
