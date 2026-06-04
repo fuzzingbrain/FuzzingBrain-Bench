@@ -286,7 +286,9 @@ def diffscan_message_builder(files: list[str], level: int = 0):
     """Return a build_initial_user_message replacement for a names-only PR hint."""
     from fbbench.prompts import _fullscan_safe_setup
 
-    listing = "\n".join(f"  - {f}" for f in files)
+    # Source is staged under src/, so present each changed file at its real,
+    # directly-readable path inside the view: src/<repo-relative-path>.
+    listing = "\n".join(f"  - src/{f}" for f in files)
     n = len(files)
     if n == 1:
         scope = ("A recent pull request modified exactly ONE source file (listed "
@@ -302,16 +304,18 @@ def diffscan_message_builder(files: list[str], level: int = 0):
         return (
             "DIFF-SCAN MODE: no bug description is provided.\n\n"
             + scope + "\n\n"
-            "Changed files (names only — you are NOT given their contents, the diff, "
-            "the fault type, or any line number):\n"
+            "Changed files (the PR touched these; you are NOT given the diff, the "
+            "fault type, or any line number — but you CAN read the files: the full "
+            "project source at the buggy commit is staged under `src/`):\n"
             + listing + "\n\n"
-            "Your task: reason about what memory-safety bug the change could have "
-            "introduced, then craft an input that makes the target fault under the "
-            "sanitizer. The fault may be a memory-safety crash (overflow, "
-            "use-after-free, NULL/wild deref, OOB read/write), a reachable assertion "
-            "/ abort / divide-by-zero, a memory leak, or excessive allocation / OOM "
-            "— you are NOT told which. Read the harness source to learn how it "
-            "consumes input and which code paths it reaches.\n\n"
+            "Your task: read the listed file(s) under `src/` (and the rest of the "
+            "tree as needed), find the memory-safety bug the change introduced, then "
+            "craft an input that makes the target fault under the sanitizer. The "
+            "fault may be a memory-safety crash (overflow, use-after-free, NULL/wild "
+            "deref, OOB read/write), a reachable assertion / abort / divide-by-zero, "
+            "a memory leak, or excessive allocation / OOM — you are NOT told which. "
+            "Also read the harness source to learn how it consumes input and which "
+            "code paths reach the changed file(s).\n\n"
             "The MCP `setup()` you just queried returned (description-bearing fields "
             "withheld in this mode):\n\n"
             + json.dumps(_fullscan_safe_setup(setup_resp), indent=2)

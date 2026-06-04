@@ -5,6 +5,7 @@ narrow shim — just enough to drive the 6-tool contract.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import re
@@ -15,6 +16,14 @@ import threading
 from typing import Any
 
 import yaml
+
+from fbbench.paths import REPO
+
+# Cached library-source checkouts (repo @ vuln_commit), shared across episodes.
+# gitignored (under runs/). Each entry is the source tree at the buggy commit
+# with .git removed, so the agent can read/grep the real (vulnerable) code but
+# cannot walk history to the fix.
+SRCCACHE = REPO / "runs" / "diffscan" / "_srccache"
 
 # URLs in staged harness sources (e.g. a "see issues/5946" comment) point the
 # agent at the upstream bug report. Network egress is already blocked, but we
@@ -46,6 +55,59 @@ _BENCH_SCRUB_TARGET = ("repo", "vuln_commit")
 
 def _ignore_leaky(_dir: str, names: list[str]) -> list[str]:
     return [n for n in names if n in SANDBOX_IGNORE]
+
+
+def _ensure_source_cache(repo: str, commit: str) -> str | None:
+    """Clone repo@commit (blobless), strip .git, cache it. Returns the cache
+    path, or None if the source can't be fetched. One-time per (repo, commit)."""
+    if not repo or not commit:
+        return None
+    key = hashlib.sha1(f"{repo}@{commit}".encode()).hexdigest()[:16]
+    cache = SRCCACHE / key
+    if (cache / ".ready").exists():
+        return str(cache)
+    SRCCACHE.mkdir(parents=True, exist_ok=True)
+    tmp = tempfile.mkdtemp(prefix="srcclone-", dir=str(SRCCACHE))
+    try:
+        # blobless clone keeps the fetch small; checkout pulls only this commit's
+        # blobs. --no-checkout first so we control which commit lands.
+        subprocess.run(["git", "clone", "--filter=blob:none", "--no-checkout",
+                        "--quiet", repo, tmp], check=True,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=600)
+        subprocess.run(["git", "-C", tmp, "checkout", "--quiet", "--detach", commit],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       timeout=600)
+        shutil.rmtree(os.path.join(tmp, ".git"), ignore_errors=True)
+        open(os.path.join(tmp, ".ready"), "w").close()
+        os.replace(tmp, cache)   # atomic same-fs move into place
+        return str(cache)
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as e:
+        shutil.rmtree(tmp, ignore_errors=True)
+        print(f"[stage_source] could not fetch {repo}@{commit}: {e}", flush=True)
+        return None
+
+
+def _stage_source(real_bug_dir: str, sandbox: str) -> None:
+    """Stage the library source (repo @ vuln_commit) into <sandbox>/src/ so the
+    agent can read/grep the real vulnerable code. Infrastructure-provided — the
+    agent never clones or reaches the network itself. Best-effort: if the source
+    can't be fetched the episode still runs (no src/)."""
+    if os.environ.get("BENCH_STAGE_SOURCE", "1") == "0":
+        return
+    try:
+        bench = yaml.safe_load(open(os.path.join(real_bug_dir, "bench.yaml"))) or {}
+    except OSError:
+        return
+    tgt = bench.get("target", {}) or {}
+    cache = _ensure_source_cache(tgt.get("repo", ""), tgt.get("vuln_commit", ""))
+    if not cache:
+        return
+    dst = os.path.join(sandbox, "src")
+    os.makedirs(dst, exist_ok=True)
+    # hardlink-copy (cheap, shares inodes) when same fs; else a plain copy.
+    if subprocess.run(["cp", "-al", cache + "/.", dst + "/"],
+                      stderr=subprocess.DEVNULL).returncode != 0:
+        subprocess.run(["cp", "-a", cache + "/.", dst + "/"], stderr=subprocess.DEVNULL)
 
 
 def _redact_urls_in_tree(root: str) -> None:
@@ -232,6 +294,8 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
         # setup() itself. A present (neutral) file suppresses that fallback.
         with open(os.path.join(sandbox, "description.txt"), "w") as fp:
             fp.write(_FULLSCAN_DESC_NOTICE)
+    # Stage the real (vulnerable) library source as infrastructure — all modes.
+    _stage_source(real_bug_dir, sandbox)
     return sandbox
 
 
