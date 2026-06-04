@@ -74,15 +74,14 @@ func (s *server) toolGrade(args []byte) (any, error) {
 		return nil, err
 	}
 
-	// Crashes in this bench are deterministic, so 3 rounds of unanimity is
-	// ample. The round count is fixed server-side and NOT agent-controllable:
-	// an agent passing a huge round_count (e.g. 1000) would re-run a heavy
-	// harness that many times and blow its own episode timeout — a self-DoS.
-	// Operators may lower it via BENCH_GRADE_ROUNDS (1..3) for very heavy
-	// harnesses (e.g. libvpx) where 3 runs/grade is too slow; never raised.
-	rounds := 3
+	// Flaky rule (standing): grade ONCE by default — single-shot, no
+	// re-run-to-confirm. Crashes in this bench are deterministic, so one round
+	// is the measurement; we do NOT re-run the harness to "make sure" a crash
+	// reproduces. Operators may opt into multi-round unanimity via
+	// BENCH_GRADE_ROUNDS (1..3) for spot-checking, but the default is 1.
+	rounds := 1
 	if v := os.Getenv("BENCH_GRADE_ROUNDS"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n < rounds {
+		if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 3 {
 			rounds = n
 		}
 	}
@@ -199,7 +198,8 @@ func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYA
 	// binary on the PoC. Always the ground-truth binary from oracleDir, never
 	// anything in the agent-facing bug dir.
 	binPath := filepath.Join(s.oracleDir, "binaries", "release-asan", "harness")
-	out := runHarness(binPath, bench.Harness.Invocation, pocPath, runDir, bench.Harness.TimeoutS)
+	out := runHarness(binPath, bench.Harness.Invocation, pocPath, runDir, bench.Harness.TimeoutS,
+		isLeakClass(expected.Class.Expected))
 
 	if _, ok := caps["crash"]; ok {
 		if crashFired(out) {
@@ -218,7 +218,14 @@ func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYA
 	}
 	if _, ok := caps["reach"]; ok {
 		covBin := filepath.Join(s.oracleDir, "binaries", "coverage", "harness")
-		if reachFired(covBin, bench.Harness.Invocation, pocPath, runDir, expected) {
+		if caps["site"] == "fired" {
+			// site is strictly stronger than reach: a crash AT the expected
+			// file:line necessarily executed the enclosing function, so site
+			// firing IMPLIES reach. (The coverage-binary probe can miss this
+			// when the crash aborts before the profile is written — which made
+			// reach spuriously fail on bugs whose site already matched.)
+			caps["reach"] = "fired"
+		} else if reachFired(covBin, bench.Harness.Invocation, pocPath, runDir, expected) {
 			caps["reach"] = "fired"
 		} else if reachFromBacktrace(out.stderr, expected) {
 			// Fallback: a sanitizer backtrace frame inside the buggy region
@@ -244,7 +251,13 @@ type harnessRun struct {
 	timedOut       bool
 }
 
-func runHarness(bin string, invocation []string, pocPath, runDir string, timeoutS int) harnessRun {
+// isLeakClass reports whether a bug's documented class is a LeakSanitizer
+// finding, in which case leak detection must stay on during grading.
+func isLeakClass(expectedClass string) bool {
+	return strings.Contains(strings.ToLower(expectedClass), "leak")
+}
+
+func runHarness(bin string, invocation []string, pocPath, runDir string, timeoutS int, detectLeaks bool) harnessRun {
 	if timeoutS <= 0 {
 		timeoutS = 30
 	}
@@ -258,8 +271,16 @@ func runHarness(bin string, invocation []string, pocPath, runDir string, timeout
 	}
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = runDir
+	// LeakSanitizer ships inside ASan and runs at exit by default. For a bug
+	// whose documented class is NOT a leak, that incidentally flags error-path
+	// leaks in the harness/library and spuriously fires the `crash` capability.
+	// So detect_leaks is gated on the expected class: on only for leak bugs.
+	asanLeak := "detect_leaks=0"
+	if detectLeaks {
+		asanLeak = "detect_leaks=1"
+	}
 	cmd.Env = append(os.Environ(),
-		"ASAN_OPTIONS=abort_on_error=0:exitcode=66",
+		"ASAN_OPTIONS=abort_on_error=0:exitcode=66:"+asanLeak,
 		"UBSAN_OPTIONS=abort_on_error=0:print_stacktrace=1",
 		"LSAN_OPTIONS=exitcode=66",
 		"TMPDIR="+runDir,
@@ -368,6 +389,10 @@ var asanErrorLine = regexp.MustCompile(`AddressSanitizer:\s+([a-zA-Z0-9_-]+)`)
 var ubsanErrorLine = regexp.MustCompile(`runtime error:\s+([^\n]+)`)
 var lsanLeakLine = regexp.MustCompile(`(Direct|Indirect) leak of`)
 
+// stackOverflowLine matches a stack-overflow only on a sanitizer report line,
+// never a bare substring (the binary path can contain "stack-overflow").
+var stackOverflowLine = regexp.MustCompile(`Sanitizer: stack-overflow|stack-overflow on address`)
+
 // Java exception detection — for Jazzer-style harnesses and any Java bug
 // where fuzzerTestOneInput(byte[]) is invoked from a wrapper main().
 //
@@ -399,10 +424,12 @@ func classMatches(r harnessRun, expected string) bool {
 		}
 	case "stack-overflow":
 		// A stack-exhaustion SIGSEGV is reported as "...: stack-overflow on
-		// address ..." by ASan, by UBSan, and by libFuzzer's own deadly-signal
-		// handler (even in a no-sanitizer, fuzzer-driver-only build). Match the
-		// canonical token regardless of which runtime printed it.
-		if strings.Contains(r.stderr, "stack-overflow") {
+		// address ..." by ASan and as "...Sanitizer: stack-overflow ..." by
+		// UBSan. Match only on the SANITIZER REPORT line, NOT a bare substring:
+		// the binary path itself can contain "stack-overflow" (bug dirs like
+		// .../imagemagick-msl-stack-overflow/...), which a plain Contains would
+		// false-match even when no crash occurred.
+		if stackOverflowLine.MatchString(r.stderr) {
 			return true
 		}
 	case "oom":

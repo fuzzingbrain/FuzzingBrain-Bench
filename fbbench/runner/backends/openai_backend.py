@@ -87,6 +87,13 @@ class OpenAIBackend:
                 args = {}
             c.tool_calls.append(ToolCall(id=tc.id, name=tc.function.name, input=args))
         if resp.usage:
-            c.input_tokens = resp.usage.prompt_tokens or 0
+            # OpenAI auto-caches server-side; prompt_tokens INCLUDES the cached
+            # prefix, broken out under prompt_tokens_details.cached_tokens. Split
+            # it so cost_usd prices the cached part at the cheaper read rate.
+            prompt = resp.usage.prompt_tokens or 0
+            details = getattr(resp.usage, "prompt_tokens_details", None)
+            cached = (getattr(details, "cached_tokens", 0) or 0) if details else 0
+            c.input_tokens = max(0, prompt - cached)
+            c.cache_read_tokens = cached
             c.output_tokens = resp.usage.completion_tokens or 0
         return c

@@ -38,8 +38,18 @@ class Completion:
     text: str = ""
     tool_calls: list[ToolCall] = field(default_factory=list)
     stop_reason: str = ""        # normalized: "tool_use" | "end" | other SDK value
+    # Token buckets, normalized across providers so cost_usd can price each at
+    # its own rate. input_tokens is FRESH (uncached) input billed at 1x; the
+    # two cache buckets are billed at the provider's cache multipliers.
+    #   Anthropic: input=usage.input_tokens (already excludes cache),
+    #              cache_write=cache_creation_input_tokens (1.25x),
+    #              cache_read=cache_read_input_tokens (0.1x).
+    #   OpenAI:    prompt_tokens INCLUDES cache, so input=prompt-cached,
+    #              cache_read=prompt_tokens_details.cached_tokens, write=0.
     input_tokens: int = 0
     output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
 
 
 class Backend(Protocol):
