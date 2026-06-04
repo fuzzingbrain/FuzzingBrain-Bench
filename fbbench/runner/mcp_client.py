@@ -23,7 +23,9 @@ from fbbench.paths import REPO
 # gitignored (under runs/). Each entry is the source tree at the buggy commit
 # with .git removed, so the agent can read/grep the real (vulnerable) code but
 # cannot walk history to the fix.
-SRCCACHE = REPO / "runs" / "diffscan" / "_srccache"
+# Library-source cache is mode-NEUTRAL (full-scan / normal / diff all stage it),
+# so it lives at runs/_srccache, not under diffscan/.
+SRCCACHE = REPO / "runs" / "_srccache"
 
 # URLs in staged harness sources (e.g. a "see issues/5946" comment) point the
 # agent at the upstream bug report. Network egress is already blocked, but we
