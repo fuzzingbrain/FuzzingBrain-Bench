@@ -58,6 +58,12 @@ def main() -> int:
                     help="harder mode: withhold the bug description (and bench.yaml "
                          "title). The agent gets only the harness and must discover "
                          "a crashing input. Grading/oracle are unchanged.")
+    ap.add_argument("--require-preset", action="store_true",
+                    help="force-preset mode: an off-target crash (different "
+                         "stack/site/class than the documented bug) does NOT end the "
+                         "episode. The agent is pushed to keep iterating until the "
+                         "preset capability set fires, or --max-turns is hit. Works "
+                         "with normal, --full-scan, and diff-scan.")
     ap.add_argument("--server-bin", default=None,
                     help="path to mcp-server binary (default: ./bin/mcp-server)")
     ap.add_argument("--repo-root", default=None,
@@ -109,6 +115,7 @@ def main() -> int:
             pocs_dir=str(pocs_dir) if pocs_dir else None,
             force_full=args.force_full,
             full_scan=args.full_scan,
+            require_preset=args.require_preset,
         )
     finally:
         shutil.rmtree(workspace, ignore_errors=True)
@@ -126,7 +133,8 @@ def main() -> int:
         "duration_s": result.duration_s,
     }
     cost = {"model": result.model,
-            **cost_usd(result.model, result.input_tokens, result.output_tokens)}
+            **cost_usd(result.model, result.input_tokens, result.output_tokens,
+                       result.cache_read_tokens, result.cache_write_tokens)}
     score["total_usd"] = cost["total_usd"]
     (out_dir / "score.json").write_text(json.dumps(score, indent=2))
     (out_dir / "cost.json").write_text(json.dumps(cost, indent=2))

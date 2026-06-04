@@ -46,6 +46,35 @@ class AnthropicBackend:
                 out.append({"role": "user", "content": content})
         return out
 
+    @staticmethod
+    def _with_cache(system: str, api_tools: list[dict], blocks: list[dict]):
+        """Attach prompt-cache breakpoints to maximize prefix reuse.
+
+        Three ephemeral breakpoints (within Anthropic's limit of 4): the tools
+        array, the system prompt, and the LAST content block of the LAST message.
+        History is append-only, so each turn the previous prefix (up to the prior
+        last message) is a cache READ and only the new turn is written. system +
+        tools are static, so after turn 1 they are always read-hits.
+        """
+        cc = {"type": "ephemeral"}
+        # system: turn the plain string into a cacheable text block.
+        sys_param = ([{"type": "text", "text": system, "cache_control": cc}]
+                     if system else system)
+        # tools: mark the last tool (caches the whole tools array before it).
+        tools_param = list(api_tools)
+        if tools_param:
+            tools_param[-1] = {**tools_param[-1], "cache_control": cc}
+        # messages: mark the last block of the last message.
+        if blocks:
+            last = blocks[-1]
+            content = last["content"]
+            if isinstance(content, str):
+                last["content"] = [{"type": "text", "text": content,
+                                    "cache_control": cc}]
+            elif content:
+                content[-1] = {**content[-1], "cache_control": cc}
+        return sys_param, tools_param, blocks
+
     def _stream_once(self, system, api_tools, blocks, max_tokens):
         with self._client.messages.stream(
             model=self.model,
@@ -62,6 +91,7 @@ class AnthropicBackend:
         api_tools = [{"name": t["name"], "description": t["description"],
                       "input_schema": t["input_schema"]} for t in tools]
         blocks = self._to_blocks(messages)
+        system, api_tools, blocks = self._with_cache(system, api_tools, blocks)
         if self._max_tokens_cap is not None:
             max_tokens = min(max_tokens, self._max_tokens_cap)
         try:
@@ -81,6 +111,11 @@ class AnthropicBackend:
                 c.tool_calls.append(ToolCall(id=block.id, name=block.name,
                                              input=block.input or {}))
         if resp.usage:
+            # input_tokens already EXCLUDES cached tokens on Anthropic.
             c.input_tokens = resp.usage.input_tokens or 0
             c.output_tokens = resp.usage.output_tokens or 0
+            c.cache_write_tokens = getattr(
+                resp.usage, "cache_creation_input_tokens", 0) or 0
+            c.cache_read_tokens = getattr(
+                resp.usage, "cache_read_input_tokens", 0) or 0
         return c
