@@ -43,6 +43,10 @@ class AnthropicBackend:
                 content = [{"type": "tool_result", "tool_use_id": r.id,
                             "content": r.content, "is_error": r.is_error}
                            for r in m["results"]]
+                # Budget note rides in the SAME user message as the tool results
+                # (keeps tool_use<->tool_result adjacency intact).
+                if m.get("note"):
+                    content.append({"type": "text", "text": m["note"]})
                 out.append({"role": "user", "content": content})
         return out
 
