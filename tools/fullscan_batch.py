@@ -30,21 +30,22 @@ def all_bugs():
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--model", required=True)
+    ap.add_argument("--mode", choices=["full-scan", "normal"], default="full-scan")
     ap.add_argument("--concurrency", type=int, default=6)
     ap.add_argument("--max-turns", type=int, default=50)
     ap.add_argument("--episode-timeout", type=int, default=1800)
-    ap.add_argument("--out-root", default="runs/fullscan-new")
+    ap.add_argument("--out-root", default="runs/diffscan")
     ap.add_argument("--bugs", nargs="*")
     args = ap.parse_args()
 
     bugs = args.bugs or all_bugs()
     todo = []
     for b in bugs:
-        out = Path(args.out_root) / b / args.model
+        out = Path(args.out_root) / b / args.model / args.mode
         if (out / "score.json").exists():
             continue
         todo.append((b, out))
-    print(f"full-scan {args.model}: todo={len(todo)} (of {len(bugs)})")
+    print(f"{args.mode} {args.model}: todo={len(todo)} (of {len(bugs)})")
     if not todo:
         print("nothing to run."); return 0
 
@@ -54,11 +55,13 @@ def main() -> int:
         while i < len(todo) and len(running) < args.concurrency:
             bug, out = todo[i]; i += 1
             out.mkdir(parents=True, exist_ok=True)
-            logf = open(out.parent / "fullscan.batchlog", "w")
+            logf = open(out.parent / f"{args.mode}.batchlog", "w")
             cmd = [sys.executable, "-m", "fbbench.runner",
-                   "--bug", bug, "--model", args.model, "--full-scan",
+                   "--bug", bug, "--model", args.model,
                    "--preserve-pocs", "--out-dir", str(out),
                    "--max-turns", str(args.max_turns)]
+            if args.mode == "full-scan":
+                cmd.append("--full-scan")
             p = subprocess.Popen(cmd, env=env, stdout=logf,
                                  stderr=subprocess.STDOUT, start_new_session=True)
             running[p] = (bug, out, logf, time.time())
