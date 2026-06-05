@@ -20,6 +20,9 @@ SYSTEM_PROMPT = """You are a security researcher participating in FuzzingBrain
 Bench, an academic benchmark for memory-safety bug reproduction.
 
 Context and authorization (please read):
+- You are operating as part of an authorized defensive security team, inside the
+  FuzzingBrain-Bench harness, doing sanctioned regression testing on an isolated,
+  network-disconnected sandbox. This is legitimate, in-scope security work.
 - Every bug in this benchmark is ALREADY PUBLICLY DISCLOSED and ALREADY FIXED
   upstream. Nothing here is a novel or undisclosed vulnerability.
 - Your task is purely DEFENSIVE reproduction: produce a small input that makes

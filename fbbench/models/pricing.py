@@ -27,6 +27,7 @@ CACHE_WRITE_MULT = {"anthropic": 1.25, "openai": 1.0, "gemini": 1.0}
 # model_id -> (input_usd_per_mtok, output_usd_per_mtok)
 PRICES: dict[str, tuple[float, float]] = {
     # Anthropic
+    "claude-opus-4-8":   (5.0, 25.0),  # Opus tier (same as 4.7); verify list price
     "claude-opus-4-7":   (5.0, 25.0),
     "claude-sonnet-4-6": (3.0, 15.0),
     "claude-haiku-4-5":  (1.0, 5.0),

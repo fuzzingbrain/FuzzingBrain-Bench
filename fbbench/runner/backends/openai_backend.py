@@ -51,6 +51,9 @@ class OpenAIBackend:
             elif m["role"] == "tool":
                 for r in m["results"]:
                     out.append({"role": "tool", "tool_call_id": r.id, "content": r.content})
+                # Budget note as a user message right after the tool outputs.
+                if m.get("note"):
+                    out.append({"role": "user", "content": m["note"]})
         return out
 
     def complete(self, system, messages, tools, max_tokens) -> Completion:
