@@ -1,0 +1,48 @@
+Use-After-Free / Double-Free in FlatBuffers Parser::Deserialize
+===============================================================
+
+Project:     google/flatbuffers
+Bug class:   use-after-free (double-free)
+Sanitizer:   AddressSanitizer
+
+flatbuffers::Parser::Deserialize() reconstructs an in-memory schema from a
+binary FlatBuffers schema (.bfbs) buffer. While walking the schema's enum
+list it does:
+
+    auto enum_def = new EnumDef();
+    if (enums_.Add(it->name()->str(), enum_def)) {
+      delete enum_def;     // duplicate name -> free it
+      return false;
+    }
+
+SymbolTable::Add() unconditionally pushes the pointer into its internal
+vector (vec.emplace_back(e)) BEFORE checking the name dictionary. When a
+duplicate enum name is detected, Add() returns true and the caller deletes
+the EnumDef -- but the dangling pointer is still in vec. When the Parser
+goes out of scope, ~SymbolTable() iterates vec and delete-s every entry,
+including the already-freed pointer, producing a double-free / heap
+use-after-free.
+
+Call chain on a crafted .bfbs schema with duplicate enum names:
+
+    LLVMFuzzerTestOneInput
+    └─ Parser::Deserialize(data, size)        src/idl_parser.cpp:4433
+       └─ Parser::Deserialize(Schema*)        src/idl_parser.cpp:4467  <- delete enum_def
+    ... later, on Parser teardown:
+    └─ ~Parser / ~SymbolTable                 include/flatbuffers/idl.h:243  <- second delete
+
+The harness verifies the input as a schema buffer (reflection::VerifySchemaBuffer)
+and only then calls Parser::Deserialize on it. The first two input bytes are a
+flags byte and a json-ratio byte consumed by the harness; the remainder is the
+schema buffer.
+
+Task
+----
+Produce a byte sequence that, when fed to this libFuzzer harness, makes it
+fault under AddressSanitizer at the SymbolTable destruction / Deserialize
+free path.
+
+References
+----------
+- Upstream report: https://github.com/google/flatbuffers/issues/9009
+- Harness: libFuzzer over reflection::VerifySchemaBuffer() + Parser::Deserialize()

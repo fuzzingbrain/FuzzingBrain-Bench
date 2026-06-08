@@ -1,0 +1,39 @@
+Heap Buffer Overflow in OpenH264 Scene Change Detection
+=======================================================
+
+Project:     openh264 (cisco/openh264 — H.264/AVC codec)
+Bug class:   heap-buffer-overflow (out-of-bounds READ)
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+OpenH264's video pre-processing module exposes a scene-change detector
+(METHOD_SCENE_CHANGE_DETECTION_VIDEO) through the public IWelsVP API.
+When the detector runs on a source/destination pixmap pair whose
+dimensions do not match the block grid the SAD routine assumes, the
+8x8 Sum-of-Absolute-Differences kernel WelsSampleSad8x8_c
+(codec/common/src/sad_common.cpp) walks the source/reference pointers
+by stride past the end of the allocated plane, producing an
+out-of-bounds heap read. CVpFrameWork::Process dispatches into the
+detector without validating that the pixmap dimensions are large enough
+for the block-wise SAD scan.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, causes
+ASan to report a heap-buffer-overflow READ whose faulting library frame
+is inside WelsSampleSad8x8_c in codec/common/src/sad_common.cpp.
+
+The harness (harness/processing_fuzzer.cpp) parses the first 5 bytes as
+{method, width, height}, allocates I420 source/destination buffers,
+sets up SPixMaps, and drives the chosen processing method via the
+public path WelsCreateVpInterface -> Init -> Process. To reach the bug,
+the method byte must select METHOD_SCENE_CHANGE_DETECTION_VIDEO and the
+derived dimensions must drive the SAD scan past the destination buffer.
+
+References
+----------
+- Upstream issue: github.com/cisco/openh264/issues/3926
+- Faulting site: codec/common/src/sad_common.cpp, WelsSampleSad8x8_c
+- Reach path: CSceneChangeDetectorVideo::operator() (SceneChangeDetection.h)
+  -> CSceneChangeDetection::Process -> CVpFrameWork::Process

@@ -1,0 +1,29 @@
+bug_id: libvpx-vp9-encoder-caq-assert
+project: libvpx
+title: "Integer Overflow / Assertion Failure in VP9 Encoder CAQ (vp9_aq_complexity.c)"
+upstream_report: https://issues.webmproject.org/issues/497896136
+
+target:
+  repo:         https://chromium.googlesource.com/webm/libvpx
+  vuln_commit:  3c456eb6eea2fcea46115d61eb72014d4f882541
+  language:     c
+  build_system: configure
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # vp9 encoder config fuzzer; original build: asan-only + --enable-debug
+
+capability_set: [reach, crash, site]   # assert ABRT: reach+crash+site fire; class "abrt" not machine-detected
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: confirmed
+cve: null
+disclosed: 2026-04-07

@@ -1,8 +1,3 @@
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="${DIR}/../lib"
-# -Xmx256m: keep heap small so the decompression bomb hits OOM fast.
-exec java -Xmx256m \
-    -cp "${LIB}/classes:${LIB}/avro-java.jar:${LIB}/deps/*" \
-    -DtargetClass=DecompressionBombFuzzer \
-    PocRunner "$@"
+version https://git-lfs.github.com/spec/v1
+oid sha256:43e8840e834df8747c5f27b6b04103f2a8be602445aead1be6c91cf60c611d9b
+size 284

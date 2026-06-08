@@ -26,14 +26,6 @@ K_b legend: R=reach C=crash Cl=class S=site. Bugs without a `Cl` flag are
 sanitizer class token; they grade on reach + crash + site (the bug's `capability_set`
 declares this, mirroring existing bench bugs like `freerdp-ntlm-memleak`).
 
-## Deferred (1) — documented, not added
-
-- **imagemagick DCM invalid-dimensions divide-by-zero (CVE-2026-49218 / GHSA-8pj9-6897-74xc)** —
-  see `discovered-candidates/imagemagick-dcm-zerodim-fpe/NOTES.md`. No reference PoC; the
-  obvious 0-column DICOM is already guarded at `coders/dcm.c:3897`, so it needs a crafted
-  multi-element DICOM reaching the unchecked end-path (fix `84fbcef8`, vuln_commit `4ac379a7`).
-  Not added to `bugs/` to avoid shipping a non-reproducing bundle.
-
 ## Validation
 
 - All 11 new bugs: `./fb-bench grade <id>` → **PASS, agreed=True**, every K_b flag fired.

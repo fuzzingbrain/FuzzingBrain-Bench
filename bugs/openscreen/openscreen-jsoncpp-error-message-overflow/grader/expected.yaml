@@ -1,0 +1,25 @@
+# Oracle answer key for openscreen-jsoncpp-error-message-overflow.
+# Verified against the Path-B production repro (jsoncpp built at the vendored
+# SHA with -DNDEBUG -DJSON_USE_EXCEPTION=0 -fno-exceptions, -O1), prod_repro.log:
+#   #0 Json::OurReader::getLocationLineAndColumn  json_reader.cpp:1828  <- OOB READ
+#   #1 ... getLocationLineAndColumn[abi:cxx11]    json_reader.cpp:1844
+#   #2 ... getFormattedErrorMessages              json_reader.cpp:1854
+#   #3 Json::OurCharReader::parse                 json_reader.cpp:1886
+# READ of size 1, "0 bytes after 1-byte region".
+# At -O2 the top frame symbolizes as getFormattedErrorMessages (the
+# getLocationLineAndColumn loop is inlined); the :1828 source line is stable.
+
+reach:
+  expected_file: json_reader.cpp
+  expected_function: getLocationLineAndColumn
+  expected_line_range: [1820, 1845]
+
+class:
+  expected: heap-buffer-overflow
+  sanitizer: asan
+
+site:
+  expected_file: json_reader.cpp
+  expected_line: 1828
+  line_tolerance: 10
+  max_frame_distance: 3

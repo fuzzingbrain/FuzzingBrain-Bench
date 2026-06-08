@@ -1,0 +1,46 @@
+Heap-buffer-overflow READ in spirv-tools FriendlyNameMapper::ParseInstruction
+=============================================================================
+
+Project:     SPIRV-Tools (KhronosGroup — SPIR-V disassembler)
+Bug class:   heap-buffer-overflow (READ, 4 bytes)
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+spvBinaryToText with both SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES and
+SPV_BINARY_TO_TEXT_OPTION_HANDLE_UNKNOWN_OPCODES set reads 4 bytes past the
+end of the caller-supplied SPIR-V word buffer at source/name_mapper.cpp:268
+when the module contains an OpTypePointer instruction whose declared word
+count is 3 (one fewer than the grammar requires) and whose StorageClass
+operand is an out-of-range enum.
+
+FRIENDLY_NAMES makes spvBinaryToText construct a FriendlyNameMapper, whose
+constructor drives spvBinaryParseWithOptions with ParseInstructionForwarder
+as the parsed-instruction callback. HANDLE_UNKNOWN_OPCODES enables the
+parser's emitAsUnknown() retry path: when parseOperand rejects an unknown enum
+value, the outer loop falls back to emitAsUnknown(), which dispatches the
+callback with inst.num_words set to the *declared* word count, BYPASSING the
+normal "all mandatory operands present" gate. FriendlyNameMapper::ParseInstruction
+then dispatches on inst.opcode; the OpTypePointer arm unconditionally reads
+inst.words[3] without checking inst.num_words, walking past the end of the
+caller's uint32_t[] when num_words == 3.
+
+Task
+----
+Produce a SPIR-V binary that, when disassembled by the harness with both
+FRIENDLY_NAMES and HANDLE_UNKNOWN_OPCODES, drives the emitAsUnknown retry for a
+short-encoded OpTypePointer (declared word_count 3, out-of-range StorageClass)
+and makes AddressSanitizer report a heap-buffer-overflow READ whose faulting
+library frame is in source/name_mapper.cpp (FriendlyNameMapper::ParseInstruction).
+
+The harness (harness/spirv_dis_extended_options_fuzzer.cc) consumes three
+FuzzedDataProvider option bytes (env, extended option bits, legacy option
+bits) then treats the remaining bytes as a SPIR-V word stream, passed to the
+public C API spvBinaryToText.
+
+References
+----------
+- Upstream report: https://github.com/KhronosGroup/SPIRV-Tools/issues/6664
+  (fixed 2026-05-31).
+- Source: source/name_mapper.cpp, FriendlyNameMapper::ParseInstruction
+  (OpTypePointer arm); enabling retry path in source/binary.cpp (emitAsUnknown).

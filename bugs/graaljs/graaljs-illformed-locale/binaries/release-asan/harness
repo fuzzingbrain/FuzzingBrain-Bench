@@ -1,7 +1,3 @@
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="${DIR}/../lib"
-exec java -Xmx512m \
-    -cp "${LIB}/classes:${LIB}/deps/*" \
-    -DtargetClass=IntlFuzzer \
-    PocRunner "$@"
+version https://git-lfs.github.com/spec/v1
+oid sha256:6f67a615cc5ee06d4e7cd2e78c8f88c2ca9ef928d8b61ead38eac9ba08f9146b
+size 181

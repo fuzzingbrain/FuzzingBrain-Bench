@@ -1,0 +1,18 @@
+# VP9 CAQ assertion: assert(cpi->rc.sb64_target_rate < INT_MAX/256) fails -> abort().
+# Original build (per the finding record): clang -fsanitize=address (ASan ONLY, no UBSan),
+# libvpx ./configure --enable-debug --disable-optimizations (asserts compiled in).
+# ASan reports "ABRT"; assert fires at vp9_aq_complexity.c:128 in vp9_caq_select_segment.
+reach:
+  expected_file: vp9_aq_complexity.c
+  expected_function: vp9_caq_select_segment
+  expected_line_range: [100, 140]
+
+class:
+  expected: abrt
+  sanitizer: asan
+
+site:
+  expected_file: vp9_aq_complexity.c
+  expected_line: 128
+  line_tolerance: 12
+  max_frame_distance: 6

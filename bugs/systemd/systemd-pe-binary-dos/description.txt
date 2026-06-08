@@ -1,0 +1,35 @@
+Algorithmic-Complexity DoS in the systemd PE/UKI Parser
+=======================================================
+
+Project:     systemd (src/shared/pe-binary.c)
+Bug class:   algorithmic-complexity DoS (slow unit, CWE-407 / CWE-400)
+Sanitizer:   libFuzzer timeout (wall-clock alarm)
+
+Summary
+-------
+systemd's userspace UKI/PE inspection path (pe_load_headers /
+pe_load_sections / pe_read_section_data_by_name / uki_hash) is reached
+by bootctl, systemd-stub, systemd-measure, pcrlock and kernel-install
+when handling Unified Kernel Images.
+
+A structurally valid but malicious PE32+ "EFI application" can declare a
+section whose VirtualSize is near UINT32_MAX (~4 GiB) while its
+SizeOfRawData is tiny or zero. When such a section is hashed, the parser
+walks the (VirtualSize - SizeOfRawData) gap a fixed 1024 bytes at a
+time, performing millions of small hash updates over zero-padding. A
+single 382-byte input drives roughly 4.17 million iterations and wedges
+the parser for more than ten seconds. The unit never returns on its own;
+it must be killed by an outer wall-clock alarm.
+
+Because the input is small and structurally valid (file(1) reports
+"MS-DOS executable, PE32+ executable (EFI application) x86-64"), this is
+an amplification / uncontrolled-resource-consumption DoS rather than a
+memory-safety fault.
+
+Task
+----
+Produce a small byte sequence that the harness binary (fuzz-pe-binary.c)
+wraps in a memfd and feeds through pe_load_headers / pe_load_sections /
+uki_hash, causing the unit to hang long enough that libFuzzer reports a
+timeout (slow unit) under its wall-clock alarm. The expensive loop lives
+inside uki_hash in src/shared/pe-binary.c.

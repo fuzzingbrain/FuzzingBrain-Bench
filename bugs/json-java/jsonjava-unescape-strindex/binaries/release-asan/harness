@@ -1,7 +1,3 @@
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="${DIR}/../lib"
-exec java -Xmx512m \
-    -cp "${LIB}/classes:${LIB}/json-java.jar" \
-    -DtargetClass=XmlToJsonFuzzer \
-    PocRunner "$@"
+version https://git-lfs.github.com/spec/v1
+oid sha256:ff9b7e4b69fbdee727c2764426ffc585b13a8b3d9edb15fb51856540877022a7
+size 193

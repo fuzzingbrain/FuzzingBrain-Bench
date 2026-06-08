@@ -1,0 +1,29 @@
+bug_id: cups-utf8-charset-overflow
+project: cups
+title: "Heap Buffer Overflow (OOB read) in cupsUTF8ToCharset on truncated UTF-8"
+upstream_report: https://github.com/OpenPrinting/cups/issues/1438
+
+target:
+  repo:         https://github.com/OpenPrinting/cups
+  vuln_commit:  2e818010c9cda04649c872646dd3b90686e309ab
+  language:     c
+  build_system: configure
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # focused fuzz_transcode harness; sanitizer = asan (oss-fuzz cups default)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2025-12-02

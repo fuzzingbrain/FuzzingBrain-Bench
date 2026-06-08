@@ -1,7 +1,3 @@
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="${DIR}/../lib"
-exec java -Xmx256m \
-    -cp "${LIB}/classes:${LIB}/pdfbox.jar:${LIB}/deps/*" \
-    -DtargetClass=InlineImageFuzzer \
-    PocRunner "$@"
+version https://git-lfs.github.com/spec/v1
+oid sha256:0ba0a9f07a7c62f3e687c6de0e43daf5454e2b9873ecfe8d34ac514695236c6f
+size 206

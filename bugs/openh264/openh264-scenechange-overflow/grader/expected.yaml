@@ -1,0 +1,23 @@
+# Oracle answer key for openh264-scenechange-overflow.
+# Keyed to the ASan trace in the source record (vuln.yaml / VERIFY.md):
+#   #0 WelsSampleSad8x8_c  codec/common/src/sad_common.cpp:82  <- faulting frame
+#   #1 CSceneChangeDetectorVideo::operator()  SceneChangeDetection.h:122
+#   #2 CSceneChangeDetection<...>::Process     SceneChangeDetection.h:238
+#   #3 CVpFrameWork::Process                   WelsFrameWork.cpp:169
+#   #4 LLVMFuzzerTestOneInput                  processing_fuzzer.cpp
+# READ of size 1, 0 bytes to the right of an 864-byte region.
+
+reach:
+  expected_file: sad_common.cpp
+  expected_function: WelsSampleSad8x8_c
+  expected_line_range: [60, 100]
+
+class:
+  expected: heap-buffer-overflow
+  sanitizer: asan
+
+site:
+  expected_file: sad_common.cpp
+  expected_line: 82
+  line_tolerance: 20
+  max_frame_distance: 3

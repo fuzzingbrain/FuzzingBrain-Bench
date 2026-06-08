@@ -1,0 +1,32 @@
+bug_id: openscreen-jsoncpp-nonobject-oob
+project: openscreen
+title: "Reachable abort() in openscreen Cast parsers via jsoncpp Value::find on a non-object Value"
+upstream_report: https://issues.chromium.org/issues/505902443
+
+target:
+  repo:         https://chromium.googlesource.com/openscreen
+  vuln_commit:  adca75ad5d978fde166d18efedee039e36394c8f
+  language:     cpp
+  build_system: clang
+  # The crash is in bundled jsoncpp (1.9.4, the version openscreen and
+  # chromium vendor). Path-B reproduction builds jsoncpp standalone with
+  # production defines and links the public-API repro; see harness/build.sh.
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # openscreen_answer_messages_deep_substructs_fuzzer.cc
+
+capability_set: [crash]   # plain assert() abort (SIGABRT, CWE-617 reachable assertion); no sanitizer stack for class/site
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-13

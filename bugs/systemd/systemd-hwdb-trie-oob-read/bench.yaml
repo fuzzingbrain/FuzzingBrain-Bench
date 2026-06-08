@@ -1,0 +1,29 @@
+bug_id: systemd-hwdb-trie-oob-read
+project: systemd
+title: "Out-of-Bounds Reads in sd-hwdb Trie Walker (offset dereferenced before bounds check)"
+upstream_report: https://github.com/systemd/systemd/pull/42347
+
+target:
+  repo:         https://github.com/systemd/systemd
+  vuln_commit:  6f31db9b07829dcd7f166da85405eecdf889a1c8
+  language:     c
+  build_system: meson
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 60
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-28

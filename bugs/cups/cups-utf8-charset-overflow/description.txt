@@ -1,0 +1,22 @@
+Heap Buffer Overflow (out-of-bounds read) in cupsUTF8ToCharset
+==============================================================
+
+Project:   CUPS (OpenPrinting) — cups/transcode.c
+Bug class: heap-buffer-overflow (OOB read), AddressSanitizer
+
+Summary
+-------
+cupsUTF8ToCharset() decodes a NUL-terminated UTF-8 string. When the input
+ends with a 2-byte UTF-8 lead byte (0xC0–0xDF) and no continuation byte, the
+decoder reads the NUL terminator as the continuation byte and advances the
+source pointer past it; the next loop iteration dereferences one byte beyond
+the end of the heap buffer.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness, drives
+cupsUTF8ToCharset() past the end of its source buffer. The harness copies the
+input into a heap buffer of exactly len+1 bytes (NUL-terminated) and calls
+cupsUTF8ToCharset(dest, src, sizeof(dest), CUPS_ISO8859_1) — a valid API call;
+the overflow is internal to the decoder. A minimal trigger is a byte string
+ending in a bare 2-byte lead such as 0xC1.

@@ -1,0 +1,7 @@
+Heap-buffer-overflow (out-of-bounds read) in mongoose's MQTT5 property parser.
+
+The harness parses an MQTT v5 packet via mg_mqtt_parse() and iterates its
+properties with mg_mqtt_next_prop(). For a User Property (STRING_PAIR), the
+parser reads a 2-byte key length, advances the cursor by 2 + key_len without
+bounds-checking against the property region, then reads the next length bytes
+— an out-of-bounds read when key_len points past the buffer.
