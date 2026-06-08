@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -201,13 +202,18 @@ func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYA
 	out := runHarness(binPath, bench.Harness.Invocation, pocPath, runDir, bench.Harness.TimeoutS,
 		isLeakClass(expected.Class.Expected))
 
+	// A finite-but-slow algorithmic-complexity DoS (expected class "timeout")
+	// does not self-print "libFuzzer: timeout" in single-input replay; libFuzzer's
+	// per-unit alarm only fires inside the fuzzing loop. The wall-clock kill in
+	// runHarness (timedOut) is the authoritative timeout signal for such bugs.
+	timeoutHit := expected.Class.Expected == "timeout" && out.timedOut
 	if _, ok := caps["crash"]; ok {
-		if crashFired(out) {
+		if crashFired(out) || timeoutHit {
 			caps["crash"] = "fired"
 		}
 	}
 	if _, ok := caps["class"]; ok {
-		if classMatches(out, expected.Class.Expected) {
+		if classMatches(out, expected.Class.Expected) || timeoutHit {
 			caps["class"] = "fired"
 		}
 	}
@@ -345,7 +351,28 @@ func (c *cappedWriter) Write(p []byte) (int, error) {
 func (c *cappedWriter) String() string { return c.buf.String() }
 
 func signalName(ee *exec.ExitError) string {
-	// Cross-platform-ish: rely on string repr.
+	// Authoritative path: read the real terminating signal from the wait status.
+	// Go's ExitError.String() renders signals as human text ("signal: aborted",
+	// "signal: segmentation fault"), NOT as "SIGABRT"/"SIGSEGV", so a substring
+	// match on the SIG* names never fires for a bare signal kill (e.g. a plain
+	// assert()/abort() with no sanitizer trailer). Use syscall.WaitStatus.
+	if ws, ok := ee.Sys().(syscall.WaitStatus); ok && ws.Signaled() {
+		switch ws.Signal() {
+		case syscall.SIGSEGV:
+			return "SIGSEGV"
+		case syscall.SIGABRT:
+			return "SIGABRT"
+		case syscall.SIGBUS:
+			return "SIGBUS"
+		case syscall.SIGILL:
+			return "SIGILL"
+		case syscall.SIGFPE:
+			return "SIGFPE"
+		case syscall.SIGKILL:
+			return "SIGKILL"
+		}
+	}
+	// Fallback: string match (covers non-unix or wrapped errors).
 	msg := ee.String()
 	for _, sig := range []string{"SIGSEGV", "SIGABRT", "SIGBUS", "SIGILL", "SIGFPE", "SIGKILL"} {
 		if strings.Contains(msg, sig) {

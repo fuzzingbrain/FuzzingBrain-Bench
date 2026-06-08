@@ -1,0 +1,26 @@
+# Oracle answer key for libwebsockets-lhp-class-oob.
+# Keyed to the ASan trace in the source record (asan_apitest_lhp.txt /
+# asan_min_app.txt / vuln.yaml crash_signature):
+#   #0 strlen                                       <- asan interceptor leaf
+#   #1 lhp_element_has_class    lib/misc/lhp.c:824:11  <- faulting library frame
+#   #2 lws_css_cascade_atr_match lib/misc/lhp.c:887
+#   #3 lws_css_cascade           lib/misc/lhp.c:1159
+#   #4 lws_lhp_parse             lib/misc/lhp.c:1524
+# READ of size 2, 0 bytes after a 47-byte region.
+# The buggy library frame is lhp_element_has_class; strlen is the asan
+# interceptor at frame 0, so the site lives at frame distance 1.
+
+reach:
+  expected_file: lhp.c
+  expected_function: lhp_element_has_class
+  expected_line_range: [800, 850]
+
+class:
+  expected: heap-buffer-overflow
+  sanitizer: asan
+
+site:
+  expected_file: lhp.c
+  expected_line: 824
+  line_tolerance: 20
+  max_frame_distance: 3

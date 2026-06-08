@@ -32,9 +32,7 @@ class OpenAIBackend:
             # Ollama ignores the key but the SDK requires a non-empty string.
             self._client = openai.OpenAI(base_url=base, api_key=api_key or "ollama")
         else:
-            # max_retries above the SDK default (2) for rate-limit resilience.
-            self._client = openai.OpenAI(
-                api_key=api_key or os.environ.get("OPENAI_API_KEY"), max_retries=8)
+            self._client = openai.OpenAI(api_key=api_key or os.environ.get("OPENAI_API_KEY"))
 
     def _to_messages(self, system: str, messages: list[dict]) -> list[dict]:
         out: list[dict] = [{"role": "system", "content": system}]

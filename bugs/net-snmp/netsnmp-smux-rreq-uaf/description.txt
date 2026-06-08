@@ -1,0 +1,45 @@
+Heap Use-After-Free in smux_rreq_process (SMUX RReq DELETE path)
+================================================================
+
+Project:     net-snmp (agent — SMUX subagent protocol, RFC 1227)
+Bug class:   heap-use-after-free (READ of size 8)
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+In the SMUX subagent protocol (RFC 1227, TCP/199), a crafted RReq
+register/delete PDU sequence from an authorized, connected SMUX peer
+drives smux_rreq_process() into a use-after-free within a SINGLE call:
+
+  - agent/mibgroup/smux/smux.c:1105
+        unregister_mib(rptr->sr_name, ...) -> unregister_mib_context
+        -> netsnmp_subtree_free (agent/agent_registry.c:491) frees the
+        subtree's reginfo (== rptr->reginfo).
+  - rptr->reginfo is NOT nulled after the free.
+  - agent/mibgroup/smux/smux.c:1115
+        smux_replace_active(rptr, nrptr) -> smux.c:1294-1295 sees
+        rptr->reginfo still non-NULL -> netsnmp_unregister_handler
+        (agent/agent_handler.c:350) dereferences reginfo->rootoid on the
+        freed 80-byte block -> heap-use-after-free READ of size 8.
+
+The freed block was allocated at smux.c:1225 (REGISTER) via
+netsnmp_create_handler_registration. Same SMUX registration-lifetime
+region as CVE-2019-20892 (double-free), but a DISTINCT use-after-free
+along the DELETE path that the 2011 fix (94b710d27) did not cover.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness, triggers ASan to
+report heap-use-after-free with the top library frame inside
+agent/agent_handler.c (netsnmp_unregister_handler), reached from
+smux_replace_active / smux_rreq_process.
+
+The harness (harness/snmp_agent_e2e_fuzzer.c) authorizes a SMUX peer,
+opens a loopback TCP connection, sends a well-formed SMUX_OPEN, calls
+smux_accept(), then feeds one fuzz-controlled SMUX PDU into
+smux_process() — the genuine per-packet entry point.
+
+References
+----------
+- Upstream: https://github.com/net-snmp/net-snmp/issues/1098 (fixed, no CVE)
+- Source: agent/mibgroup/smux/smux.c, function smux_rreq_process

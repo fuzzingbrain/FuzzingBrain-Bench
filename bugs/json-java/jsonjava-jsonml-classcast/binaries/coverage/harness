@@ -1,9 +1,3 @@
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="${DIR}/../lib"
-RUNDIR="$(pwd)"
-exec java -Xmx512m \
-    -javaagent:"${LIB}/jacocoagent.jar"=destfile="${RUNDIR}/jacoco.exec" \
-    -cp "${LIB}/classes:${LIB}/json-java.jar" \
-    -DtargetClass=JsonMLFuzzer \
-    PocRunner "$@"
+version https://git-lfs.github.com/spec/v1
+oid sha256:db3c5141d081e9660e9bc6fd75b0ef6822266208444d68d7d5bc19b9d0ad5644
+size 281

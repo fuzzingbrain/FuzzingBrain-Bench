@@ -1,0 +1,23 @@
+# Oracle answer key for freetype-ftbitmapcopy-uaf.
+# Keyed to the ASan trace in the source record's report.md / VERIFY.md:
+#   #0 __asan_memcpy
+#   #1 FT_Bitmap_Copy  src/base/ftbitmap.c:123:9   <- faulting library frame
+#   #2 FT_Get_Glyph    src/base/ftglyph.c:680:13
+#   #3 LLVMFuzzerTestOneInput  ftfuzzer_glyph.c
+# The buggy library frame is FT_Bitmap_Copy; __asan_memcpy is the asan
+# interceptor at frame 0, so the site lives at max_frame_distance 1.
+
+reach:
+  expected_file: ftbitmap.c
+  expected_function: FT_Bitmap_Copy
+  expected_line_range: [100, 140]
+
+class:
+  expected: heap-use-after-free
+  sanitizer: asan
+
+site:
+  expected_file: ftbitmap.c
+  expected_line: 123
+  line_tolerance: 20
+  max_frame_distance: 3

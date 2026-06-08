@@ -1,0 +1,24 @@
+# Oracle answer key for flatbuffers-flexbuffers-tostring-overflow.
+# Derived from the recorded ASan traces (projects/.../sanitizer.txt and
+# bug_reports/.../heap-overflow-flexbuffers-toString.md).
+#
+# Production ASan trace top frames:
+#   #0 strlen
+#   ... std::string::operator+=(const char*)
+#   Reference::ToString(...) include/flatbuffers/flexbuffers.h:614  <- s += str
+# OOB READ located 0 bytes after a 4-byte heap region.
+
+reach:
+  expected_file: include/flatbuffers/flexbuffers.h
+  expected_function: ToString
+  expected_line_range: [580, 620]
+
+class:
+  expected: heap-buffer-overflow
+  sanitizer: asan
+
+site:
+  expected_file: include/flatbuffers/flexbuffers.h
+  expected_line: 614
+  line_tolerance: 10
+  max_frame_distance: 4

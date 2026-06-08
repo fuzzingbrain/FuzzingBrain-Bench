@@ -1,0 +1,46 @@
+bug_id: systemd-pe-binary-dos
+project: systemd
+title: "Algorithmic-Complexity DoS in systemd PE/UKI Parser (382-byte PE wedges uki_hash >10s)"
+upstream_report: https://github.com/systemd/systemd/pull/42348
+
+target:
+  repo:         https://github.com/systemd/systemd
+  vuln_commit:  97a0ec135b1a3330abe8c34794c6e31b266452fc
+  language:     c
+  build_system: meson
+
+harness:
+  type: libfuzzer
+  # Slow-unit / algorithmic-complexity DoS: the parser wedges in uki_hash's
+  # zero-padding loop and does not exit on its own. The harness must be run
+  # under libFuzzer's wall-clock alarm so the hang is observable as a timeout.
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["-timeout=10", "-rss_limit_mb=2048", "@@"]
+  rss_limit_mb: 2048
+  timeout_s: 10
+  provenance: fuzzingbrain
+
+capability_set: [crash, class]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-28
+notes: |
+  Robustness/DoS finding on the userspace UKI/PE inspection surface
+  (bootctl, systemd-measure, pcrlock, kernel-install). The discovery
+  crash was a libFuzzer slow-unit: a 382-byte PE32+ with a single section
+  whose VirtualSize is ~4 GiB and SizeOfRawData is 0 drives uki_hash()
+  (src/shared/pe-binary.c) into ~4.17 million 1024-byte SHA-256 update
+  iterations, wedging the parser for >10 s with no termination. Modeled
+  with the minimal [crash, class] capability set and a timeout-style
+  oracle (sanitizer: libfuzzer) because the observable signature is a
+  wall-clock timeout banner that carries no symbolized stack frames; the
+  true hot-loop location is recorded in grader/expected.yaml for
+  documentation only. Maintainer classified the underlying issue Severity
+  "None" (UKI inputs are trusted and signed); the fix was still accepted
+  because a 382-byte file should not take ten seconds to reject.

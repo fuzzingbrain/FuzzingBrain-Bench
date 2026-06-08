@@ -1,0 +1,35 @@
+bug_id: netsnmp-smux-rreq-uaf
+project: net-snmp
+title: "Heap Use-After-Free in smux_rreq_process (SMUX RReq DELETE path)"
+upstream_report: https://github.com/net-snmp/net-snmp/issues/1098
+
+target:
+  repo:         https://github.com/net-snmp/net-snmp
+  vuln_commit:  1852fec16
+  language:     c
+  build_system: autoconf
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 90
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-31
+notes: |
+  SMUX subagent protocol (RFC 1227). Unlike netsnmp-vacm-parse-npd this harness
+  exercises the SNMP *agent* + smux mibgroup (not just snmplib), so the build
+  compiles the agent tree and links internal smux_* symbols. vuln_commit is the
+  short master SHA recorded in the source vuln.yaml (full SHA not captured in the
+  record). See NOTES.md.

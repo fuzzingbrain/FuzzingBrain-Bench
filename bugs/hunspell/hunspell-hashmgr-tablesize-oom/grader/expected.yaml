@@ -1,0 +1,22 @@
+# The original fault is a libFuzzer out-of-memory (CWE-789). The requested
+# ~1.6 GB block sits below ASan's default allocation-size-too-big ceiling, so it
+# is surfaced as a libFuzzer OOM via -rss_limit_mb=256 (see harness invocation in
+# bench.yaml). The rss-based OOM banner carries NO symbolized stack frames, so
+# only the crash + class capabilities are machine-gradable. The reach/site fields
+# below record the true source locations in the vuln_commit
+# (f23fcd33052c7c8a307eaa3e1b1a4c0cdcf45651, verified by clone) for documentation;
+# capability_set is [crash, class] only.
+reach:
+  expected_file: src/hunspell/hashmgr.cxx
+  expected_function: HashMgr::load_tables
+  expected_line_range: [600, 660]
+
+class:
+  expected: oom
+  sanitizer: libfuzzer-oom
+
+site:
+  expected_file: src/hunspell/hashmgr.cxx
+  expected_line: 642
+  line_tolerance: 15
+  max_frame_distance: 6

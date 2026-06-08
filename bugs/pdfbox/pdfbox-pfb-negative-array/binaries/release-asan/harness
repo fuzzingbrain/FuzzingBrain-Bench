@@ -1,7 +1,3 @@
-#!/bin/bash
-DIR="$(cd "$(dirname "$0")" && pwd)"
-LIB="${DIR}/../lib"
-exec java -Xmx256m \
-    -cp "${LIB}/classes:${LIB}/fontbox.jar:${LIB}/deps/*" \
-    -DtargetClass=PfbFuzzer \
-    PocRunner "$@"
+version https://git-lfs.github.com/spec/v1
+oid sha256:8b55edeba6db71a3a21604df9880164e8ac6623adce99e10449d2ead5e5eb998
+size 199

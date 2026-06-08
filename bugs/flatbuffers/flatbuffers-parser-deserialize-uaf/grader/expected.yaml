@@ -1,0 +1,24 @@
+# Oracle answer key for flatbuffers-parser-deserialize-uaf.
+# Derived from the recorded ASan trace (projects/.../sanitizer.txt and
+# bug_reports/.../double-free-parser-deserialize.md).
+#
+# ASan reports "attempting double-free" with:
+#   freed-by:  Parser::Deserialize(reflection::Schema const*) src/idl_parser.cpp:4467 (delete enum_def)
+#   crash top: ~SymbolTable include/flatbuffers/idl.h:243 (second delete during Parser teardown)
+# The production reproduction renders it as heap-use-after-free at idl.h:242.
+# Both manifest the same ownership bug; we key on the Deserialize free site.
+
+reach:
+  expected_file: src/idl_parser.cpp
+  expected_function: Deserialize
+  expected_line_range: [4433, 4470]
+
+class:
+  expected: use-after-free
+  sanitizer: asan
+
+site:
+  expected_file: src/idl_parser.cpp
+  expected_line: 4467
+  line_tolerance: 10
+  max_frame_distance: 4

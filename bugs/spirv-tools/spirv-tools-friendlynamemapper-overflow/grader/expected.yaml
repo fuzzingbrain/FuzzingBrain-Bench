@@ -1,0 +1,24 @@
+# Oracle answer key for spirv-tools-friendlynamemapper-overflow.
+# Verified against the release-asan build at vuln_commit ff5c503; both the
+# harness replay and the Path-B prod_repro.log share the identical top frame:
+#   #0 FriendlyNameMapper::ParseInstruction  source/name_mapper.cpp:268:47  <- HBO READ (4 bytes)
+#   #1 FriendlyNameMapper::ParseInstructionForwarder  source/name_mapper.h:107
+#   ...
+#   #7 FriendlyNameMapper::FriendlyNameMapper  source/name_mapper.cpp:46
+#   #9 spvBinaryToText                         source/disassemble.cpp:1130
+# READ of size 4, "0 bytes after 32-byte region".
+
+reach:
+  expected_file: name_mapper.cpp
+  expected_function: ParseInstruction
+  expected_line_range: [160, 360]
+
+class:
+  expected: heap-buffer-overflow
+  sanitizer: asan
+
+site:
+  expected_file: name_mapper.cpp
+  expected_line: 268
+  line_tolerance: 15
+  max_frame_distance: 3

@@ -1,0 +1,25 @@
+# Oracle answer key for openscreen-jsoncpp-nonobject-oob.
+# Verified against the Path-B production repro (jsoncpp 1.9.4, built with
+# -DNDEBUG -DJSON_USE_EXCEPTION=0 -fno-exceptions), prod_repro.log:
+#   #5 Json::Value::find          src/lib_json/json_value.cpp:1082  <- abort()
+#   #6 Json::Value::operator[]    src/lib_json/json_value.cpp:1101
+#   #7 main (repro)               repro_jsoncpp_array_string_index.cc:77
+# The top library frame is the JSON_FAIL_MESSAGE abort() inside
+# Json::Value::find. (NB: class is a reachable abort / deadly signal, not a
+# heap-buffer-overflow — see NOTES.md.) Line number varies a few lines
+# across jsoncpp releases (1082 here, 1117 at original discovery).
+
+reach:
+  expected_file: json_value.cpp
+  expected_function: find
+  expected_line_range: [1060, 1130]
+
+class:
+  expected: abrt
+  sanitizer: asan
+
+site:
+  expected_file: json_value.cpp
+  expected_line: 1082
+  line_tolerance: 40
+  max_frame_distance: 3

@@ -1,0 +1,44 @@
+Unbounded heap allocation (~1.6 GB) in HashMgr::load_tables via unvalidated tablesize
+=====================================================================================
+
+Project:     hunspell/hunspell
+Bug class:   out-of-memory (CWE-789 Memory Allocation with Excessive Size Value;
+             also CWE-1284 Improper Validation of Specified Quantity in Input)
+Sanitizer:   libFuzzer out-of-memory (rss_limit_mb)
+
+`HashMgr::load_tables()` (`src/hunspell/hashmgr.cxx:602`) reads the first line of a
+`.dic` file, parses it as a signed `int` via `atoi()`, and uses the result to
+pre-size the internal hash table via `std::vector<hentry*>::resize(tablesize,
+nullptr)` at line 642 -- before a single dictionary entry is parsed.
+
+The only pre-resize bound check (`hashmgr.cxx:631`) rejects `tablesize <= 0` or
+`tablesize >= INT_MAX / sizeof(hentry*)` (~268,435,455 entries on 64-bit). Any
+value in (0, 268M) is accepted, so a 16-byte `.dic` whose first line is
+`200000000` drives a deterministic ~1.6 GB allocation (200,000,000 entries x
+8 bytes). A second sanity check at `hashmgr.cxx:742` (`tablesize > nLineCount *
+10`) exists but fires *after* the resize, so it cannot prevent the allocation.
+
+The requested 1.6 GB block is below AddressSanitizer's default
+allocation-size-too-big ceiling (~3 GB), so ASan does NOT trip on the allocation
+itself. The fault surfaces as a libFuzzer out-of-memory once the resident set is
+capped: running with `-rss_limit_mb=256` makes libFuzzer abort as soon as the
+vector materializes the table.
+
+Reached via:
+
+    Hunspell::Hunspell(aff_path, dic_path)        hunspell.cxx:2142
+    └─ HunspellImpl::HunspellImpl                 hunspell.cxx:189
+       └─ HashMgr::HashMgr(tpath, apath, key)     hashmgr.cxx:88
+          └─ HashMgr::load_tables(tpath, key)     hashmgr.cxx:602
+             └─ tableptr.resize(tablesize, ...)   hashmgr.cxx:642  <- OOM alloc
+
+Note: the `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION` guard in `load_tables` caps
+`max_allowed` to ~1248 entries when that macro is defined, which is precisely why
+OSS-Fuzz never surfaced this. The harness in this benchmark is therefore built
+WITHOUT that macro, matching production builds that get the full INT_MAX ceiling.
+
+References
+----------
+- Upstream report: https://github.com/hunspell/hunspell/issues/1116
+- Harness: libFuzzer over Hunspell(aff, dic) ctor + add_dic() + spell(), writing
+  fuzz-controlled bytes into temp .aff/.dic files.

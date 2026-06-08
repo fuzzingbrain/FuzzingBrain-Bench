@@ -1,0 +1,29 @@
+bug_id: openh264-scenechange-overflow
+project: openh264
+title: "Heap Buffer Overflow (OOB read) in WelsSampleSad8x8_c during scene change detection"
+upstream_report: https://github.com/cisco/openh264/issues/3926
+
+target:
+  repo:         https://github.com/cisco/openh264
+  vuln_commit:  cf568c83f71a18778f9a16e344effaf40c11b752
+  language:     cpp
+  build_system: make
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # processing_fuzzer.cpp
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: confirmed
+cve: null
+disclosed: 2026-01-27

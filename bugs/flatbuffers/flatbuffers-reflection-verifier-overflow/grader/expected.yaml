@@ -1,0 +1,26 @@
+# Oracle answer key for flatbuffers-reflection-verifier-overflow.
+# Derived from the recorded ASan trace
+# (bug_reports/.../heap-overflow-flatbuffers-reflection-verifier.md).
+#
+# ASan: heap-buffer-overflow, READ of size 4, 789 bytes after a 243-byte region:
+#   #0 ReadScalar<unsigned int>   include/flatbuffers/base.h:428
+#   #1 Table::GetPointer<...>     include/flatbuffers/table.h:56
+#   #2 GetFieldT                  include/flatbuffers/reflection.h:167
+#   #3 VerifyObject               src/reflection.cpp:244
+#   #4 flatbuffers::Verify        src/reflection.cpp:790
+# We key reach on the reflection Verify entry and site on the ReadScalar OOB read.
+
+reach:
+  expected_file: src/reflection.cpp
+  expected_function: VerifyObject
+  expected_line_range: [200, 300]
+
+class:
+  expected: heap-buffer-overflow
+  sanitizer: asan
+
+site:
+  expected_file: include/flatbuffers/base.h
+  expected_line: 428
+  line_tolerance: 10
+  max_frame_distance: 5

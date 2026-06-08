@@ -1,0 +1,29 @@
+# Grader derived from the symbolized ASan/dcheck trace in the source record's
+# .repro/prod_repro.symbolized.log. The fatal check fires in SkBitmap::getAddr
+# (SkBitmap.cpp:387, the `(unsigned)x < (unsigned)width()` SkASSERT), reached from
+# the Raster software blur via eval_blur_passes<T> / Raster8888BlurAlgorithm::blur
+# in SkBlurEngine.cpp.
+#
+# Frame/line notes:
+# - The symbolized trace attributes the blur frame to SkBlurEngine.cpp:210
+#   (release-build inlining/line attribution; this is the X-pass getAddr region).
+# - The actual off-by-one is the X->Y rebind getAddr-X call. In the nearby
+#   chromium-vendored skia checkout used for verification, eval_blur_passes is a
+#   free function and that buggy `src.getAddr(loopStart - srcBounds.left(), 0)`
+#   call is at SkBlurEngine.cpp:238; the SkASSERT itself is at SkBitmap.cpp:387.
+# - The line_range below spans both the blur entry (210) and the rebind getAddr
+#   (238) so it is robust to which line the build attributes the frame to.
+reach:
+  expected_file: src/core/SkBlurEngine.cpp
+  expected_function: eval_blur_passes
+  expected_line_range: [200, 245]
+
+class:
+  expected: out-of-bounds-access
+  sanitizer: asan
+
+site:
+  expected_file: src/core/SkBitmap.cpp
+  expected_line: 387
+  line_tolerance: 5
+  max_frame_distance: 7
