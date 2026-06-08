@@ -25,8 +25,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp_grade.add_argument("bug_id")
     sp_grade.add_argument("blob", nargs="?",
                           help="path to blob (default: bug's own poc/poc.bin)")
-    sp_grade.add_argument("--rounds", type=int, default=3,
-                          help="randomization rounds for unanimity (default 3)")
+    sp_grade.add_argument("--rounds", type=int, default=1,
+                          help="grade rounds (default 1; the corpus is deterministic). "
+                               "Use --rounds 3 as the opt-in determinism gate.")
     sp_grade.add_argument("-v", "--verbose", action="store_true",
                           help="print oracle evidence")
     sp_grade.set_defaults(fn=commands.cmd_grade)
@@ -59,7 +60,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp_all = sub.add_parser("grade-all",
                             help="grade every bug's reference poc (smoke test for the install)")
-    sp_all.add_argument("--rounds", type=int, default=3)
+    sp_all.add_argument("--rounds", type=int, default=1,
+                        help="grade rounds (default 1; the corpus is deterministic). "
+                             "Use --rounds 3 as the opt-in determinism gate.")
     sp_all.add_argument("--include-slow", action="store_true",
                         help="also run the 5 slow bugs (openssl/imagemagick/icu/jq/ghidra-cplus)")
     sp_all.set_defaults(fn=commands.cmd_grade_all)
