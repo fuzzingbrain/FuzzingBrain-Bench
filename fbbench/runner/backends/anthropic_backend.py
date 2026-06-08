@@ -18,11 +18,8 @@ _MAX_TOKENS_LIMIT_RE = re.compile(r"max_tokens:\s*\d+\s*>\s*(\d+)")
 class AnthropicBackend:
     def __init__(self, model: str, api_key: str | None = None):
         self.model = model
-        # max_retries higher than the SDK default (2) so rate-limit (429/529)
-        # waves recover inside the episode instead of failing it.
         self._client = anthropic.Anthropic(
-            api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"),
-            max_retries=8)
+            api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"))
         # Discovered per-model output ceiling (None until a 400 reveals it).
         self._max_tokens_cap: int | None = None
 

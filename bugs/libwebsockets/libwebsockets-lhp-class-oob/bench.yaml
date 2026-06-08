@@ -1,0 +1,29 @@
+bug_id: libwebsockets-lhp-class-oob
+project: libwebsockets
+title: "Heap Buffer Overflow (OOB read) in lhp_element_has_class via missing value NUL-terminator in lhp_atr_new"
+upstream_report: "https://github.com/warmcat/libwebsockets (private disclosure to andy@warmcat.com per SECURITY.md; fixed bd57edb5fc)"
+
+target:
+  repo:         https://github.com/warmcat/libwebsockets
+  vuln_commit:  8a422a736b84191a2fd4ec492d82888096329817
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # lws_lhp_fuzzer.cc
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-31

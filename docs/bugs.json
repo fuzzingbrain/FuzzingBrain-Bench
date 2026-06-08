@@ -1,28 +1,9 @@
 {
-  "$schema": "./schema.json",
-  "generated": "2026-05-18",
+  "generated": "2026-06-08",
   "summary": {
-    "total": 50,
-    "fixed": 42,
-    "confirmed": 8
+    "total": 69
   },
   "bugs": [
-    {
-      "id": "avro-neg-block-size",
-      "project": "avro",
-      "title": "Negative block size causes allocation-size-too-big crash",
-      "status": "fixed",
-      "report": "https://github.com/apache/avro/pull/3623",
-      "bug_class": "allocation-size-too-big"
-    },
-    {
-      "id": "avro-neg-string-len",
-      "project": "avro",
-      "title": "Negative string length causes allocation-size-too-big crash",
-      "status": "fixed",
-      "report": "https://github.com/apache/avro/pull/3622",
-      "bug_class": "allocation-size-too-big"
-    },
     {
       "id": "avro-decompression-bomb",
       "project": "avro",
@@ -30,6 +11,22 @@
       "status": "fixed",
       "report": "https://github.com/apache/avro/pull/3625",
       "bug_class": "oom"
+    },
+    {
+      "id": "avro-neg-block-size",
+      "project": "avro",
+      "title": "Negative Block Size Crash in Avro C DataFile Reader",
+      "status": "fixed",
+      "report": "https://github.com/apache/avro/pull/3623",
+      "bug_class": "allocation-size-too-big"
+    },
+    {
+      "id": "avro-neg-string-len",
+      "project": "avro",
+      "title": "Negative String Length OOB in Avro C Value Reader",
+      "status": "fixed",
+      "report": "https://github.com/apache/avro/pull/3622",
+      "bug_class": null
     },
     {
       "id": "binutils-rust-demangle-oom",
@@ -40,6 +37,14 @@
       "bug_class": "oom"
     },
     {
+      "id": "cups-utf8-charset-overflow",
+      "project": "cups",
+      "title": "Heap Buffer Overflow (OOB read) in cupsUTF8ToCharset on truncated UTF-8",
+      "status": "fixed",
+      "report": "https://github.com/OpenPrinting/cups/issues/1438",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
       "id": "dtc-fdt32-misalign",
       "project": "dtc",
       "title": "Misaligned Memory Access in fdt32_to_cpu() During FDT Node Traversal",
@@ -48,36 +53,28 @@
       "bug_class": "misaligned-access"
     },
     {
-      "id": "flatbuffers-verify-heap-overflow",
+      "id": "flatbuffers-flexbuffers-tostring-overflow",
       "project": "flatbuffers",
-      "title": "Heap Buffer Overflow in flatbuffers::Verify via Reflection VerifyObject",
-      "status": "confirmed",
-      "report": "https://github.com/google/flatbuffers/issues/9040",
-      "bug_class": "heap-buffer-overflow"
-    },
-    {
-      "id": "flatbuffers-parser-double-free",
-      "project": "flatbuffers",
-      "title": "Double-Free in FlatBuffers Parser::Deserialize (idl_parser.cpp)",
-      "status": "confirmed",
-      "report": "https://github.com/google/flatbuffers/issues/9009",
-      "bug_class": "double-free"
-    },
-    {
-      "id": "flatbuffers-flexbuffers-tostring",
-      "project": "flatbuffers",
-      "title": "Heap Buffer Overflow in FlexBuffers ToString (flexbuffers.h)",
+      "title": "Heap Buffer Overflow in FlexBuffers Reference::ToString via strlen on FBT_KEY",
       "status": "confirmed",
       "report": "https://github.com/google/flatbuffers/issues/9008",
       "bug_class": "heap-buffer-overflow"
     },
     {
-      "id": "flatbuffers-genbinary-npd",
+      "id": "flatbuffers-parser-deserialize-uaf",
       "project": "flatbuffers",
-      "title": "NULL Pointer Dereference in GenerateBinary",
+      "title": "Use-After-Free / Double-Free in FlatBuffers Parser::Deserialize via SymbolTable",
       "status": "confirmed",
-      "report": "https://github.com/google/flatbuffers/issues/8902",
-      "bug_class": "null-deref"
+      "report": "https://github.com/google/flatbuffers/issues/9009",
+      "bug_class": "use-after-free"
+    },
+    {
+      "id": "flatbuffers-reflection-verifier-overflow",
+      "project": "flatbuffers",
+      "title": "Heap Buffer Overflow in flatbuffers::Verify via Reflection VerifyObject/GetFieldT",
+      "status": "confirmed",
+      "report": "https://github.com/google/flatbuffers/issues/9040",
+      "bug_class": "heap-buffer-overflow"
     },
     {
       "id": "freerdp-ntlm-memleak",
@@ -88,25 +85,17 @@
       "bug_class": "memory-leak"
     },
     {
-      "id": "fwupd-sbatlevel-underflow",
-      "project": "fwupd",
-      "title": "Integer Underflow in sbatlevel Section Parser",
+      "id": "freetype-ftbitmapcopy-uaf",
+      "project": "freetype",
+      "title": "Heap Use-After-Free in FT_Bitmap_Copy via lazy bitmap ownership transfer in ft_bitmap_glyph_init",
       "status": "fixed",
-      "report": "https://github.com/fwupd/fwupd/issues/9659",
-      "bug_class": "integer-underflow"
-    },
-    {
-      "id": "fwupd-logitech-stack-overflow",
-      "project": "fwupd",
-      "title": "Stack Overflow in Logitech RDFU Firmware Parser via Deeply Nested JSON",
-      "status": "fixed",
-      "report": "https://github.com/fwupd/fwupd/issues/9779",
-      "bug_class": "stack-overflow"
+      "report": "https://gitlab.freedesktop.org/freetype/freetype/-/issues/1385",
+      "bug_class": "heap-use-after-free"
     },
     {
       "id": "fwupd-cab-mszip-bomb",
       "project": "fwupd",
-      "title": "CAB MSZIP Decompression Bomb",
+      "title": "Decompression Bomb in CAB MSZIP Parser causes excessive memory allocation",
       "status": "fixed",
       "report": "https://github.com/fwupd/fwupd/issues/9790",
       "bug_class": "oom"
@@ -114,15 +103,31 @@
     {
       "id": "fwupd-logitech-oob-read",
       "project": "fwupd",
-      "title": "Out-of-Bounds Read in Logitech Bulk Controller Device Response Parsing",
+      "title": "OOB Read in Logitech Bulkcontroller sync response parsing",
       "status": "fixed",
       "report": "https://github.com/fwupd/fwupd/issues/9792",
-      "bug_class": "oob-read"
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "fwupd-logitech-stack-overflow",
+      "project": "fwupd",
+      "title": "Stack Overflow in logitech-rdfu JSON Parsing (Missing Depth Limit)",
+      "status": "open",
+      "report": "https://github.com/fwupd/fwupd/issues/9779",
+      "bug_class": "stack-overflow"
+    },
+    {
+      "id": "fwupd-sbatlevel-underflow",
+      "project": "fwupd",
+      "title": "Integer underflow in fu_sbatlevel_section_add_entry",
+      "status": "fixed",
+      "report": "https://github.com/fwupd/fwupd/issues/9659",
+      "bug_class": "oom"
     },
     {
       "id": "ghidra-cplus-demangle-oom",
       "project": "Ghidra",
-      "title": "OOM in cplus_demangle due to malformed symbol",
+      "title": "OOM / Null Deref in Ghidra Bundled libiberty cplus_demangle",
       "status": "fixed",
       "report": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
       "bug_class": "oom"
@@ -130,7 +135,7 @@
     {
       "id": "ghidra-rust-demangle-oom",
       "project": "Ghidra",
-      "title": "OOM in rust_demangle due to nested generic parameters",
+      "title": "OOM in Ghidra Bundled libiberty rust_demangle",
       "status": "fixed",
       "report": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
       "bug_class": "oom"
@@ -157,28 +162,52 @@
       "title": "OOB Write in HarfBuzz fontations Glyph-Name Callback with size == 0",
       "status": "fixed",
       "report": "https://github.com/harfbuzz/harfbuzz/issues/5946",
-      "bug_class": "oob-write"
+      "bug_class": "stack-buffer-overflow"
+    },
+    {
+      "id": "hunspell-hashmgr-tablesize-oom",
+      "project": "hunspell",
+      "title": "Unbounded heap allocation (~1.6 GB) in HashMgr::load_tables via unvalidated tablesize field in .dic file",
+      "status": "fixed",
+      "report": "https://github.com/hunspell/hunspell/issues/1116",
+      "bug_class": "oom"
+    },
+    {
+      "id": "icu-translit-rule-dtor-uaf",
+      "project": "icu",
+      "title": "Use-After-Free in TransliterationRule destructor on partially-constructed rule",
+      "status": "fixed",
+      "report": "https://unicode-org.atlassian.net/browse/ICU-23365",
+      "bug_class": "segv"
     },
     {
       "id": "icu-translit-rule-uaf",
       "project": "icu",
-      "title": "Use-After-Free / Null Pointer Dereference in TransliterationRule Destructor",
+      "title": "Memory Leak in ICU TransliteratorIDParser::parseFilterID",
       "status": "fixed",
       "report": "https://unicode-org.atlassian.net/browse/ICU-23365",
-      "bug_class": "use-after-free"
+      "bug_class": "memory-leak"
+    },
+    {
+      "id": "imagemagick-kernelinfo-alloc",
+      "project": "imagemagick",
+      "title": "Excessive memory allocation in AcquireKernelInfo parsing a large-radius kernel string",
+      "status": "fixed",
+      "report": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-q62c-h75r-2xhc",
+      "bug_class": null
     },
     {
       "id": "imagemagick-msl-comment-npd",
       "project": "ImageMagick",
-      "title": "NULL pointer dereference in MSL comment tag",
+      "title": "NULL Pointer Dereference Parsing MSL <comment>",
       "status": "fixed",
       "report": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-5vx3-wx4q-6cj8",
-      "bug_class": "null-deref"
+      "bug_class": "abort"
     },
     {
       "id": "imagemagick-msl-stack-overflow",
       "project": "ImageMagick",
-      "title": "Stack overflow via recursive MSL write",
+      "title": "Stack overflow via recursive MSL read",
       "status": "fixed",
       "report": "https://github.com/ImageMagick/ImageMagick/security/advisories/GHSA-9vj4-wc7r-p844",
       "bug_class": "stack-overflow"
@@ -189,7 +218,7 @@
       "title": "NULL Pointer Dereference in dump_operation",
       "status": "fixed",
       "report": "https://github.com/jqlang/jq/issues/3458",
-      "bug_class": "null-deref"
+      "bug_class": "segv"
     },
     {
       "id": "jsonjava-jsonml-classcast",
@@ -197,15 +226,7 @@
       "title": "ClassCastException in JSONML.toJSONArray due to unsafe type cast",
       "status": "fixed",
       "report": "https://github.com/stleary/JSON-java/issues/1034",
-      "bug_class": "uncaught-exception"
-    },
-    {
-      "id": "jsonjava-unescape-strindex",
-      "project": "json-java",
-      "title": "StringIndexOutOfBoundsException in XMLTokener.unescapeEntity due to missing length check",
-      "status": "fixed",
-      "report": "https://github.com/stleary/JSON-java/issues/1035",
-      "bug_class": "uncaught-exception"
+      "bug_class": "class-cast"
     },
     {
       "id": "jsonjava-unescape-numformat",
@@ -216,11 +237,123 @@
       "bug_class": "uncaught-exception"
     },
     {
+      "id": "jsonjava-unescape-strindex",
+      "project": "json-java",
+      "title": "StringIndexOutOfBoundsException in XMLTokener.unescapeEntity due to missing length check",
+      "status": "fixed",
+      "report": "https://github.com/stleary/JSON-java/issues/1035",
+      "bug_class": "oob-read"
+    },
+    {
+      "id": "libaom-av1-config-assert",
+      "project": "libaom",
+      "title": "Reachable assertion in aom_rb_read_literal via AV1 config (av1C) parser",
+      "status": "fixed",
+      "report": "https://aomedia.googlesource.com/aom/",
+      "bug_class": null
+    },
+    {
+      "id": "libaom-restore-layer-overflow",
+      "project": "libaom",
+      "title": "Heap Buffer Overflow in AV1RateControlRTC via av1_restore_layer_context",
+      "status": "fixed",
+      "report": "https://issues.chromium.org/issues/501657371",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "libaom-svc-encoder-hang",
+      "project": "libaom",
+      "title": "DoS in libaom AV1 SVC encoder: divide-by-zero / unbounded resize loop via av1_resize_plane",
+      "status": "fixed",
+      "report": "https://issues.chromium.org/issues/505976409",
+      "bug_class": "oom"
+    },
+    {
       "id": "libavif-jni-signext",
       "project": "libavif",
       "title": "Heap Buffer Overflow in libavif Android JNI via Signed-Int Length Sign-Extension",
       "status": "fixed",
       "report": "https://github.com/AOMediaCodec/libavif/issues/3177",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "libheif-image-crop-overflow",
+      "project": "libheif",
+      "title": "Heap Buffer Overflow in heif_image_crop via integer underflow in crop margins",
+      "status": "fixed",
+      "report": "https://github.com/strukturag/libheif/issues/1746",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "libpng-zlib-inflate-uaf",
+      "project": "libpng",
+      "title": "Heap Use-After-Free in png_zlib_inflate via stale zstream.next_in after pCAL chunk handling",
+      "status": "fixed",
+      "report": "https://github.com/pnggroup/libpng/security/advisories/GHSA-qvg3-h654-xq3j",
+      "bug_class": "heap-use-after-free"
+    },
+    {
+      "id": "libvpx-vp9-encoder-caq-assert",
+      "project": "libvpx",
+      "title": "Integer Overflow / Assertion Failure in VP9 Encoder CAQ (vp9_aq_complexity.c)",
+      "status": "confirmed",
+      "report": "https://issues.webmproject.org/issues/497896136",
+      "bug_class": "abrt"
+    },
+    {
+      "id": "libvpx-vp9-reconfig-overflow",
+      "project": "libvpx",
+      "title": "Heap Buffer Overflow in VP9 Encoder via vpx_codec_enc_config_set when increasing resolution",
+      "status": "fixed",
+      "report": "https://issues.webmproject.org/issues/501696590",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "libvpx-vp9-svc-ratectrl-ub",
+      "project": "libvpx",
+      "title": "Undefined Behavior in libvpx VP9 SVC rate control: NaN-to-int cast in saturate_cast_double_to_int",
+      "status": "fixed",
+      "report": "https://issues.webmproject.org/issues/508317885",
+      "bug_class": "undefined-behavior"
+    },
+    {
+      "id": "libvpx-vpx-img-flip-ub",
+      "project": "libvpx",
+      "title": "Undefined Behavior in libvpx vpx_img_flip: pointer arithmetic on NULL alpha plane",
+      "status": "fixed",
+      "report": "https://issues.webmproject.org/issues/512911654",
+      "bug_class": "undefined-behavior"
+    },
+    {
+      "id": "libwebp-muxassemble-npd",
+      "project": "libwebp",
+      "title": "NULL Pointer Dereference in WebPMuxAssemble (GetFrameInfo) on malformed animated WebP",
+      "status": "fixed",
+      "report": "https://issues.webmproject.org/issues/497882857",
+      "bug_class": "segv"
+    },
+    {
+      "id": "libwebp-sharpyuv-convert-stride-oob",
+      "project": "libwebp",
+      "title": "Out-of-Bounds Read in libwebp SharpYuvConvert via missing stride validation",
+      "status": "fixed",
+      "report": "https://issues.webmproject.org/issues/501147575",
+      "bug_class": "segv"
+    },
+    {
+      "id": "libwebp-sharpyuv-gamma-oob",
+      "project": "libwebp",
+      "title": "OOB Read in libsharpyuv gamma-to-linear LUT via unclamped high-bit-depth pixel",
+      "status": "fixed",
+      "report": "https://github.com/webmproject/libwebp/security/advisories/GHSA-6gpr-h4hq-vh57",
+      "bug_class": "segv"
+    },
+    {
+      "id": "libwebsockets-lhp-class-oob",
+      "project": "libwebsockets",
+      "title": "Heap Buffer Overflow (OOB read) in lhp_element_has_class via missing value NUL-terminator in lhp_atr_new",
+      "status": "fixed",
+      "report": "https://github.com/warmcat/libwebsockets (private disclosure to andy@warmcat.com per SECURITY.md; fixed bd57edb5fc)",
       "bug_class": "heap-buffer-overflow"
     },
     {
@@ -232,12 +365,28 @@
       "bug_class": "heap-buffer-overflow"
     },
     {
+      "id": "mongoose-mqtt-nextprop-oob",
+      "project": "mongoose",
+      "title": "Heap Buffer Overflow (OOB read) in mg_mqtt_next_prop MQTT5 property parsing",
+      "status": "fixed",
+      "report": "https://github.com/cesanta/mongoose/issues/3419",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
       "id": "ndpi-hex-decode-sscanf",
       "project": "ndpi",
       "title": "nDPI ndpi_hex_decode Unbounded sscanf Over Borrowed Buffer (TLS Block Parser)",
       "status": "fixed",
       "report": "https://github.com/ntop/nDPI/issues/3159",
-      "bug_class": "oob-read"
+      "bug_class": "segv"
+    },
+    {
+      "id": "netsnmp-smux-rreq-uaf",
+      "project": "net-snmp",
+      "title": "Heap Use-After-Free in smux_rreq_process (SMUX RReq DELETE path)",
+      "status": "fixed",
+      "report": "https://github.com/net-snmp/net-snmp/issues/1098",
+      "bug_class": "heap-use-after-free"
     },
     {
       "id": "netsnmp-vacm-parse-npd",
@@ -245,38 +394,30 @@
       "title": "NULL Pointer Dereference in vacm_parse_config_group",
       "status": "fixed",
       "report": "https://github.com/net-snmp/net-snmp/issues/1052",
-      "bug_class": "null-deref"
+      "bug_class": "segv"
     },
     {
-      "id": "njs-atod2-overflow",
-      "project": "njs",
-      "title": "Heap Buffer Overflow in njs_atod2 (Harness Bug)",
+      "id": "opcua-pubsub-json-assert",
+      "project": "open62541",
+      "title": "Assertion Failure in PubSub JSON NetworkMessage Decoder (lookAheadForKey)",
       "status": "fixed",
-      "report": "https://github.com/nginx/njs/issues/1006",
-      "bug_class": "heap-buffer-overflow"
+      "report": "https://github.com/open62541/open62541/pull/7680",
+      "bug_class": null
     },
     {
       "id": "opencv-yaml-parsekey",
       "project": "opencv",
-      "title": "Heap buffer overflow in YAML parser parseKey() when key is empty",
+      "title": "Heap Buffer Overflow in OpenCV YAML parseKey handling empty keys",
       "status": "fixed",
       "report": "https://github.com/opencv/opencv/issues/28619",
       "bug_class": "heap-buffer-overflow"
     },
     {
-      "id": "openh264-sad8x8-overflow",
+      "id": "openh264-scenechange-overflow",
       "project": "openh264",
-      "title": "Heap Buffer Overflow in Scene Change Detection (WelsSampleSad8x8_c)",
+      "title": "Heap Buffer Overflow (OOB read) in WelsSampleSad8x8_c during scene change detection",
       "status": "confirmed",
       "report": "https://github.com/cisco/openh264/issues/3926",
-      "bug_class": "heap-buffer-overflow"
-    },
-    {
-      "id": "openldap-parse-whsp",
-      "project": "openldap",
-      "title": "Heap Buffer Overflow in Schema Parser parse_whsp",
-      "status": "fixed",
-      "report": "https://bugs.openldap.org/show_bug.cgi?id=10430",
       "bug_class": "heap-buffer-overflow"
     },
     {
@@ -288,44 +429,28 @@
       "bug_class": "stack-buffer-underflow"
     },
     {
-      "id": "cups-utf8-charset-overflow",
-      "project": "OpenPrinting CUPS",
-      "title": "Heap buffer overflow in cupsUTF8ToCharset when processing truncated UTF-8 sequences",
+      "id": "openldap-parse-whsp",
+      "project": "openldap",
+      "title": "Heap Buffer Overflow in Schema Parser parse_whsp",
       "status": "fixed",
-      "report": "https://github.com/OpenPrinting/cups/issues/1438",
+      "report": "https://bugs.openldap.org/show_bug.cgi?id=10430",
       "bug_class": "heap-buffer-overflow"
     },
     {
-      "id": "cups-oauth-open-redirect",
-      "project": "OpenPrinting CUPS",
-      "title": "Open redirect issue in OAuth login flow",
+      "id": "openscreen-jsoncpp-error-message-overflow",
+      "project": "openscreen",
+      "title": "Heap-buffer-overflow READ in jsoncpp getLocationLineAndColumn (CR at end of input), reachable from openscreen Cast parser",
       "status": "fixed",
-      "report": "https://github.com/OpenPrinting/cups/issues/1419",
-      "bug_class": "open-redirect"
+      "report": "https://github.com/open-source-parsers/jsoncpp/issues/1682",
+      "bug_class": "heap-buffer-overflow"
     },
     {
-      "id": "cups-ppd-jclbegin-memleak",
-      "project": "OpenPrinting CUPS",
-      "title": "Memory leak in PPD parser when processing duplicate JCLBegin keywords",
-      "status": "confirmed",
-      "report": "https://github.com/OpenPrinting/fuzzing/issues/46",
-      "bug_class": "memory-leak"
-    },
-    {
-      "id": "cups-fuzz-array-alloc-mismatch",
-      "project": "OpenPrinting CUPS",
-      "title": "Memory Allocation/Deallocation Mismatch in fuzz_array.c",
-      "status": "confirmed",
-      "report": "https://github.com/OpenPrinting/fuzzing/issues/43",
-      "bug_class": "alloc-dealloc-mismatch"
-    },
-    {
-      "id": "cups-getconflicts-misuse",
-      "project": "OpenPrinting CUPS",
-      "title": "Incorrect API usage in fuzz_ppd_gen_conflicts.c - cupsGetConflicts return value ignored",
-      "status": "confirmed",
-      "report": "https://github.com/OpenPrinting/fuzzing/issues/45",
-      "bug_class": "api-misuse"
+      "id": "openscreen-jsoncpp-nonobject-oob",
+      "project": "openscreen",
+      "title": "Reachable abort() in openscreen Cast parsers via jsoncpp Value::find on a non-object Value",
+      "status": "fixed",
+      "report": "https://issues.chromium.org/issues/505902443",
+      "bug_class": "abrt"
     },
     {
       "id": "openssl-des-ofb-cfb-overread",
@@ -333,7 +458,7 @@
       "title": "Stack Buffer Over-Read in DES OFB/CFB64 via Unchecked num Parameter",
       "status": "fixed",
       "report": "https://github.com/openssl/openssl/issues/30284",
-      "bug_class": "stack-buffer-overread"
+      "bug_class": "stack-buffer-overflow"
     },
     {
       "id": "ots-processgeneric-npd",
@@ -341,15 +466,7 @@
       "title": "NULL Pointer Dereference in OTS ProcessGeneric() with TABLE_ACTION_PASSTHRU",
       "status": "fixed",
       "report": "https://github.com/khaledhosny/ots/issues/308",
-      "bug_class": "null-deref"
-    },
-    {
-      "id": "pdfbox-inlineimage-type-confusion",
-      "project": "pdfbox",
-      "title": "Type Confusion DoS in PDInlineImage.getDecode",
-      "status": "fixed",
-      "report": "https://github.com/apache/pdfbox/pull/410",
-      "bug_class": "type-confusion"
+      "bug_class": "segv"
     },
     {
       "id": "pdfbox-cmap-bfrange-aioob",
@@ -357,7 +474,15 @@
       "title": "ArrayIndexOutOfBoundsException in fontbox CMapParser.increment() via Malformed bfrange",
       "status": "fixed",
       "report": "https://github.com/apache/pdfbox/pull/411",
-      "bug_class": "uncaught-exception"
+      "bug_class": "oob-read"
+    },
+    {
+      "id": "pdfbox-inlineimage-type-confusion",
+      "project": "pdfbox",
+      "title": "Type Confusion DoS in PDInlineImage.getDecode",
+      "status": "fixed",
+      "report": "https://github.com/apache/pdfbox/pull/410",
+      "bug_class": "class-cast"
     },
     {
       "id": "pdfbox-pfb-negative-array",
@@ -376,35 +501,59 @@
       "bug_class": "heap-buffer-overflow"
     },
     {
+      "id": "skia-raster8888-blur-oob",
+      "project": "skia",
+      "title": "OOB pixel pointer in Raster8888BlurAlgorithm via eval_blur_passes X->Y rebind off-by-one",
+      "status": "fixed",
+      "report": "https://issues.chromium.org/issues/508075339",
+      "bug_class": "out-of-bounds-access"
+    },
+    {
+      "id": "spirv-orderblocks-segv",
+      "project": "spirv-tools",
+      "title": "SEGV in OrderBlocks via empty CFG when OpFunctionEnd precedes any OpLabel",
+      "status": "fixed",
+      "report": "https://github.com/KhronosGroup/SPIRV-Tools/issues/6663",
+      "bug_class": "segv"
+    },
+    {
+      "id": "spirv-tools-friendlynamemapper-overflow",
+      "project": "spirv-tools",
+      "title": "Heap-buffer-overflow READ in FriendlyNameMapper::ParseInstruction (OpTypePointer short word-count under HANDLE_UNKNOWN_OPCODES)",
+      "status": "fixed",
+      "report": "https://github.com/KhronosGroup/SPIRV-Tools/issues/6664",
+      "bug_class": "heap-buffer-overflow"
+    },
+    {
+      "id": "systemd-hwdb-trie-oob-read",
+      "project": "systemd",
+      "title": "Out-of-Bounds Reads in sd-hwdb Trie Walker (offset dereferenced before bounds check)",
+      "status": "fixed",
+      "report": "https://github.com/systemd/systemd/pull/42347",
+      "bug_class": "segv"
+    },
+    {
+      "id": "systemd-pe-binary-dos",
+      "project": "systemd",
+      "title": "Algorithmic-Complexity DoS in systemd PE/UKI Parser (382-byte PE wedges uki_hash >10s)",
+      "status": "fixed",
+      "report": "https://github.com/systemd/systemd/pull/42348",
+      "bug_class": "timeout"
+    },
+    {
       "id": "upx-elf32-pack2-memleak",
       "project": "upx",
-      "title": "Memory Leak in UPX PackLinuxElf32::pack2 when packing ELF executables",
+      "title": "Memory Leak in ElfLinker::addLoader() when packing ELF executables",
       "status": "fixed",
       "report": "https://github.com/upx/upx/issues/945",
       "bug_class": "memory-leak"
     },
     {
-      "id": "upx-pe-resource-memleak",
-      "project": "upx",
-      "title": "Memory Leak in UPX PeFile::Resource::convert() when processing PE resources",
-      "status": "fixed",
-      "report": "https://github.com/upx/upx/issues/946",
-      "bug_class": "memory-leak"
-    },
-    {
       "id": "upx-elf64-generate-overflow",
       "project": "upx",
-      "title": "Heap Buffer Overflow in UPX PackLinuxElf64::generateElfHdr when packing malformed ELF64",
+      "title": "Heap Buffer Overflow in PackLinuxElf64::generateElfHdr",
       "status": "fixed",
       "report": "https://github.com/upx/upx/issues/947",
-      "bug_class": "heap-buffer-overflow"
-    },
-    {
-      "id": "upx-pe-loadconf-overflow",
-      "project": "upx",
-      "title": "Heap Buffer Overflow in UPX PeFile::processLoadConf when packing malformed PE32 files",
-      "status": "fixed",
-      "report": "https://github.com/upx/upx/issues/950",
       "bug_class": "heap-buffer-overflow"
     }
   ]

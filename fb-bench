@@ -25,4 +25,44 @@ existing = os.environ.get("PYTHONPATH")
 os.environ["PYTHONPATH"] = os.pathsep.join([str(REPO), existing]) if existing else str(REPO)
 os.environ.setdefault("FBBENCH_REPO", str(REPO))
 
+
+def _ensure_lfs():
+    """Prebuilt harness binaries live in git-lfs. On a fresh clone without
+    `git lfs pull` they are tiny pointer stubs and grade/run would fail. Detect
+    that and materialize them once so `git clone && ./fb-bench …` still just
+    works. No-op once binaries are real; silent on the happy path."""
+    import glob, subprocess
+    if os.environ.get("FBBENCH_SKIP_LFS"):
+        return
+    pointer = None
+    for f in sorted(glob.glob(str(REPO / "bugs" / "*" / "*" / "binaries" / "*" / "harness"))):
+        try:
+            if os.path.getsize(f) < 1024:
+                with open(f, "rb") as fh:
+                    if fh.read(40).startswith(b"version https://git-lfs"):
+                        pointer = f
+                        break
+        except OSError:
+            continue
+    if pointer is None:
+        return  # binaries already materialized — nothing to do
+    if subprocess.call(["git", "-C", str(REPO), "lfs", "version"],
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) != 0:
+        sys.stderr.write(
+            "\n[fb-bench] Harness binaries are git-lfs pointers but git-lfs is not installed.\n"
+            "           Install it (https://git-lfs.com), then: git lfs install && git lfs pull\n\n")
+        return
+    sys.stderr.write("[fb-bench] Fetching prebuilt harness binaries from git-lfs (first run)…\n")
+    subprocess.call(["git", "-C", str(REPO), "lfs", "install"],
+                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    subprocess.call(["git", "-C", str(REPO), "lfs", "pull"])
+
+
+# grade/grade-all/run read the prebuilt binaries; list/show/models do not.
+if len(sys.argv) > 1 and sys.argv[1] in ("grade", "grade-all", "run"):
+    try:
+        _ensure_lfs()
+    except Exception:
+        pass  # never let the LFS helper block the real command
+
 os.execvp(sys.executable, [sys.executable, "-m", "fbbench", *sys.argv[1:]])

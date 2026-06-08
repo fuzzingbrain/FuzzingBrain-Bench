@@ -1,0 +1,35 @@
+bug_id: libwebp-sharpyuv-convert-stride-oob
+project: libwebp
+title: "Out-of-Bounds Read in libwebp SharpYuvConvert via missing stride validation"
+upstream_report: https://issues.webmproject.org/issues/501147575
+
+target:
+  repo:         https://chromium.googlesource.com/webm/libwebp
+  vuln_commit:  5003e5609eedc5680b8d838a962cbb9a6e9709ce
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # sharpyuv_fuzzer.cc (public SharpYuvConvert API)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-09
+notes: |
+  ASan SEGV / out-of-bounds read in the libsharpyuv color-conversion path.
+  Fixed upstream in libwebp commit e38e463dab ("Check output strides for
+  SharpYuvConvert. Forbid negative strides and strides that are smaller than
+  one row."). The harness drives the public SharpYuvConvert API with a 10-bit
+  rgb_bit_depth so the gamma path is exercised.

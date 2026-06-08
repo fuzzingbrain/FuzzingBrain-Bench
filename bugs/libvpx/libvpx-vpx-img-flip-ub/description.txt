@@ -1,0 +1,39 @@
+Undefined Behavior in libvpx vpx_img_flip (NULL alpha-plane arithmetic)
+======================================================================
+
+Project:     libvpx (WebM — public vpx_image utility API)
+Bug class:   undefined-behavior (pointer arithmetic on a NULL pointer, CWE-758)
+Sanitizer:   UndefinedBehaviorSanitizer
+
+Summary
+-------
+vpx_img_flip() (vpx/src/vpx_image.c) unconditionally executes
+  img->planes[VPX_PLANE_ALPHA] += (signed)(img->d_h - 1) * img->stride[VPX_PLANE_ALPHA];
+for every image, even for formats that have no alpha plane
+(VPX_IMG_FMT_YV12 / I420 / I422 / I444 / I440 / NV12 and the HIGHBITDEPTH
+variants). img_alloc_helper leaves planes[VPX_PLANE_ALPHA] == NULL for those
+formats but copies the Y-plane stride into stride[VPX_PLANE_ALPHA] (non-zero),
+so the expression computes NULL + non_zero_offset — undefined behavior per
+C99 6.5.6/8. UBSan reports
+  "runtime error: applying non-zero offset N to null pointer"
+at vpx/src/vpx_image.c:263. (In a non-UBSan release build the invalid pointer
+is parked in the field and never dereferenced by in-tree code, so the UB is
+latent there.)
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, allocates a
+non-alpha image format and then calls vpx_img_flip on it, so UBSan reports the
+null-pointer-arithmetic undefined behavior in vpx_img_flip.
+
+The harness (harness/vpx_image_format_matrix_fuzzer.cc) drives the public
+vpx_image API: byte[0] selects one of ten YUV formats, byte[1] bit 1 enables
+the post-alloc vpx_img_flip call, bytes 2..5 are LE u16 width/height. A
+non-alpha format with the flip bit set reaches the bug.
+
+References
+----------
+- Upstream report: issues.webmproject.org/issues/512911654 (filed 2026-05-14)
+- Fix: chromium-review.googlesource.com/7848304
+  (commit ca2f535c9ce6fce777864d4ce5b5774516b08978)
+- Source: vpx/src/vpx_image.c (vpx_img_flip)

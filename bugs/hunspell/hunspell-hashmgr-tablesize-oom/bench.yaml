@@ -1,0 +1,29 @@
+bug_id: hunspell-hashmgr-tablesize-oom
+project: hunspell
+title: "Unbounded heap allocation (~1.6 GB) in HashMgr::load_tables via unvalidated tablesize field in .dic file"
+upstream_report: https://github.com/hunspell/hunspell/issues/1116
+
+target:
+  repo:         https://github.com/hunspell/hunspell
+  vuln_commit:  f23fcd33052c7c8a307eaa3e1b1a4c0cdcf45651
+  language:     cpp
+  build_system: autotools
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["-rss_limit_mb=256", "@@"]
+  rss_limit_mb: 256
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [crash, class]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-05-05

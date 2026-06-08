@@ -1,0 +1,57 @@
+OOB pixel pointer in Raster8888BlurAlgorithm via eval_blur_passes X->Y rebind off-by-one
+========================================================================================
+
+Project:     skia (chromium-vendored third_party/skia)
+Bug class:   out-of-bounds-access (CWE-125 / CWE-787)
+Sanitizer:   AddressSanitizer (surfaced as a SkASSERT/dcheck fatal in
+             dcheck_always_on builds; a silent OOB pixel read/write in
+             release/no-assert builds)
+
+`SkBitmap::getAddr(int x, int y)` (`src/core/SkBitmap.cpp:386`) asserts
+`(unsigned)x < (unsigned)this->width()` at line 387. The Raster software blur
+path reaches it with an out-of-bounds `x`.
+
+In `eval_blur_passes<T>()` (`src/core/SkBlurEngine.cpp`), a separable Gaussian
+blur is performed as an X pass followed by a Y pass. Between the two passes the
+source bitmap and bounds are rebound for the Y pass:
+
+    src = dst;                       // X output becomes Y input
+    srcBounds = dstBounds;           // rebind src bounds to the (wider) X-pass dst
+    ...
+    auto srcAddr = ... src.getAddr(loopStart - srcBounds.left(), 0);  // Y pass
+
+After the rebind, `loopStart - srcBounds.left()` can exceed the new `src`
+bitmap's width by one in certain bound configurations (an off-by-one in the X->Y
+rebind), so `getAddr` is asked for a pixel one column past the row. The blur loop
+then reads/writes through that pointer.
+
+In Chromium's default fuzz config (`dcheck_always_on=true`, ASan), the
+`SkASSERT` at SkBitmap.cpp:387 is promoted to a fatal `SK_ABORT`, which is what
+the fuzzer observes:
+
+    FATAL third_party/skia/src/core/SkBitmap.cpp:387:
+        check((unsigned)x < (unsigned)this->width())
+    #5  SkAbort_FileLine
+    #6  SkBitmap::HeapAllocator::allocPixelRef          (getAddr inlined)
+    #7  (anon)::Raster8888BlurAlgorithm::blur           SkBlurEngine.cpp
+    #8  skif::FilterResult::Builder::blur
+    #9  (anon)::SkBlurImageFilter::onFilterImage
+    #11 SkCanvas::internalDrawDeviceWithFilter
+    #15 SkCanvas::drawRect
+    #16 main
+
+In stable/release builds where `SkASSERT` is a no-op, `getAddr` silently returns
+an out-of-bounds pixel pointer that the blur loop dereferences -- a real heap
+memory-safety bug. The crash is reached purely through the public Skia surface
+(`SkSurfaces::Raster` -> `SkPaint::setImageFilter(<blur chain>)` ->
+`SkCanvas::drawRect`), with all fuzzer-supplied parameters inside documented
+ranges (blur sigmas in [0,100], below the engine's own maxSigma()=135.f).
+
+References
+----------
+- Upstream: https://issues.chromium.org/issues/508075339
+- Fix: skia CL 1225736 (commit d2740c899a1ec8a22209840bd8350f22f8c27ecf),
+  "Fix assert in SkBlurEngine/SkBitmap"; rolled into Chromium.
+- Harness: libFuzzer building a recursive SkImageFilters chain
+  (Blur/Compose/Offset/DropShadow/Crop/Merge/MatrixTransform/Empty) and applying
+  it via SkCanvas::drawRect on a 64x64 raster surface.
