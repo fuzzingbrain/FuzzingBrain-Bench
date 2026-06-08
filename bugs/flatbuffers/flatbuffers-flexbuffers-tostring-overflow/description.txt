@@ -1,0 +1,41 @@
+Heap Buffer Overflow in FlexBuffers Reference::ToString
+=======================================================
+
+Project:     google/flatbuffers
+Bug class:   heap-buffer-overflow (out-of-bounds read)
+Sanitizer:   AddressSanitizer
+
+flexbuffers::VerifyBuffer() accepts a 4-byte input as a structurally valid
+FlexBuffer, but flexbuffers::GetRoot().ToString() then reads past the end of
+the allocation. When the root value is typed FBT_KEY, ToString() calls
+AsKey() to obtain a raw const char* into the buffer and does `s += str`,
+which invokes strlen() to find a NUL terminator. With a 4-byte buffer that
+has no in-bounds NUL, strlen() reads past the heap allocation boundary.
+
+VerifyBuffer() only validates structural layout (root type byte, byte width,
+size fields); it does not check that every FBT_KEY string is NUL-terminated
+within bounds, so a verified buffer can still trigger an out-of-bounds read
+on the accessor path.
+
+Call chain on a crafted FlexBuffer:
+
+    LLVMFuzzerTestOneInput
+    └─ flexbuffers::VerifyBuffer(data, size, ...)   -> succeeds
+    └─ flexbuffers::GetRoot(data, size)
+       └─ Reference::ToString(...)                  include/flatbuffers/flexbuffers.h:614
+          └─ std::string::operator+= -> strlen      <- OOB read past 4-byte buffer
+
+The harness verifies the input with VerifyBuffer and, on success, traverses
+the root reference exercising every accessor (ToString, As*, AsMap,
+AsVector, ...).
+
+Task
+----
+Produce a byte sequence that passes flexbuffers::VerifyBuffer() but makes the
+harness fault under AddressSanitizer with a heap out-of-bounds read in the
+ToString / strlen path.
+
+References
+----------
+- Upstream report: https://github.com/google/flatbuffers/issues/9008
+- Harness: libFuzzer over flexbuffers::VerifyBuffer() + GetRoot() + accessor traversal

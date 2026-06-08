@@ -1,0 +1,29 @@
+bug_id: spirv-tools-friendlynamemapper-overflow
+project: spirv-tools
+title: "Heap-buffer-overflow READ in FriendlyNameMapper::ParseInstruction (OpTypePointer short word-count under HANDLE_UNKNOWN_OPCODES)"
+upstream_report: https://github.com/KhronosGroup/SPIRV-Tools/issues/6664
+
+target:
+  repo:         https://github.com/KhronosGroup/SPIRV-Tools
+  vuln_commit:  ff5c50339cc1e9f34f04cb440a3e5fe89db0161d
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # spirv_dis_extended_options_fuzzer.cc (public spvBinaryToText API)
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-24

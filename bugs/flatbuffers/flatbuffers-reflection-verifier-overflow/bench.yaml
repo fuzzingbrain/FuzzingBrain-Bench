@@ -1,0 +1,29 @@
+bug_id: flatbuffers-reflection-verifier-overflow
+project: flatbuffers
+title: "Heap Buffer Overflow in flatbuffers::Verify via Reflection VerifyObject/GetFieldT"
+upstream_report: https://github.com/google/flatbuffers/issues/9040
+
+target:
+  repo:         https://github.com/google/flatbuffers
+  vuln_commit:  e223d69b36574c4a2b10dbd27761753de81624ab
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: confirmed
+cve: null
+disclosed: 2026-04-11

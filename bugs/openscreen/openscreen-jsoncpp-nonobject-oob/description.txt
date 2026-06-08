@@ -1,0 +1,53 @@
+Reachable abort() in openscreen Cast parsers via jsoncpp non-object find()
+=========================================================================
+
+Project:     openscreen (Chromium Open Screen Library — Cast streaming)
+Bug class:   reachable assertion / abort (ABRT)  [deadly signal]
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+openscreen's Cast-streaming ANSWER sub-struct parsers in
+cast/streaming/public/answer_messages.cc (AudioConstraints::TryParse and
+its siblings VideoConstraints / Constraints / DisplayDescription) take a
+`const Json::Value& root` and immediately index it with string keys
+(e.g. root[kMaxSampleRate]) without first calling root.isObject(). When
+the attacker-supplied JSON document parses to a non-object Value — a bare
+array `[]`, a number, a string, or a bool — jsoncpp's
+operator[](key) const routes into Json::Value::find(), whose precondition
+JSON_ASSERT_MESSAGE(type() == nullValue || type() == objectValue, ...)
+fails. Under openscreen's production configuration
+(JSON_USE_EXCEPTION=0, -DNDEBUG, -fno-exceptions) the JSON_FAIL_MESSAGE
+macro expands to `{ ...; assert(false && ...); abort(); }`: NDEBUG elides
+the assert(), but the trailing unconditional abort() still runs. The
+result is a network-reachable, pre-auth abort of any Cast sender whose
+OnMessage path validates an ANSWER from an attacker-controlled LAN Cast
+receiver.
+
+The same jsoncpp non-object find() abort is reachable from the sibling
+RECEIVER- and SENDER-message parsers (receiver_message.cc /
+sender_message.cc), whose existing `if (!value)` guards only reject
+nullValue, not arrays. This benchmark merges those into one entry: the
+root cause and fix (an isObject() guard before any value[key]) are the
+same. The primary harness/crash here is the ANSWER (answer_messages)
+path.
+
+Task
+----
+Produce a JSON document that, when parsed and handed to one of the
+openscreen ANSWER sub-struct TryParse entries, drives a `root[key]`
+lookup on a non-object Json::Value and makes the sanitizer report a
+deadly signal (ABRT) whose faulting library frame is in jsoncpp's
+Json::Value::find (src/lib_json/json_value.cpp).
+
+The harness (harness/openscreen_answer_messages_deep_substructs_fuzzer.cc)
+reads byte 0 as a selector (mod 5, picking one of the five sub-struct
+TryParse entries) and treats the remaining bytes as JSON text, parsed via
+openscreen::json::Parse before dispatch.
+
+References
+----------
+- Tracker: https://issues.chromium.org/issues/505902443 (siblings
+  505902444 / 505947418); fix CL
+  https://chromium-review.googlesource.com/c/openscreen/+/7801091
+- Bundled library: jsoncpp 1.9.4, Json::Value::find / operator[].

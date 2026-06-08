@@ -1,0 +1,29 @@
+bug_id: freetype-ftbitmapcopy-uaf
+project: freetype
+title: "Heap Use-After-Free in FT_Bitmap_Copy via lazy bitmap ownership transfer in ft_bitmap_glyph_init"
+upstream_report: https://gitlab.freedesktop.org/freetype/freetype/-/issues/1385
+
+target:
+  repo:         https://github.com/freetype/freetype
+  vuln_commit:  d41d4943410cb942e02e0a8866f39be02378ecf5
+  language:     c
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # ftfuzzer_glyph.c
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-01-28

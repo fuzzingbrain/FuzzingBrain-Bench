@@ -1,0 +1,48 @@
+Heap-buffer-overflow READ in jsoncpp getLocationLineAndColumn (trailing CR)
+==========================================================================
+
+Project:     jsoncpp (vendored by openscreen / Chromium for Cast streaming)
+Bug class:   heap-buffer-overflow (READ, 1 byte / off-by-one past end)
+Sanitizer:   AddressSanitizer
+
+Summary
+-------
+Json::OurReader::getLocationLineAndColumn
+(src/lib_json/json_reader.cpp:1820-1840) walks the input buffer to compute a
+(line, column) position for a parse-error token. Inside the loop, when the
+current byte is '\r' (carriage return), the code unconditionally peeks at
+*current to check for a following '\n' — WITHOUT re-testing the
+`current != end_` loop guard. If the CR is the LAST byte of the input,
+`current++` advances current to end_, and the peek at json_reader.cpp:1828
+(`if (*current == '\n')`) reads one byte past the heap allocation.
+
+The formatter runs on every failed parse: OurCharReader::parse
+(json_reader.cpp:1886) always calls getFormattedErrorMessages
+(json_reader.cpp:1854) when a non-null `errs` pointer is supplied — which
+openscreen::json::Parse always does. A single attacker-supplied byte (0x0d)
+delivered to the openscreen Cast RECEIVER-message parse path produces a
+parse error whose token sits on the CR, and formatting it reads OOB. The same
+off-by-one is duplicated in the legacy Json::Reader::getLocationLineAndColumn
+(json_reader.cpp:776); the upstream fix adds a `current != end_` guard to
+both.
+
+Task
+----
+Produce an input that, when parsed via Json::CharReader::parse(begin, end,
+&root, &errs) (the call shape openscreen::json::Parse uses), makes jsoncpp's
+error formatter peek past the end of the input buffer and makes
+AddressSanitizer report a heap-buffer-overflow READ whose faulting library
+frame is in jsoncpp's error-location formatter
+(src/lib_json/json_reader.cpp).
+
+The harness (harness/openscreen_receiver_message_json_parse_fuzzer.cc) treats
+the whole input as a JSON string, parses it with openscreen::json::Parse, then
+runs openscreen::cast::ReceiverMessage::Parse on the result.
+
+References
+----------
+- Upstream report: https://github.com/open-source-parsers/jsoncpp/issues/1682
+  (fixed 2026-05-05); cross-filed via chromium openscreen tracker.
+- Affected function: Json::OurReader::getLocationLineAndColumn (and legacy
+  Json::Reader::getLocationLineAndColumn), the `if (*current == '\n')` CR-LF
+  look-ahead.

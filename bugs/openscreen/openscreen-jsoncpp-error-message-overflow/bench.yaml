@@ -1,0 +1,31 @@
+bug_id: openscreen-jsoncpp-error-message-overflow
+project: openscreen
+title: "Heap-buffer-overflow READ in jsoncpp getLocationLineAndColumn (CR at end of input), reachable from openscreen Cast parser"
+upstream_report: https://github.com/open-source-parsers/jsoncpp/issues/1682
+
+target:
+  repo:         https://github.com/open-source-parsers/jsoncpp
+  vuln_commit:  42e892d96e47b1f6e29844cc705e148ec4856448
+  language:     cpp
+  build_system: clang
+  # jsoncpp is the bundled library that crashes (chromium/openscreen vendor it
+  # under third_party/jsoncpp/source). vuln_commit is the chromium-vendored SHA.
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # openscreen_receiver_message_json_parse_fuzzer.cc
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-24

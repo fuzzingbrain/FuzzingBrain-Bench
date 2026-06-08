@@ -1,0 +1,41 @@
+Undefined Behavior in libvpx VP9 SVC Rate Control (NaN-to-int cast)
+==================================================================
+
+Project:     libvpx (WebM VP9 encoder — SVC rate controller)
+Bug class:   undefined-behavior (NaN -> int conversion, CWE-704 / CWE-758)
+Sanitizer:   UndefinedBehaviorSanitizer
+
+Summary
+-------
+saturate_cast_double_to_int() in vpx_dsp/vpx_dsp_common.h only guards the
+d > INT_MAX corner and otherwise performs a bare (int)d. (int)NaN is undefined
+behavior in C/C++. In vp9_update_buffer_level_svc_preencode()
+(vp9/encoder/vp9_ratectrl.c) the encoder divides a per-layer
+target_bandwidth by a per-layer framerate for every SVC LAYER_CONTEXT slot.
+On an unconfigured layer slot both operands are 0, so the division yields
+0.0/0.0 = NaN, round(NaN) = NaN, and that NaN is passed through
+saturate_cast_double_to_int — tripping UBSan with
+"runtime error: -nan is outside the range of representable values of type
+'int'". In a release (NDEBUG, no UBSan) build the cast silently folds the NaN
+into an implementation-defined integer that corrupts the rate controller's
+bits_off_target / buffer_level state for the rest of the stream.
+
+Task
+----
+Produce a byte sequence that, when fed to the harness binary, drives the VP9
+encoder through a multi-layer SVC configuration that reaches an unconfigured
+layer slot on a later superframe, so UBSan reports the NaN-to-int undefined
+behavior in vpx_dsp/vpx_dsp_common.h via
+vp9_update_buffer_level_svc_preencode.
+
+The harness (harness/vp9_encoder_svc_layer_config_fuzzer.cc) builds a
+contract-compliant SVC config (monotonic bitrate ladders, ts_periodicity a
+multiple of ts_number_layers, even W/H) and runs
+vpx_codec_enc_config_default -> vpx_codec_enc_init -> VP9E_SET_SVC -> a loop of
+VP9E_SET_SVC_LAYER_ID / VP9E_SET_SVC_REF_FRAME_CONFIG + vpx_codec_encode.
+
+References
+----------
+- Upstream report: issues.webmproject.org/issues/508317885 (filed 2026-04-30)
+- Source: vpx_dsp/vpx_dsp_common.h (saturate_cast_double_to_int),
+  vp9/encoder/vp9_ratectrl.c (vp9_update_buffer_level_svc_preencode)

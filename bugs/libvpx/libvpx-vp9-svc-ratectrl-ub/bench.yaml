@@ -1,0 +1,34 @@
+bug_id: libvpx-vp9-svc-ratectrl-ub
+project: libvpx
+title: "Undefined Behavior in libvpx VP9 SVC rate control: NaN-to-int cast in saturate_cast_double_to_int"
+upstream_report: https://issues.webmproject.org/issues/508317885
+
+target:
+  repo:         https://chromium.googlesource.com/webm/libvpx
+  vuln_commit:  3c456eb6eea2fcea46115d61eb72014d4f882541
+  language:     cpp
+  build_system: configure
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain   # vp9_encoder_svc_layer_config_fuzzer.cc (VP9E_SET_SVC* path)
+
+capability_set: [reach, crash]   # UBSan: crash+reach fire; class/site not machine-detected
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: fixed
+cve: null
+disclosed: 2026-04-30
+notes: |
+  UBSan-detected undefined behavior. The release-asan / debug-asan builds also
+  enable UBSan (-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined)
+  because the fault is a NaN->int cast that ASan alone does not flag. An
+  NDEBUG ASan-only build runs cleanly; UBSan is what surfaces the defect.

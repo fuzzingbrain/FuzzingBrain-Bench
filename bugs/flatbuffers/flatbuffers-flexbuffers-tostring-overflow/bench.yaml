@@ -1,0 +1,29 @@
+bug_id: flatbuffers-flexbuffers-tostring-overflow
+project: flatbuffers
+title: "Heap Buffer Overflow in FlexBuffers Reference::ToString via strlen on FBT_KEY"
+upstream_report: https://github.com/google/flatbuffers/issues/9008
+
+target:
+  repo:         https://github.com/google/flatbuffers
+  vuln_commit:  ""   # no exact commit recorded for this bug; campaign-pinned tree was bab10754d93d74d1ff44d46de63558bc4127f7d8 (see NOTES.md)
+  language:     cpp
+  build_system: cmake
+
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: fuzzingbrain
+
+capability_set: [reach, crash, class, site]
+
+reproducibility:
+  base_image_digest: ""
+  snapshot_debian_date: "20260101T000000Z"
+  source_date_epoch: 1735689600
+
+status: confirmed
+cve: null
+disclosed: 2026-03-30
