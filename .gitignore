@@ -32,9 +32,5 @@ runs/
 .env
 *.key
 
-# Off-target experiment analysis scripts (experiment-only, not shipped)
-tools/fullscan_cases.py
-tools/fullscan_html.py
-tools/scan_all_crashes.py
-tools/recover_offtarget.py
-tools/firecheck.py
+# Experiment-only scripts (analysis, sweep runners, report generators — not shipped)
+tools/experiments/
