@@ -4,7 +4,7 @@
 # `sanitizer`/`disclosed`/`vuln_version` mirror their source-of-truth in
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
-category: unclassified
+category: reachable-assertion
 difficulty: none
 metadata:
   sanitizer: null

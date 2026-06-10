@@ -55,6 +55,35 @@ UNCLASSIFIED = "unclassified"
 # abort, uncaught-exception, out-of-bounds-access, empty) are deliberately absent
 # -> they resolve to `unclassified` and get a per-bug code-reading pass (#12),
 # because e.g. a `segv` may be a null-deref, a UAF, or an OOB read.
+# Per-bug categories established by READING the root-cause code (the #12 pass) —
+# authoritative, overrides the crash-class map. Used for symptom classes (segv/
+# abrt/uncaught-exception/empty) where the crash class doesn't reveal the type.
+# Each is grounded in the reach/site source (see commit / PR notes).
+_CURATED = {
+    "avro-neg-string-len":            "out-of-bounds-read",      # negative key_size -> OOB string read
+    "graal-regexlexer-oob":           "out-of-bounds-read",      # pattern.charAt(position) no bounds check
+    "graaljs-illformed-locale":       "uncaught-exception",      # IllformedLocaleException from Locale.Builder
+    "icu-translit-rule-dtor-uaf":     "use-after-free",          # dtor frees pointers of a partial rule
+    "imagemagick-kernelinfo-alloc":   "memory-exhaustion",       # excessive AcquireKernelInfo allocation
+    "imagemagick-msl-comment-npd":    "null-pointer-dereference",  # msl_info->image[n] NULL deref
+    "jq-dump-op-npd":                 "null-pointer-dereference",  # getlevel()->subfunctions[idx] NULL
+    "jsonjava-unescape-numformat":    "uncaught-exception",      # NumberFormatException
+    "libaom-av1-config-assert":       "reachable-assertion",     # assert in aom_rb_read_literal
+    "libvpx-vp9-encoder-caq-assert":  "reachable-assertion",     # VP9 CAQ assertion
+    "libwebp-muxassemble-npd":        "null-pointer-dereference",  # data->bytes NULL deref
+    "libwebp-sharpyuv-convert-stride-oob": "out-of-bounds-read",  # missing stride validation -> OOB read
+    "libwebp-sharpyuv-gamma-oob":     "out-of-bounds-read",      # unclamped LUT index -> OOB read
+    "ndpi-hex-decode-sscanf":         "out-of-bounds-read",      # sscanf reads past borrowed src buffer
+    "netsnmp-vacm-parse-npd":         "null-pointer-dereference",  # skip_token_const()->NULL then deref
+    "opcua-pubsub-json-assert":       "reachable-assertion",     # lookAheadForKey assertion
+    "openscreen-jsoncpp-nonobject-oob": "reachable-assertion",   # jsoncpp find() JSON_ASSERT abort
+    "ots-processgeneric-npd":         "null-pointer-dereference",  # maxp NULL deref
+    "pdfbox-pfb-negative-array":      "uncaught-exception",      # NegativeArraySizeException
+    "skia-raster8888-blur-oob":       "out-of-bounds-read",      # eval_blur_passes OOB pixel pointer (read)
+    "spirv-orderblocks-segv":         "null-pointer-dereference",  # blocks[0] on empty CFG -> null data deref
+    "systemd-hwdb-trie-oob-read":     "out-of-bounds-read",      # trie offset deref before bounds check
+}
+
 _CONFIDENT_MAP = {
     "heap-buffer-overflow":    "heap-buffer-overflow",
     "heap-use-after-free":     "use-after-free",
@@ -103,7 +132,9 @@ def _compute(bug_dir: str) -> dict:
         exp = yaml.safe_load(open(exp_path)) or {}
     cls = (exp.get("class") or {})
     raw = cls.get("expected") or ""
-    category = _CONFIDENT_MAP.get(raw, UNCLASSIFIED)
+    # curated (code-verified) wins; else the self-describing crash class; else
+    # unclassified.
+    category = _CURATED.get(bug) or _CONFIDENT_MAP.get(raw, UNCLASSIFIED)
     assert category in CANONICAL_CATEGORIES or category == UNCLASSIFIED, \
         f"{bug}: category {category!r} not in the controlled vocabulary"
     return {
