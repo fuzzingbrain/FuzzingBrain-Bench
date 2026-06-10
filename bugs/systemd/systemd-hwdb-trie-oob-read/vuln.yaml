@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/libsystemd/sd-hwdb/sd-hwdb.c
+  '1':
+  - src/libsystemd/sd-hwdb/sd-hwdb.c
+  - src/libsystemd/sd-hwdb/hwdb-internal.h
+  '2':
+  - src/basic/fd-util.h
+  - src/libsystemd/sd-hwdb/sd-hwdb.c
+  - src/libsystemd/sd-hwdb/hwdb-internal.h
+  '3':
+  - src/libsystemd/sd-hwdb/hwdb-internal.h
+  - src/libsystemd/sd-hwdb/sd-hwdb.c
+  - src/basic/fd-util.h
+  - src/systemd/sd-hwdb.h
 metadata:
   language: c
   arch: x86_64

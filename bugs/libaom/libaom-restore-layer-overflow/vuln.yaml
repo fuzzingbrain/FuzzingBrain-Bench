@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - av1/encoder/svc_layercontext.c
+  '1':
+  - av1/encoder/tx_search.c
+  - av1/encoder/svc_layercontext.c
+  '2':
+  - av1/encoder/svc_layercontext.c
+  - av1/encoder/tx_search.c
+  - av1/encoder/global_motion_facade.h
+  '3':
+  - av1/encoder/tokenize.h
+  - av1/encoder/svc_layercontext.c
+  - av1/encoder/global_motion_facade.h
+  - av1/encoder/tx_search.c
 metadata:
   language: cpp
   arch: x86_64

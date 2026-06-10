@@ -13,6 +13,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java
+  '1':
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/StableContextOptionValue.java
+  '2':
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/StableContextOptionValue.java
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/DebugJSAgent.java
+  '3':
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/StableContextOptionValue.java
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/UnmodifiablePropertyKeyList.java
+  - graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/DebugJSAgent.java
 metadata:
   language: jvm
   arch: x86_64

@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/main/java/org/json/XMLTokener.java
+  '1':
+  - src/main/java/org/json/XMLTokener.java
+  - src/main/java/org/json/JSONWriter.java
+  '2':
+  - src/main/java/org/json/CDL.java
+  - src/main/java/org/json/XMLTokener.java
+  - src/main/java/org/json/JSONWriter.java
+  '3':
+  - src/main/java/org/json/CDL.java
+  - src/main/java/org/json/JSONPropertyName.java
+  - src/main/java/org/json/XMLTokener.java
+  - src/main/java/org/json/JSONWriter.java
 metadata:
   language: jvm
   arch: x86_64

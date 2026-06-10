@@ -15,6 +15,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - winpr/libwinpr/sspi/NTLM/ntlm.c
+  '1':
+  - winpr/libwinpr/sspi/NTLM/ntlm_av_pairs.c
+  - winpr/libwinpr/sspi/NTLM/ntlm.c
+  '2':
+  - winpr/libwinpr/sspi/NTLM/ntlm_av_pairs.c
+  - winpr/libwinpr/sspi/NTLM/ntlm.c
+  - winpr/libwinpr/sspi/NTLM/ntlm_av_pairs.h
+  '3':
+  - winpr/libwinpr/sspi/NTLM/ntlm_av_pairs.c
+  - winpr/libwinpr/sspi/NTLM/ntlm_compute.h
+  - winpr/libwinpr/sspi/NTLM/ntlm_av_pairs.h
+  - winpr/libwinpr/sspi/NTLM/ntlm.c
 metadata:
   language: c
   arch: x86_64

@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - libfdt/fdt.c
+  '1':
+  - libfdt/fdt_addresses.c
+  - libfdt/fdt.c
+  '2':
+  - libfdt/fdt.c
+  - libfdt/fdt_addresses.c
+  - libfdt/fdt_ro.c
+  '3':
+  - libfdt/fdt_ro.c
+  - libfdt/fdt_addresses.c
+  - libfdt/fdt_strerror.c
+  - libfdt/fdt.c
 metadata:
   language: c
   arch: x86_64

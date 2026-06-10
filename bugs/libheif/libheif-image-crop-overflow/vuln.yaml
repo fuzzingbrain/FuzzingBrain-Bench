@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - libheif/pixelimage.cc
+  '1':
+  - libheif/pixelimage.cc
+  - libheif/nclx.h
+  '2':
+  - libheif/pixelimage.cc
+  - libheif/nclx.h
+  - libheif/plugin_registry.cc
+  '3':
+  - libheif/nclx.h
+  - libheif/pixelimage.cc
+  - libheif/plugin_registry.cc
+  - libheif/file.h
 metadata:
   language: cpp
   arch: x86_64

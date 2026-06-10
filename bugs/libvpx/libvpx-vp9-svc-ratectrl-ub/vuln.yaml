@@ -14,6 +14,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - vpx_dsp/vpx_dsp_common.h
+  '1':
+  - vpx_dsp/vpx_dsp_common.h
+  - vpx_dsp/bitwriter_buffer.h
+  '2':
+  - vpx_dsp/vpx_dsp_common.h
+  - vpx_dsp/bitreader_buffer.h
+  - vpx_dsp/bitwriter_buffer.h
+  '3':
+  - vpx_dsp/bitwriter_buffer.h
+  - vpx_dsp/sse.c
+  - vpx_dsp/vpx_dsp_common.h
+  - vpx_dsp/bitreader_buffer.h
 metadata:
   language: cpp
   arch: x86_64

@@ -14,6 +14,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/hunspell/hashmgr.cxx
+  '1':
+  - src/hunspell/filemgr.cxx
+  - src/hunspell/hashmgr.cxx
+  '2':
+  - src/hunspell/hunspell.cxx
+  - src/hunspell/hashmgr.cxx
+  - src/hunspell/filemgr.cxx
+  '3':
+  - src/hunspell/hunspell.cxx
+  - src/hunspell/filemgr.cxx
+  - src/hunspell/affixmgr.cxx
+  - src/hunspell/hashmgr.cxx
 metadata:
   language: cpp
   arch: x86_64

@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - agent/agent_handler.c
+  '1':
+  - agent/agent_handler.c
+  - agent/object_monitor.c
+  '2':
+  - agent/object_monitor.c
+  - agent/agent_trap.c
+  - agent/agent_handler.c
+  '3':
+  - agent/agent_trap.c
+  - agent/object_monitor.c
+  - agent/agent_read_config.c
+  - agent/agent_handler.c
 metadata:
   language: c
   arch: x86_64

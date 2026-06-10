@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/bytecode.c
+  '1':
+  - src/parser.h
+  - src/bytecode.c
+  '2':
+  - src/parser.h
+  - src/util.h
+  - src/bytecode.c
+  '3':
+  - src/execute.c
+  - src/parser.h
+  - src/bytecode.c
+  - src/util.h
 metadata:
   language: c
   arch: x86_64

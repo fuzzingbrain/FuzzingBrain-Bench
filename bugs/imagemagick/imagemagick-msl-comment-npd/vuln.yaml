@@ -15,6 +15,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - coders/msl.c
+  '1':
+  - coders/pdb.h
+  - coders/msl.c
+  '2':
+  - coders/tile.h
+  - coders/msl.c
+  - coders/pdb.h
+  '3':
+  - coders/fits.h
+  - coders/tile.h
+  - coders/pdb.h
+  - coders/msl.c
 metadata:
   language: cpp
   arch: x86_64

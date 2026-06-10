@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - libraries/libldap/schema.c
+  '1':
+  - libraries/libldap/unbind.c
+  - libraries/libldap/schema.c
+  '2':
+  - libraries/libldap/tls_o.c
+  - libraries/libldap/unbind.c
+  - libraries/libldap/schema.c
+  '3':
+  - libraries/libldap/tls_o.c
+  - libraries/libldap/cyrus.c
+  - libraries/libldap/unbind.c
+  - libraries/libldap/schema.c
 metadata:
   language: c
   arch: x86_64

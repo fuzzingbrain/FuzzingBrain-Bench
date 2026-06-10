@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - mongoose.c
+  '1':
+  - mongoose.c
+  - tutorials/http/uart-bridge/esp32/main/mongoose.c
+  '2':
+  - tutorials/http/uart-bridge/esp32/main/mongoose.c
+  - tutorials/mqtt/mqtt-over-ws-client/mongoose.h
+  - mongoose.c
+  '3':
+  - tutorials/udp/mdns-server/mongoose.c
+  - tutorials/mqtt/mqtt-over-ws-client/mongoose.h
+  - tutorials/http/uart-bridge/esp32/main/mongoose.c
+  - mongoose.c
 metadata:
   language: c
   arch: x86_64

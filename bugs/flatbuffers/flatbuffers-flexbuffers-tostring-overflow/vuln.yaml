@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - include/flatbuffers/flexbuffers.h
+  '1':
+  - include/flatbuffers/code_generator.h
+  - include/flatbuffers/flexbuffers.h
+  '2':
+  - include/flatbuffers/code_generator.h
+  - include/flatbuffers/code_generators.h
+  - include/flatbuffers/flexbuffers.h
+  '3':
+  - include/flatbuffers/flexbuffers.h
+  - include/flatbuffers/code_generator.h
+  - include/flatbuffers/table.h
+  - include/flatbuffers/code_generators.h
 metadata:
   language: cpp
   arch: x86_64

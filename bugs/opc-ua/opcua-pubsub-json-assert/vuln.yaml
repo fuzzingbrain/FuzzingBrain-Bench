@@ -15,6 +15,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/ua_types_encoding_json_105.c
+  '1':
+  - src/ua_types_encoding_json_105.c
+  - src/ua_securechannel_crypto.c
+  '2':
+  - src/ua_securechannel_crypto.c
+  - src/ua_types_encoding_json.c
+  - src/ua_types_encoding_json_105.c
+  '3':
+  - src/ua_types_encoding_xml.h
+  - src/ua_securechannel_crypto.c
+  - src/ua_types_encoding_json_105.c
+  - src/ua_types_encoding_json.c
 metadata:
   language: c
   arch: x86_64

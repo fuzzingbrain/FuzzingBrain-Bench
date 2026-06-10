@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/lib/ndpi_utils.c
+  '1':
+  - src/lib/ndpi_memory.c
+  - src/lib/ndpi_utils.c
+  '2':
+  - src/lib/ndpi_memory.c
+  - src/lib/ndpi_plugin.c
+  - src/lib/ndpi_utils.c
+  '3':
+  - src/lib/ndpi_memory.c
+  - src/lib/ndpi_utils.c
+  - src/lib/ndpi_content_match.c.inc
+  - src/lib/ndpi_plugin.c
 metadata:
   language: c
   arch: x86_64

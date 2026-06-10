@@ -13,6 +13,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java
+  '1':
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexParserGlobals.java
+  '2':
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexParserGlobals.java
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexValidator.java
+  '3':
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexParser.java
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexValidator.java
+  - regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexParserGlobals.java
 metadata:
   language: jvm
   arch: x86_64

@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/base/ftbitmap.c
+  '1':
+  - src/base/ftbitmap.c
+  - src/base/ftpatent.c
+  '2':
+  - src/base/ftsynth.c
+  - src/base/ftpatent.c
+  - src/base/ftbitmap.c
+  '3':
+  - src/base/ftbitmap.c
+  - src/base/ftsynth.c
+  - src/base/fthash.c
+  - src/base/ftpatent.c
 metadata:
   language: c
   arch: x86_64

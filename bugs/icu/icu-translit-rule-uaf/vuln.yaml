@@ -15,6 +15,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - icu4c/source/i18n/tridpars.cpp
+  '1':
+  - icu4c/source/i18n/tridpars.cpp
+  - icu4c/source/i18n/numparse_compositions.h
+  '2':
+  - icu4c/source/i18n/numparse_compositions.h
+  - icu4c/source/i18n/tridpars.cpp
+  - icu4c/source/i18n/number_decimalquantity.h
+  '3':
+  - icu4c/source/i18n/tridpars.cpp
+  - icu4c/source/i18n/numparse_compositions.h
+  - icu4c/source/i18n/sharedbreakiterator.cpp
+  - icu4c/source/i18n/number_decimalquantity.h
 metadata:
   language: cpp
   arch: x86_64

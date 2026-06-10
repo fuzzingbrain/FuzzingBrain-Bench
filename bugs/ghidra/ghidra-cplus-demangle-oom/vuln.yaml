@@ -14,6 +14,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/rust-demangle.c
+  '1':
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/rust-demangle.c
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/xstrdup.c
+  '2':
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/argv.c
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/rust-demangle.c
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/xstrdup.c
+  '3':
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/rust-demangle.c
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/xstrdup.c
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/d-demangle.c
+  - GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/argv.c
 metadata:
   language: c
   arch: x86_64

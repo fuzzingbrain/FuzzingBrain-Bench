@@ -13,6 +13,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - coders/msl.c
+  '1':
+  - coders/msl.c
+  - coders/scr.h
+  '2':
+  - coders/scr.h
+  - coders/msl.c
+  - coders/mask.h
+  '3':
+  - coders/coders-list.h
+  - coders/scr.h
+  - coders/msl.c
+  - coders/mask.h
 metadata:
   language: c
   arch: x86_64

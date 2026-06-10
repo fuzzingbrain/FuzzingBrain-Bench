@@ -14,6 +14,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/stream.c
+  '1':
+  - src/mem.c
+  - src/stream.c
+  '2':
+  - src/mem.c
+  - src/stream.c
+  - src/properties.c
+  '3':
+  - src/mem.c
+  - src/properties.c
+  - src/rawdata.c
+  - src/stream.c
 metadata:
   language: cpp
   arch: x86_64

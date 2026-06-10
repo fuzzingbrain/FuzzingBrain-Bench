@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - codec/common/src/sad_common.cpp
+  '1':
+  - codec/common/src/sad_common.cpp
+  - codec/common/src/WelsThread.cpp
+  '2':
+  - codec/common/src/WelsThread.cpp
+  - codec/common/src/sad_common.cpp
+  - codec/common/src/WelsThreadPool.cpp
+  '3':
+  - codec/common/src/copy_mb.cpp
+  - codec/common/src/sad_common.cpp
+  - codec/common/src/WelsThreadPool.cpp
+  - codec/common/src/WelsThread.cpp
 metadata:
   language: cpp
   arch: x86_64

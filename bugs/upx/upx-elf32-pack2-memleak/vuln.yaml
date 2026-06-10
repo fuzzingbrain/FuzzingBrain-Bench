@@ -14,6 +14,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/linker.cpp
+  '1':
+  - src/p_mach.cpp
+  - src/linker.cpp
+  '2':
+  - src/msg.cpp
+  - src/linker.cpp
+  - src/p_mach.cpp
+  '3':
+  - src/p_mach.cpp
+  - src/linker.cpp
+  - src/msg.cpp
+  - src/p_wcle.h
 metadata:
   language: cpp
   arch: x86_64

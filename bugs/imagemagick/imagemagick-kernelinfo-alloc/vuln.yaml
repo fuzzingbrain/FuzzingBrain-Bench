@@ -15,6 +15,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - MagickCore/memory.c
+  '1':
+  - MagickCore/token-private.h
+  - MagickCore/memory.c
+  '2':
+  - MagickCore/memory.c
+  - MagickCore/token-private.h
+  - MagickCore/animate-private.h
+  '3':
+  - MagickCore/annotate.c
+  - MagickCore/memory.c
+  - MagickCore/animate-private.h
+  - MagickCore/token-private.h
 metadata:
   language: c
   arch: x86_64

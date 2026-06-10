@@ -13,6 +13,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/idl_parser.cpp
+  '1':
+  - src/idl_parser.cpp
+  - src/idl_gen_kotlin.cpp
+  '2':
+  - src/idl_gen_kotlin.cpp
+  - src/idl_gen_csharp.cpp
+  - src/idl_parser.cpp
+  '3':
+  - src/idl_gen_kotlin.cpp
+  - src/idl_parser.cpp
+  - src/idl_gen_php.cpp
+  - src/idl_gen_csharp.cpp
 metadata:
   language: cpp
   arch: x86_64

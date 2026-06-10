@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - cups/transcode.c
+  '1':
+  - cups/transcode.c
+  - cups/notify.c
+  '2':
+  - cups/notify.c
+  - cups/transcode.c
+  - cups/ppd-localize.c
+  '3':
+  - cups/ppd-localize.c
+  - cups/file.c
+  - cups/notify.c
+  - cups/transcode.c
 metadata:
   language: c
   arch: x86_64

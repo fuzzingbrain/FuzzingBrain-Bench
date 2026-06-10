@@ -13,6 +13,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - src/core/SkBitmap.cpp
+  '1':
+  - src/core/SkBlitMask.h
+  - src/core/SkBitmap.cpp
+  '2':
+  - src/core/SkBitmap.cpp
+  - src/core/SkBlitMask.h
+  - src/core/SkMatrixUtils.h
+  '3':
+  - src/core/SkMatrixUtils.h
+  - src/core/SkBlitMask.h
+  - src/core/SkBitmap.cpp
+  - src/core/SkImageFilterCache.h
 metadata:
   language: cpp
   arch: x86_64

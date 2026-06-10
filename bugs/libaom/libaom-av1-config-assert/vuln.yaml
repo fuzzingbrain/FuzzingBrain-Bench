@@ -15,6 +15,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - aom_dsp/bitreader_buffer.c
+  '1':
+  - aom_dsp/bitreader_buffer.c
+  - aom_dsp/butteraugli.c
+  '2':
+  - aom_dsp/butteraugli.c
+  - aom_dsp/bitreader_buffer.c
+  - aom_dsp/grain_params.h
+  '3':
+  - aom_dsp/grain_params.h
+  - aom_dsp/psnr.c
+  - aom_dsp/butteraugli.c
+  - aom_dsp/bitreader_buffer.c
 metadata:
   language: cpp
   arch: x86_64

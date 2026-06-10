@@ -14,6 +14,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - modules/core/src/persistence_yml.cpp
+  '1':
+  - modules/core/src/directx.inc.hpp
+  - modules/core/src/persistence_yml.cpp
+  '2':
+  - modules/core/src/directx.inc.hpp
+  - modules/core/src/persistence_yml.cpp
+  - modules/core/src/split.dispatch.cpp
+  '3':
+  - modules/core/src/split.dispatch.cpp
+  - modules/core/src/persistence_yml.cpp
+  - modules/core/src/parallel_impl.cpp
+  - modules/core/src/directx.inc.hpp
 metadata:
   language: cpp
   arch: x86_64

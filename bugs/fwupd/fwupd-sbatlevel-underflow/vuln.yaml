@@ -13,6 +13,21 @@ supports:
   modes:
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - libfwupdplugin/fu-sbatlevel-section.c
+  '1':
+  - libfwupdplugin/fu-sum.h
+  - libfwupdplugin/fu-sbatlevel-section.c
+  '2':
+  - libfwupdplugin/fu-sum.h
+  - libfwupdplugin/fu-ioctl.h
+  - libfwupdplugin/fu-sbatlevel-section.c
+  '3':
+  - libfwupdplugin/fu-ioctl.h
+  - libfwupdplugin/fu-sum.h
+  - libfwupdplugin/fu-sbatlevel-section.c
+  - libfwupdplugin/fu-efi-vss-auth-variable.h
 metadata:
   language: c
   arch: x86_64

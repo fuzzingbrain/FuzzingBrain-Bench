@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - snmplib/vacm.c
+  '1':
+  - snmplib/snmp_service.c
+  - snmplib/vacm.c
+  '2':
+  - snmplib/snmp_service.c
+  - snmplib/vacm.c
+  - snmplib/snprintf.h
+  '3':
+  - snmplib/strtol.c
+  - snmplib/snprintf.h
+  - snmplib/vacm.c
+  - snmplib/snmp_service.c
 metadata:
   language: c
   arch: x86_64

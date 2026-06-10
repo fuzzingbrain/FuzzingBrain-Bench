@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - mongoose.c
+  '1':
+  - mongoose.c
+  - tutorials/stm32/portenta-h7-make-baremetal-builtin/mongoose.h
+  '2':
+  - tutorials/stm32/portenta-h7-make-baremetal-builtin/mongoose.h
+  - tutorials/mqtt/mqtt-client/arduino/w5500-mqtt/mongoose.h
+  - mongoose.c
+  '3':
+  - tutorials/core/timers/mongoose.h
+  - tutorials/mqtt/mqtt-client/arduino/w5500-mqtt/mongoose.h
+  - mongoose.c
+  - tutorials/stm32/portenta-h7-make-baremetal-builtin/mongoose.h
 metadata:
   language: c
   arch: x86_64

@@ -16,6 +16,21 @@ supports:
   - normal
   - full-scan
   - diff-scan
+diff_files:
+  '0':
+  - crypto/des/ofb64ede.c
+  '1':
+  - crypto/des/fcrypt.c
+  - crypto/des/ofb64ede.c
+  '2':
+  - crypto/des/ofb64ede.c
+  - crypto/des/fcrypt.c
+  - crypto/des/str2key.c
+  '3':
+  - crypto/des/ofb64ede.c
+  - crypto/des/des_enc.c
+  - crypto/des/fcrypt.c
+  - crypto/des/str2key.c
 metadata:
   language: c
   arch: x86_64
