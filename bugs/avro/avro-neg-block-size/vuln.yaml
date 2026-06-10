@@ -12,4 +12,5 @@ metadata:
   sanitizer: asan
   disclosed: 2026-01-13
   vuln_version: 3af7a4654d574be7c78125e610a7d4ca23542eab
+  fix_commit: null
 active: true

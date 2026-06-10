@@ -12,4 +12,5 @@ metadata:
   sanitizer: null
   disclosed: 2026-01-13
   vuln_version: f7dfbc0d37608a896ffcc8734a8d64376c463039
+  fix_commit: null
 active: true

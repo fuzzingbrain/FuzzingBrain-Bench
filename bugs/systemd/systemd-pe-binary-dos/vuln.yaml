@@ -12,4 +12,5 @@ metadata:
   sanitizer: libfuzzer
   disclosed: 2026-05-28
   vuln_version: 97a0ec135b1a3330abe8c34794c6e31b266452fc
+  fix_commit: null
 active: true

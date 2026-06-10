@@ -12,4 +12,5 @@ metadata:
   sanitizer: libfuzzer-oom
   disclosed: null
   vuln_version: caeeac88ddb5b004736de440db86380ff6e61229
+  fix_commit: null
 active: true

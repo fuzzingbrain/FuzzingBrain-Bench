@@ -12,4 +12,5 @@ metadata:
   sanitizer: jvm
   disclosed: 2026-01-13
   vuln_version: 24.1.2
+  fix_commit: null
 active: true

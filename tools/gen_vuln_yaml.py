@@ -53,6 +53,12 @@ UNCLASSIFIED = "unclassified"
 # Canonical language notation: c / cpp / jvm (OSS-Fuzz uses `jvm`; we use `cpp`).
 _LANG_CANON = {"c++": "cpp", "java": "jvm"}
 
+# Fixing commit, where known (not recorded upstream for most). Add as discovered;
+# bugs absent here get `fix_commit: null`.
+_FIX_COMMIT = {
+    "skia-raster8888-blur-oob": "d2740c899a1ec8a22209840bd8350f22f8c27ecf",  # CL 1225736 (see NOTES.md)
+}
+
 # Crash class -> canonical category, but ONLY where the crash class is itself
 # self-describing (the type == the symptom). Symptom-only classes (segv, abrt,
 # abort, uncaught-exception, out-of-bounds-access, empty) are deliberately absent
@@ -150,6 +156,7 @@ def _compute(bug_dir: str) -> dict:
             "sanitizer": cls.get("sanitizer") or None,
             "disclosed": bench.get("disclosed"),
             "vuln_version": tgt.get("vuln_commit") or None,
+            "fix_commit": _FIX_COMMIT.get(bug),   # null where not recorded
         },
         "active": bug not in DEACTIVATED,
     }

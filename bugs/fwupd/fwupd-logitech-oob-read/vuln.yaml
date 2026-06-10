@@ -12,4 +12,5 @@ metadata:
   sanitizer: asan
   disclosed: 2025-12-11
   vuln_version: logitech-bulkcontroller-oob-repro
+  fix_commit: null
 active: true
