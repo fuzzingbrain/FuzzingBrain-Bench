@@ -10,7 +10,7 @@
 # across jsoncpp releases (1082 here, 1117 at original discovery).
 
 reach:
-  expected_file: json_value.cpp
+  expected_file: src/lib_json/json_value.cpp
   expected_function: find
   expected_line_range: [1060, 1130]
 
@@ -19,7 +19,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: json_value.cpp
+  expected_file: src/lib_json/json_value.cpp
   expected_line: 1082
   line_tolerance: 40
   max_frame_distance: 3

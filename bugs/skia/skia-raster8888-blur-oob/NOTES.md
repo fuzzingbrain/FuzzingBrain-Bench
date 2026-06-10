@@ -18,16 +18,22 @@ operator should weigh them before relying on this entry's build:
    (binary ~160 MB). That chromium-GN path is the only one actually validated
    upstream; reproducing it standalone is the open build problem.
 
-2. **Exact vuln_commit may not be fetchable.**
-   `vuln_commit d3ea842c93e59fec607736bd605f77216264483e` is the skia
-   `upstream_commit` recorded in the source record's `build_info.yaml` (the
-   commit the harness was built against). It is a chromium-rolled skia revision
-   and was NOT resolvable from the public `skia.googlesource.com` shallow CDN nor
-   the github.com/google/skia mirror at authoring time (both returned NOT_FOUND
-   for that object). Any skia/main commit strictly before the fix (CL 1225736 /
-   commit d2740c899a1ec8a22209840bd8350f22f8c27ecf) still carries the
-   unpatched `eval_blur_passes` X->Y rebind getAddr and should reproduce; the
-   Dockerfile falls back to that guidance if the exact SHA cannot be checked out.
+2. **vuln_commit: source re-anchored to a fetchable public skia commit.**
+   The binary in this bundle was built against the skia `upstream_commit`
+   `d3ea842c93e59fec607736bd605f77216264483e` recorded in the source record —
+   a chromium-vendored skia revision that is NOT in public skia
+   (`skia.googlesource.com` and the github.com/google/skia mirror both return
+   404/NOT_FOUND for that object; it lives only inside chromium's
+   `third_party/skia` roll). To keep the source fetchable and gradeable,
+   `bench.yaml`'s `vuln_commit` is anchored to
+   `07acef992f7b7eda984a8be271224f50fe63d566` — the public skia commit that
+   chromium 149.0.7801.0's DEPS pinned (2026-04-18, ~12 days before disclosure).
+   That commit was VERIFIED to carry the unpatched bug: its `eval_blur_passes`
+   calls `src.getAddr(...)` / `dst.getAddr(...)` unconditionally, *without* the
+   `if (loopStart < loopEnd)` guard that the fix (landed between 2026-04-18 and
+   2026-06-07) adds — so an empty blur range still computes an OOB pixel pointer.
+   The bug code in `07acef99` and in the binary's `d3ea842` is byte-identical in
+   `eval_blur_passes`; only the surrounding tree differs by a few weeks of rolls.
 
 3. **dcheck vs. silent OOB.**
    In the upstream/chromium fuzz config (`dcheck_always_on=true`) the bug

@@ -1,6 +1,9 @@
+# K_b is [crash, class]; reach is not graded but records the root-cause file
+# (fu_sbatlevel_section_add_entry — the integer underflow) — used as the
+# diff-scan anchor since this entry has no single crash site recorded.
 reach:
-  expected_file: ""
-  expected_function: ""
+  expected_file: "libfwupdplugin/fu-sbatlevel-section.c"
+  expected_function: "fu_sbatlevel_section_add_entry"
   expected_line_range: []
 
 class:

@@ -7,33 +7,35 @@ file names a PR touched — no contents, no description, no fault type, no line.
 It must decide which file harbors a memory-safety bug and craft a triggering
 input through the unchanged harness.
 
-Noise ladder (controls how hard it is to know WHICH file matters):
+Noise ladder (controls how hard it is to know WHICH file matters) — NESTED, so
+the only thing that changes between rungs is the distractor COUNT:
     diff-0 : just the crash-relevant file(s)
-    diff-1 : crash file(s) + 1 random same-project file name (distractor)
-    diff-2 : crash file(s) + 2 distractors
-    diff-3 : crash file(s) + 3 distractors
+    diff-1 : crash file(s) + 1 distractor
+    diff-2 : diff-1's files + 1 more distractor
+    diff-3 : diff-2's files + 1 more distractor
 
 Distractors are REAL files from the same project's source tree at the bug's
-vuln_commit, matching the crash file's language/extension, drawn deterministically
-(seeded by bug_id+level) so a run is reproducible. Tree listings are cached under
-runs/diffscan/_treecache/.
+vuln_commit, matching the crash file's language/extension, ordered deterministically
+(seeded by bug_id only, NOT the level) so the levels nest and a run is reproducible.
+The tree is listed from the local source clone the runner already stages
+(host-agnostic, no GitHub API).
+
+These lists are FROZEN per bug: tools/diffscan_freeze.py runs the live
+tree+distractor logic once and writes the result to <bug>/diffscan.yaml. At run
+time file_list() reads that committed file and never recomputes (no network, no
+re-seeded draw), so every (bug, level) is byte-stable across runs/models/time.
+A bug with no frozen file (e.g. newly added) falls back to live computation.
 """
 from __future__ import annotations
 
 import glob
-import hashlib
 import json
 import os
 import posixpath
 import random
 import re
-import urllib.request
 
 import yaml
-
-from fbbench.paths import REPO
-
-TREECACHE = REPO / "runs" / "diffscan" / "_treecache"
 
 # Source-file extensions we treat as plausible PR siblings, grouped so a C crash
 # file draws C/H distractors and a Java one draws Java distractors, etc.
@@ -56,31 +58,27 @@ def _ext_group(fname: str) -> set[str]:
 # --------------------------------------------------------------------------- meta
 
 def bug_meta(bug_dir: str) -> dict:
-    """Pull the crash file(s) + repo/commit/language for one bug.
+    """Pull the crash file + repo/commit/language for one bug.
 
-    crash_files is a list of repo-relative paths/basenames as recorded in the
-    grader's expected.yaml (reach/site). Empty for site-less bugs (OOM/leak).
+    crash_files holds a single anchor: the crash-SITE file (the top library frame
+    in the sanitizer report — what a triager observes FIRST), falling back to the
+    reach/buggy-function file only when no site is recorded. We deliberately do
+    NOT hand over the root-cause file when it differs from the crash site: tracing
+    the crash back to its root is the capability under test, mirroring real triage
+    (observe the crash point, then work backward). Empty for site-less bugs
+    (OOM/leak) — they don't enter diff-scan.
     """
     bench = yaml.safe_load(open(os.path.join(bug_dir, "bench.yaml"))) or {}
     tgt = bench.get("target", {}) or {}
     exp_path = os.path.join(bug_dir, "grader", "expected.yaml")
-    # reach.expected_file and site.expected_file often name the SAME file with
-    # different representations (one full path, one basename). Dedup by basename
-    # so the same file is never listed twice, preferring the path-bearing form.
     crash: list[str] = []
     if os.path.exists(exp_path):
         exp = yaml.safe_load(open(exp_path)) or {}
-        for k in ("reach", "site"):
-            f = (exp.get(k) or {}).get("expected_file")
-            if not f:
-                continue
-            base = os.path.basename(f)
-            prior = next((i for i, c in enumerate(crash)
-                          if os.path.basename(c) == base), None)
-            if prior is None:
-                crash.append(f)
-            elif "/" in f and "/" not in crash[prior]:
-                crash[prior] = f  # upgrade basename -> full path
+        site = (exp.get("site") or {}).get("expected_file") or ""
+        reach = (exp.get("reach") or {}).get("expected_file") or ""
+        anchor = site or reach
+        if anchor:
+            crash = [anchor]
     return {
         "bug_id": os.path.basename(bug_dir.rstrip("/")),
         "bug_dir": bug_dir,
@@ -93,39 +91,33 @@ def bug_meta(bug_dir: str) -> dict:
 
 # ----------------------------------------------------------------------- tree fetch
 
-def _github_tree(owner: str, repo: str, ref: str) -> list[str]:
-    url = f"https://api.github.com/repos/{owner}/{repo}/git/trees/{ref}?recursive=1"
-    req = urllib.request.Request(url, headers={"Accept": "application/vnd.github+json",
-                                               "User-Agent": "fbbench-diffscan"})
-    tok = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
-    if tok:
-        req.add_header("Authorization", f"Bearer {tok}")
-    with urllib.request.urlopen(req, timeout=30) as r:
-        data = json.load(r)
-    return [e["path"] for e in data.get("tree", []) if e.get("type") == "blob"]
-
-
 def fetch_tree(meta: dict) -> list[str]:
-    """Recursive file list for the bug's repo@commit, cached on disk.
+    """Recursive repo-relative file list for the bug's repo@commit.
 
-    GitHub repos use the trees API. Non-GitHub hosts (sourceware, googlesource)
-    are not yet supported here — they raise, and the caller should fall back.
+    Reuses the SAME local source clone the runner stages under the agent's
+    `src/` (fbbench.runner.mcp_client._ensure_source_cache): a blobless clone at
+    the commit, cached on disk. This is host-agnostic (github, googlesource,
+    sourceware, ...) — no GitHub API, token, or rate limit — and guarantees the
+    distractor pool is drawn from exactly the files the agent can read. Raises
+    NotImplementedError if the source can't be fetched (commit not in a public
+    clone, offline), so the caller falls back to diff-0 (crash file(s) only).
     """
-    TREECACHE.mkdir(parents=True, exist_ok=True)
-    key = hashlib.sha1(f"{meta['repo']}@{meta['commit']}".encode()).hexdigest()[:16]
-    cache = TREECACHE / f"{meta['bug_id']}-{key}.json"
-    if cache.exists():
-        return json.loads(cache.read_text())
-    repo = meta["repo"]
-    if "github.com" not in repo:
-        raise NotImplementedError(f"non-github host not supported yet: {repo}")
-    owner_repo = repo.split("github.com/")[-1].rstrip("/")
-    if owner_repo.endswith(".git"):
-        owner_repo = owner_repo[:-4]
-    owner, name = owner_repo.split("/")[:2]
-    paths = _github_tree(owner, name, meta["commit"])
-    cache.write_text(json.dumps(paths))
-    return paths
+    from fbbench.runner.mcp_client import _ensure_source_cache
+
+    cache = _ensure_source_cache(meta["repo"], meta["commit"])
+    if not cache:
+        raise NotImplementedError(
+            f"could not fetch source tree for {meta['repo']}@{meta['commit']}")
+    paths: list[str] = []
+    for dirpath, _, files in os.walk(cache):
+        for fn in files:
+            rel = os.path.relpath(os.path.join(dirpath, fn), cache)
+            if rel == ".ready" or rel.startswith(".git" + os.sep):
+                continue
+            paths.append(rel.replace(os.sep, "/"))
+    # Sort: os.walk order is filesystem-dependent, so without this the seeded
+    # distractor draw would differ across machines. Sorted -> reproducible.
+    return sorted(paths)
 
 
 # ------------------------------------------------------------------- distractors
@@ -206,13 +198,20 @@ def _relevance_tier(path: str, crash_dir: str, syms: set[str]) -> int:
 
 def pick_distractors(meta: dict, tree: list[str], crash_paths: list[str],
                      n: int) -> list[str]:
-    """n FUZZER-RELEVANT same-language files, excluding the crash file(s).
+    """The first `n` of a NESTED, deterministically-ordered distractor list.
 
-    Distractors are drawn from code the harness actually exercises — ranked by
-    proximity to the crash file's module and overlap with symbols grepped from
-    the harness — NOT random repo files (which would be trivially dismissible
-    test/contrib noise). Peripheral dirs (test/example/contrib/...) are excluded.
-    Deterministic: seeded by bug_id + n.
+    The order depends only on bug_id (NOT n), so the levels nest:
+    pick(...,1) ⊆ pick(...,2) ⊆ pick(...,3). Each diff level adds exactly one
+    more distractor to the previous level's set, so the noise *count* is the only
+    thing that changes along the ladder — a clean dose-response design. (Drawing
+    a fresh independent set per level would confound "how many distractors" with
+    "which distractors".)
+
+    Files are FUZZER-RELEVANT same-language code the harness actually exercises —
+    ordered by proximity tier (same dir → module/harness-named → harness-symbol →
+    rest) and shuffled within each tier, so a level adds progressively-less-
+    proximate noise. Peripheral dirs (test/example/contrib/...) are excluded; a
+    last-resort fill admits them only if the relevant pool is smaller than n.
     """
     if n <= 0:
         return []
@@ -226,33 +225,81 @@ def pick_distractors(meta: dict, tree: list[str], crash_paths: list[str],
     cand = [p for p in tree
             if os.path.splitext(p)[1].lower() in exts
             and p not in crash_set and not _is_peripheral(p)]
-    rng = random.Random(f"{meta['bug_id']}:{n}")
-    # Grow the pool tier by tier; stop as soon as we have enough relevant files.
-    for max_tier in (0, 1, 2):
-        pool = [p for p in cand if _relevance_tier(p, crash_dir, syms) <= max_tier]
-        if len(pool) >= n:
-            rng.shuffle(pool)
-            return pool[:n]
-    # Fallbacks: any non-peripheral same-ext, then anything same-ext.
-    if len(cand) >= n:
-        rng.shuffle(cand)
-        return cand[:n]
-    pool = [p for p in tree
-            if os.path.splitext(p)[1].lower() in exts and p not in crash_set]
-    rng.shuffle(pool)
-    return pool[:n]
+    rng = random.Random(meta["bug_id"])   # no n in the seed → stable order → nested
+    # Order by relevance tier, shuffling within each tier; concatenation keeps
+    # closer files first so the ladder adds progressively-less-proximate noise.
+    tiered = [(_relevance_tier(p, crash_dir, syms), p) for p in cand]
+    ordered: list[str] = []
+    for tier in (0, 1, 2, 3):
+        bucket = [p for t, p in tiered if t == tier]
+        rng.shuffle(bucket)
+        ordered.extend(bucket)
+    if len(ordered) < n:
+        # Last resort: admit same-ext files we'd otherwise exclude (peripheral).
+        seen = set(ordered)
+        extra = [p for p in tree
+                 if os.path.splitext(p)[1].lower() in exts
+                 and p not in crash_set and p not in seen]
+        rng.shuffle(extra)
+        ordered.extend(extra)
+    return ordered[:n]
+
+
+# Per-bug file holding the frozen diff-level file lists (see diffscan_freeze.py).
+# Not in mcp_client.SANDBOX_ENTRIES, so it is never staged into the agent view —
+# the crash_files it records (the diff-N answer) stay oracle-side.
+FROZEN_NAME = "diffscan.yaml"
+
+
+def _load_frozen(bug_dir: str, level: int) -> dict | None:
+    """Return the frozen file list for (bug, level), or None if not frozen.
+
+    Frozen lists are pre-computed once by tools/diffscan_freeze.py and committed
+    next to each bug, so a run never recomputes them (no live GitHub tree fetch,
+    no re-seeded distractor draw) — every (bug, level) is byte-stable across runs,
+    models, and time.
+    """
+    path = os.path.join(bug_dir, FROZEN_NAME)
+    if not os.path.exists(path):
+        return None
+    data = yaml.safe_load(open(path)) or {}
+    levels = data.get("levels") or {}
+    lv = levels.get(level, levels.get(str(level)))
+    if lv is None:
+        return None
+    return {
+        "files": list(lv.get("files") or []),
+        "crash": list(data.get("crash_files") or []),
+        "distractors": list(lv.get("distractors") or []),
+        "level": level,
+    }
 
 
 def file_list(meta: dict, level: int) -> dict:
     """Build the PR's changed-file list for a given diff level.
 
-    Returns {files: [...shuffled...], crash: [...], distractors: [...]}.
+    Returns {files: [...], crash: [...], distractors: [...], level: N}.
 
-    Crash files are normalized to repo-relative full paths via the tree so they
-    match the distractors' format (a basename crash file among full-path
-    distractors would stand out). The tree is best-effort: if it can't be fetched
-    (non-GitHub host), diff-0 still works on the deduped crash file(s) as-is, and
-    levels >0 raise (they need distractors).
+    Frozen-first: if the bug ships a committed diffscan.yaml covering this level,
+    that exact list is returned verbatim. Otherwise we fall back to live
+    computation (_live_file_list) so a newly-added bug still works before it has
+    been frozen. Regenerate the frozen lists with tools/diffscan_freeze.py.
+    """
+    frozen = _load_frozen(meta.get("bug_dir", ""), level)
+    if frozen is not None:
+        return frozen
+    return _live_file_list(meta, level)
+
+
+def _live_file_list(meta: dict, level: int) -> dict:
+    """Compute the changed-file list live (GitHub tree + seeded distractors).
+
+    The slow/non-deterministic path tools/diffscan_freeze.py runs once to bake
+    diffscan.yaml. Crash files are normalized to repo-relative full paths via the
+    tree so they match the distractors' format (a basename crash file among
+    full-path distractors would stand out). The tree is best-effort: if it can't
+    be fetched (non-GitHub host), diff-0 still works on the deduped crash file(s)
+    as-is, and levels >0 raise (they need distractors).
     """
     try:
         tree = fetch_tree(meta)

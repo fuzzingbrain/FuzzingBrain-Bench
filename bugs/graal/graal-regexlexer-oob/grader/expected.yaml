@@ -1,0 +1,18 @@
+# NOTE: K_b is [crash, class]; reach/site are not graded but are recorded for
+# documentation and as the diff-scan anchor. The OOB originates in graal's
+# Truffle regex engine: RegexLexer.consumeChar does `pattern.charAt(position)`
+# with no bounds check (StringIndexOutOfBoundsException when position == length).
+reach:
+  expected_file: "regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java"
+  expected_function: "consumeChar"
+  expected_line_range: [543, 547]
+
+class:
+  expected: uncaught-exception
+  sanitizer: jvm
+
+site:
+  expected_file: "regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java"
+  expected_line: 544
+  line_tolerance: 0
+  max_frame_distance: 0
