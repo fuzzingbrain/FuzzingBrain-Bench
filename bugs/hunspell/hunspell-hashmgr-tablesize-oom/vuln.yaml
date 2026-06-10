@@ -7,7 +7,7 @@
 category:
   class: uncontrolled-resource-consumption
   cwe: CWE-400
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: libfuzzer-oom
   disclosed: 2026-05-05

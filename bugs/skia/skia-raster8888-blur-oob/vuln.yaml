@@ -7,7 +7,7 @@
 category:
   class: out-of-bounds-access
   cwe: CWE-125
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: asan
   disclosed: 2026-04-30

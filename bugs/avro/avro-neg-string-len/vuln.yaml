@@ -7,7 +7,7 @@
 category:
   class: null
   cwe: null
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: null
   disclosed: 2026-01-13

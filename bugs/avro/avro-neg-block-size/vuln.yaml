@@ -7,7 +7,7 @@
 category:
   class: excessive-allocation
   cwe: CWE-789
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: asan
   disclosed: 2026-01-13

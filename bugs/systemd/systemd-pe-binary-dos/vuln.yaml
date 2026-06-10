@@ -7,7 +7,7 @@
 category:
   class: excessive-iteration
   cwe: CWE-834
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: libfuzzer
   disclosed: 2026-05-28

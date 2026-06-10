@@ -7,7 +7,7 @@
 category:
   class: stack-exhaustion
   cwe: CWE-674
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: asan
   disclosed: 2026-01-19

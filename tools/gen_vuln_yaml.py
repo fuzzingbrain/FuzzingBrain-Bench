@@ -91,7 +91,7 @@ def _compute(bug_dir: str) -> dict:
     sem, cwe = _CLASS_MAP.get(raw, (raw or None, None))
     return {
         "category": {"class": sem, "cwe": cwe},
-        "difficulty": "unrated",
+        "difficulty": "none",
         "metadata": {
             "sanitizer": cls.get("sanitizer") or None,
             "disclosed": bench.get("disclosed"),

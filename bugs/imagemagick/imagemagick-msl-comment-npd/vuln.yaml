@@ -7,7 +7,7 @@
 category:
   class: reachable-assertion
   cwe: CWE-617
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: none
   disclosed: 2026-01-20

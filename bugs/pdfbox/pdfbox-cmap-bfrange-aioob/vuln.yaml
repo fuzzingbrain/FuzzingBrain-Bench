@@ -7,7 +7,7 @@
 category:
   class: out-of-bounds-read
   cwe: CWE-125
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: jvm
   disclosed: 2026-01-30

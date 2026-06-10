@@ -7,7 +7,7 @@
 category:
   class: stack-buffer-underflow
   cwe: CWE-124
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: asan
   disclosed: 2026-01-27

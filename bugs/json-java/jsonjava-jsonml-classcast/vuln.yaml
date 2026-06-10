@@ -7,7 +7,7 @@
 category:
   class: type-confusion
   cwe: CWE-704
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: jvm
   disclosed: 2026-01-29

@@ -7,7 +7,7 @@
 category:
   class: misaligned-access
   cwe: CWE-758
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: ubsan
   disclosed: 2026-01-27

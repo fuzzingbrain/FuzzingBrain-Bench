@@ -7,7 +7,7 @@
 category:
   class: null-pointer-dereference
   cwe: CWE-476
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: asan
   disclosed: 2026-02-15

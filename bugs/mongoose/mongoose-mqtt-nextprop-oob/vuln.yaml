@@ -7,7 +7,7 @@
 category:
   class: heap-buffer-overflow
   cwe: CWE-122
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: asan
   disclosed: 2026-01-27

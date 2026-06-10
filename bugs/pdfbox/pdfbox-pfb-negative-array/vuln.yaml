@@ -7,7 +7,7 @@
 category:
   class: uncaught-exception
   cwe: CWE-248
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: jvm
   disclosed: 2026-01-30

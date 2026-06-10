@@ -7,7 +7,7 @@
 category:
   class: uncontrolled-resource-consumption
   cwe: CWE-400
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: runtime
   disclosed: null

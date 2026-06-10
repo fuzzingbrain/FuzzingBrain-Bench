@@ -7,7 +7,7 @@
 category:
   class: memory-leak
   cwe: CWE-401
-difficulty: unrated
+difficulty: none
 metadata:
   sanitizer: lsan
   disclosed: 2026-04-16
