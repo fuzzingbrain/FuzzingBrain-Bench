@@ -1,0 +1,14 @@
+ArrayIndexOutOfBoundsException in fontbox CMapParser.increment via Malformed bfrange
+===================================================================================
+
+Project:     pdfbox (fontbox CMap parser)
+Bug class:   out-of-bounds-read (ArrayIndexOutOfBoundsException)
+Sanitizer:   JVM (uncaught exception)
+
+The harness parses the input as a CMap stream
+(`CMapParser.parse(RandomAccessReadBuffer(data))`). When handling a
+`bfrange` entry, CMapParser.increment() walks the start/end code byte
+arrays to produce the next code, assuming they have the expected length.
+A bfrange whose start and end byte strings have mismatched or zero
+length makes increment() index past the array bounds, throwing
+ArrayIndexOutOfBoundsException.

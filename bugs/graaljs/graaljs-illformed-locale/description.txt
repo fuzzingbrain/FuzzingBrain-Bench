@@ -1,0 +1,14 @@
+IllformedLocaleException treated as Internal Error in Intl API
+=============================================================
+
+Project:     graaljs (Intl implementation; runtime/util/IntlUtil.java)
+Bug class:   uncaught-exception (IllformedLocaleException)
+Sanitizer:   JVM (uncaught exception / "Internal Error")
+
+The harness reads the input as a UTF-8 string and passes it as a locale
+to the Intl API (`new Intl.Locale(tag)`). IntlUtil constructs a locale
+with `Locale.Builder().setLanguageTag(tag).build()`, which throws
+java.util.IllformedLocaleException on an ill-formed BCP-47 tag. That
+exception is not caught and converted to a JavaScript RangeError, so it
+escapes as an Internal Error. Any sufficiently malformed language tag
+triggers it.

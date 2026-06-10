@@ -1,0 +1,15 @@
+StringIndexOutOfBoundsException in RegexLexer.consumeChar
+========================================================
+
+Project:     oracle/graal (Truffle regex engine), reached via GraalJS
+Bug class:   out-of-bounds-read (surfaced as StringIndexOutOfBoundsException)
+Sanitizer:   JVM (uncaught exception / "Internal Error")
+
+The harness reads the input as a UTF-8 string and compiles it as a
+JavaScript regular expression (`new RegExp(pattern, 'v'|'u'|'')`), which
+routes into graal's Truffle regex parser. RegexLexer.consumeChar() reads
+the next pattern character with `pattern.charAt(position)` and no bounds
+check. A regex whose parse path advances `position` to the end of the
+pattern and then calls consumeChar() once more throws
+StringIndexOutOfBoundsException, which GraalJS surfaces as an Internal
+Error instead of a normal SyntaxError.

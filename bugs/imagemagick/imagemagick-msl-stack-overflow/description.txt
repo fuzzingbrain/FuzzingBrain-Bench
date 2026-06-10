@@ -1,0 +1,13 @@
+Stack overflow via recursive MSL read
+=====================================
+
+Project:     ImageMagick (coders/msl.c)
+Bug class:   stack-exhaustion (unbounded recursion)
+Sanitizer:   AddressSanitizer (stack-overflow)
+
+The harness reads the input as an image. The MSL (Magick Scripting
+Language) coder in coders/msl.c processes `<read>`/`<image>` directives
+that can themselves load further MSL, recursing for each nested read
+with no depth limit. An MSL document that nests reads deeply (or refers
+to itself) recurses until the call stack is exhausted, producing a
+stack-overflow.

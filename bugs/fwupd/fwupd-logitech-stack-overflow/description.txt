@@ -1,0 +1,11 @@
+Stack Overflow in logitech-rdfu JSON Parsing (Missing Depth Limit)
+=================================================================
+
+Project:     fwupd (plugins/logitech-rdfu)
+Bug class:   stack-exhaustion (unbounded recursion)
+Sanitizer:   none (native SIGSEGV from stack exhaustion)
+
+The harness feeds the input as logitech-rdfu JSON. The RDFU JSON parser
+descends into nested objects/arrays recursively with no maximum-depth
+limit, so a deeply nested input (many opening brackets) recurses until
+the call stack is exhausted, crashing with a stack-overflow SIGSEGV.

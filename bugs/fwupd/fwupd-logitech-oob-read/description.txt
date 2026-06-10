@@ -1,0 +1,13 @@
+OOB Read in Logitech Bulkcontroller sync response parsing
+=========================================================
+
+Project:     fwupd (plugins/logitech-bulkcontroller)
+Bug class:   heap-buffer-overflow (OOB read)
+Sanitizer:   AddressSanitizer
+
+The harness feeds the input as a Logitech bulkcontroller "sync" response
+buffer. fu-logitech-bulkcontroller-device.c parses length/offset fields
+from that response and reads payload bytes without validating them
+against the actual buffer size. A response that declares a length or
+offset larger than the data supplied drives a read past the end of the
+heap allocation.

@@ -1,0 +1,13 @@
+Integer underflow in fu_sbatlevel_section_add_entry
+===================================================
+
+Project:     fwupd (libfwupdplugin)
+Bug class:   integer-underflow -> out-of-memory
+Sanitizer:   libFuzzer (OOM, -rss_limit_mb)
+
+The harness loads the input as firmware via fwupd's firmware parser.
+fu_sbatlevel_section_add_entry() in libfwupdplugin/fu-sbatlevel-section.c
+computes a length from attacker-controlled header fields and subtracts
+without checking for underflow. A crafted SBAT-level section makes the
+length wrap to a huge unsigned value, which is then used as an
+allocation/copy size and exhausts memory (OOM).

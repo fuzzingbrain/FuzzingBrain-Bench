@@ -1,0 +1,13 @@
+Memory Leak in ElfLinker::addLoader() when packing ELF executables
+==================================================================
+
+Project:     upx (src/linker.cpp)
+Bug class:   memory-leak
+Sanitizer:   LeakSanitizer
+
+The harness writes the input to a temp file and runs upx's pack path on
+it as an ELF executable. ElfLinker::addLoader() (src/linker.cpp)
+allocates loader/section bookkeeping while assembling the packed stub.
+On certain malformed 32-bit ELF inputs the pack attempt aborts on an
+error path that returns without freeing those allocations, leaking
+memory that LeakSanitizer reports at exit.

@@ -1,0 +1,14 @@
+Heap Buffer Overflow in libavif Android JNI via Signed-Int Length Sign-Extension
+===============================================================================
+
+Project:     libavif (Android JNI binding; src/stream.c)
+Bug class:   heap-buffer-overflow
+Sanitizer:   AddressSanitizer
+
+The Android JNI wrapper passes the AVIF byte buffer's length as a Java
+`int`. When that length is widened to `size_t` for
+avifDecoderSetIOMemory(), a value with the sign bit set is sign-extended
+to a huge 64-bit size. The decoder then trusts that size and reads past
+the end of the actual buffer in avifDecoderParse(), a heap buffer
+overflow. The harness reproduces this by handing avifDecoderSetIOMemory
+a size derived the same (sign-extending) way from the input length.

@@ -1,0 +1,13 @@
+Decompression Bomb in CAB MSZIP Parser causes excessive memory allocation
+=========================================================================
+
+Project:     fwupd (libfwupdplugin)
+Bug class:   decompression-bomb / out-of-memory
+Sanitizer:   libFuzzer (OOM, -rss_limit_mb)
+
+The harness loads the input as a firmware archive via fwupd's firmware
+parser. fu_cab_firmware in libfwupdplugin/fu-cab-firmware.c inflates
+MSZIP-compressed CAB folder data without bounding the decompressed
+output against any ratio or absolute cap. A small CAB whose MSZIP
+blocks expand enormously makes the parser allocate far more memory
+than the input size, exhausting the address space (OOM).

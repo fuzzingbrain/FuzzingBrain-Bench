@@ -1,0 +1,13 @@
+NegativeArraySizeException in fontbox PfbParser.parsePfb via Crafted PFB Header Size Field
+=========================================================================================
+
+Project:     pdfbox (fontbox PFB parser)
+Bug class:   uncaught-exception (NegativeArraySizeException)
+Sanitizer:   JVM (uncaught exception)
+
+The harness parses the input as a PFB (Printer Font Binary) file
+(`new PfbParser(data)`). parsePfb() reads each segment's length from the
+PFB header and uses it directly to allocate a byte array, without
+validating that the length is non-negative. A crafted header whose size
+field decodes to a negative int makes the `new byte[len]` allocation
+throw NegativeArraySizeException.

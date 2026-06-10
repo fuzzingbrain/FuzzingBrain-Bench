@@ -1,0 +1,13 @@
+Heap Buffer Overflow in OpenCV YAML parseKey handling empty keys
+===============================================================
+
+Project:     opencv (modules/core persistence; persistence_yml.cpp)
+Bug class:   heap-buffer-overflow
+Sanitizer:   AddressSanitizer
+
+The harness loads the input through cv::FileStorage in YAML mode. The
+YAML key parser (parseKey in persistence_yml.cpp) advances and
+dereferences the read pointer while scanning a mapping key without
+handling the empty-key case (a `:` with no preceding key characters).
+A YAML document with an empty key drives the pointer past the end of the
+input buffer, a heap read overflow.
