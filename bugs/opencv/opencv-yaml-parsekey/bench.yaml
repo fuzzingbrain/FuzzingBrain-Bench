@@ -6,7 +6,7 @@ upstream_report: https://github.com/opencv/opencv/issues/28619
 target:
   repo:         https://github.com/opencv/opencv
   vuln_commit:  1a3e1e05b71e15197f7decc451a2f650ff2ee591
-  language:     c++
+  language:     cpp
   build_system: cmake
 
 harness:
