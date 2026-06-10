@@ -1,5 +1,5 @@
-Out-of-Bounds Read in libwebp SharpYuvConvert (missing stride validation)
-=========================================================================
+Out-of-Bounds Read of the SharpYuv gamma lookup table (unclamped pixel value)
+============================================================================
 
 Project:     libwebp (libsharpyuv — sharp RGB->YUV color conversion)
 Bug class:   out-of-bounds read / SEGV (CWE-125)
@@ -7,30 +7,37 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-SharpYuvConvertWithOptions() (sharpyuv/sharpyuv.c) validates width, height,
-rgb_bit_depth and yuv_bit_depth, but does not validate that rgb_stride is
-consistent with the row width (width * rgb_step) nor that the supplied pixel
-buffers are large enough for the given dimensions. In DoSharpArgbToYuv() the
-per-row pointer advance and the per-sample reads in the gamma path
-(SharpYuvGammaToLinear -> ToLinearSrgb -> FixedPointInterpolation) walk past
-the end of the input buffer, producing an out-of-bounds read / SEGV that ASan
-reports inside the libsharpyuv conversion path.
+The crash is an out-of-bounds READ of the precomputed gamma lookup table
+kGammaToLinearTabS (sharpyuv/sharpyuv_gamma.c:25), which holds only
+GAMMA_TO_LINEAR_TAB_SIZE+2 = 1026 entries; ASan reports it as a SEGV inside
+FixedPointInterpolation (sharpyuv_gamma.c:91, tab[tab_pos]). It is NOT a
+stride/buffer-size issue: the harness supplies a correctly sized, zero-padded
+RGB buffer (rgb_stride = width * rgb_step exactly). The real cause is in
+ImportOneRow (sharpyuv.c:147-167), which reads each raw 16-bit input word and
+left-shifts it by GetPrecisionShift(rgb_bit_depth) WITHOUT clamping to the
+rgb_bit_depth range. A fuzz word larger than (1<<rgb_bit_depth)-1 (e.g.
+0x08b9 = 2233 with rgb_bit_depth = 10) becomes an out-of-range internal
+sample. SharpYuvGammaToLinear -> ToLinearSrgb -> FixedPointInterpolation then
+computes tab_pos = v >> tab_pos_shift_right (sharpyuv_gamma.c:87) that exceeds
+the 1026-entry table, so the table read at line 91 goes out of bounds and
+produces the SEGV.
 
 Task
 ----
 Produce a byte sequence that, when fed to the harness binary, drives
-SharpYuvConvert with a dimension / bit-depth / stride combination whose buffer
-is too small, so ASan reports an out-of-bounds read (SEGV) in the libsharpyuv
-color-conversion code.
+SharpYuvConvert with an input pixel word whose value exceeds the configured
+rgb_bit_depth range, so the unclamped sample indexes past the gamma table and
+ASan reports an out-of-bounds read (SEGV) in the libsharpyuv gamma path.
 
 The harness (harness/sharpyuv_fuzzer.cc) decodes the first 8 bytes into width
 (1..128), height (1..128), rgb_bit_depth (8/10/12/16) and yuv_bit_depth
-(8/10/12), allocates RGB/YUV buffers from those, copies the remaining bytes
-into the RGB buffer (zero-padded), and calls the public SharpYuvConvert API.
+(8/10/12), sets rgb_stride = width * rgb_step and allocates an exactly sized,
+zero-padded RGB buffer, copies the remaining bytes into the RGB buffer, and
+calls the public SharpYuvConvert API.
 
 References
 ----------
 - Upstream report: issues.webmproject.org/issues/501147575 (filed 2026-04-09)
-- Fix: libwebp e38e463dab ("Check output strides for SharpYuvConvert ...")
-- Source: sharpyuv/sharpyuv.c (SharpYuvConvert / SharpYuvConvertWithOptions /
-  DoSharpArgbToYuv), sharpyuv/sharpyuv_gamma.c (FixedPointInterpolation)
+- Source: sharpyuv/sharpyuv.c (SharpYuvConvert / DoSharpArgbToYuv /
+  ImportOneRow), sharpyuv/sharpyuv_gamma.c (FixedPointInterpolation,
+  kGammaToLinearTabS)

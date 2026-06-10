@@ -7,24 +7,29 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-The VP9 encoder allocates internal per-frame context buffers (such as
-the mode-info and loop-filter mask arrays) sized to the initial encode
-dimensions. vpx_codec_enc_config_set() lets a caller change the
-configured width/height mid-stream, but the reconfiguration path does
-not reallocate those context buffers when the new dimensions exceed the
-initial allocation. A subsequent encode then writes past the end of the
-under-sized buffer — a heap buffer overflow.
+The VP9 encoder sizes its per-frame entropy-context buffers
+(cm->above_context / cm->above_seg_context) by the configured frame
+width (mi_cols). vpx_codec_enc_config_set() -> vp9_change_config only
+reallocates the context buffers when the new total mi size exceeds the
+old allocation (cm->mi_alloc_size < new_mi_size); it does not re-check
+mi_cols on its own. So a mid-stream reconfig that increases the width
+(more mi_cols) while keeping the total mi size within the prior
+allocation leaves above_context under-sized. The next encode's
+init_encode_frame_mb_context() memsets above_context using the new,
+larger aligned_mi_cols, overflowing the heap buffer.
 
 Task
 ----
 Produce a byte sequence that, when fed to the harness binary, drives the
-encoder through a reconfiguration to larger dimensions followed by an
+encoder through a reconfiguration that increases the width followed by an
 encode, so the sanitizer reports a heap-buffer-overflow whose faulting
 library frame is in libvpx's VP9 encoder (vp9/encoder/vp9_encodeframe.c).
 
 The harness (harness/vp9_encoder_midstream_reconfig_fuzzer.cc) initializes
-a VP9 encoder, then loops applying vpx_codec_enc_config_set() with mutated
-(width, height, timebase, bitrate, lag) before each vpx_codec_encode().
+a VP9 encoder, then across reconfig epochs mutates only (width, height,
+rc_target_bitrate) from a pre-validated dimension ladder, applying
+vpx_codec_enc_config_set() before each vpx_codec_encode(); the timebase is
+set once at init and lag is fixed at 0.
 
 References
 ----------

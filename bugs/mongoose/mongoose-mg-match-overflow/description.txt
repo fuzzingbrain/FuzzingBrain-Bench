@@ -8,9 +8,14 @@ Sanitizer:   AddressSanitizer (ASan)
 Summary
 -------
 The function mg_match() in src/str.c performs glob-style pattern
-matching with backtracking. During the backtracking branch the code
-reads p.buf[ni] without checking that ni < p.len, causing a 1-byte
-out-of-bounds heap read.
+matching with backtracking. During the `*`/`#` backtracking branch the
+condition dereferences s.buf[j] without ensuring j < s.len. Because the
+outer while loop continues while i < p.len even after the candidate
+string is fully consumed (j == s.len), and the branch's `nj <= s.len`
+guard does not bound j, s.buf[j] performs a 1-byte out-of-bounds heap
+read on the candidate string buffer. (The pattern read p.buf[ni] on the
+same line is in-bounds — ni is always < p.len — and short-circuits
+before s.buf[j].)
 
 Task
 ----
@@ -30,11 +35,12 @@ mg_match directly:
     }
 
 The first half of the input is treated as the glob pattern, the
-second half as the candidate string. The bug fires when the
-backtracking path follows the `*` rewind logic with an `ni` index
-past the end of `p.buf`.
+second half as the candidate string. The bug fires when the first-half
+pattern ends in a literal after a `*` (e.g. '*x') and the second-half
+string is one the `*` consumes entirely, so j advances to s.len while
+i < p.len keeps the loop alive and s.buf[j] reads past the buffer.
 
 References
 ----------
 - Fix PR (informational, not consumed by grader): #3394
-- Bug site: src/str.c, mg_match() function, around line 91
+- Bug site: src/str.c, mg_match() function, around line 90

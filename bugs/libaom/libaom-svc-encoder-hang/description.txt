@@ -3,8 +3,11 @@ Denial of Service in libaom AV1 SVC Encoder (resize / recode path)
 
 Project:     libaom (AOMedia AV1 codec — real-time SVC encoder)
 Bug class:   denial-of-service (CWE-835 unbounded loop / CWE-369 divide-by-zero)
-Sanitizer:   AddressSanitizer (the fault surfaces as a libFuzzer timeout on the
-             fuzzer build and as a SIGFPE on the standalone repro)
+Sanitizer:   libFuzzer (timeout / deadly-signal oracle; the fuzzer build is
+             additionally ASan-instrumented via -fsanitize=fuzzer,address). The
+             fault surfaces as a libFuzzer wall-clock timeout on the fuzzer build
+             and as a deterministic SIGFPE (integer divide-by-zero) on the
+             standalone public-API repro.
 
 Summary
 -------

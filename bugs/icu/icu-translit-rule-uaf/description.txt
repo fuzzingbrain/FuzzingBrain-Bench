@@ -3,13 +3,15 @@ Memory Leak in ICU TransliteratorIDParser::parseFilterID
 
 Project:     unicode-org/icu (icu4c)
 Bug class:   memory-leak
-Sanitizer:   LeakSanitizer / AddressSanitizer
+Sanitizer:   LeakSanitizer
 
 `icu::Transliterator::createFromRules()` invokes
 `TransliteratorIDParser::parseFilterID()` while parsing a filter
 clause inside a transliteration rules string. On certain malformed
-rules, `parseFilterID()` allocates an internal UnicodeSet (200 bytes)
-via `uprv_malloc()` but never frees it on the error/abandon path.
+rules, `parseFilterID()` (tridpars.cpp:229) calls `specsToID`, which
+allocates a 200-byte `SingleID` object (via `new SingleID`, routed
+through `UMemory::operator new` -> `uprv_malloc()`) but never frees it
+on the error/abandon path.
 
 The leak is observed every run on the recorded PoC and is reported
 by LeakSanitizer at exit.

@@ -5,7 +5,12 @@ Project:     net-snmp (snmplib)
 Bug class:   null-deref
 Sanitizer:   AddressSanitizer
 
-vacm_parse_config_group() in snmplib/vacm.c does not validate that
-its `line` argument has enough tokens before calling helper parsers
-that dereference internal pointers. Malformed config lines (missing
-trailing fields) cause a NULL dereference.
+vacm_parse_config_group() in snmplib/vacm.c walks the config line with
+skip_token_const(), which returns NULL once a token is missing (end of
+string). The function never checks for this, so a malformed/short line
+(e.g. a single field) makes the next atoi(line) at vacm.c:414 dereference
+the NULL `line` pointer, causing a SEGV (reported by AddressSanitizer).
+Longer-but-still-short lines hit the same NULL `line` in
+read_config_read_octet_string(). The libFuzzer harness vacm_fuzzer.c
+null-terminates the fuzz input and passes it directly as the `line`
+argument to vacm_parse_config_group("vacmGroup", line).

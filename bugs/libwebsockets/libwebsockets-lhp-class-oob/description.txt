@@ -15,9 +15,11 @@ lhp_atr_new allocates room for a value-terminator byte but never writes
 it: it copies only name_len+1 bytes and re-terminates only the name, and
 the backing lws_malloc/_realloc (lib/core/alloc.c) does not zero memory.
 Later, when a compound CSS selector (tag.class / .class.class) is
-cascaded, lhp_element_has_class (lib/misc/lhp.c) fetches the attribute
-value (name+1 offset) and calls strlen() on it — reading past the end of
-the heap allocation because the value slot was never NUL-terminated.
+cascaded, lhp_element_has_class (lib/misc/lhp.c) calls
+lws_html_get_atr("class"), which returns the value pointer at
+name+name_len+1 (the slot immediately after the attribute name's NUL
+terminator), then calls strlen() on it — reading past the end of the
+heap allocation because that value slot was never NUL-terminated.
 
 ASan reports a heap-buffer-overflow READ of size 2, 0 bytes after a
 47-byte region; the faulting library frame is lhp_element_has_class

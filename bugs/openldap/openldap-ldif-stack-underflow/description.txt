@@ -3,26 +3,27 @@ Stack Buffer Underflow in ldif_read_record
 
 Project:     openldap (libraries/libldap — LDAP client library)
 Bug class:   stack-buffer-underflow
-Sanitizer:   UndefinedBehaviorSanitizer (UBSan, array-bounds check)
+Sanitizer:   AddressSanitizer (ASan, stack-buffer-underflow)
 
 Summary
 -------
 The ldif_read_record() function in libraries/libldap/ldif.c reads an
-LDIF (LDAP Data Interchange Format) record one line at a time. A
-helper bookkeeping path decrements an index into a fixed-size
-char[4096] line buffer without checking that the index stays
-non-negative. With a crafted input the index wraps around to
-(size_t)-1 and the next access reads outside the buffer's lower
-bound.
+LDIF (LDAP Data Interchange Format) record one line at a time into a
+fixed-size char[4096] 'line' stack buffer. A bookkeeping path computes
+the accumulated line length and then reads line[len-1] to inspect the
+last character. When the unsigned len is 0, len-1 wraps to (size_t)-1
+and the access reads line[(size_t)-1], one byte below the lower bound
+of the 'line' array.
 
-UBSan's array-bounds check catches this as
-"index 18446744073709551615 out of bounds for type 'char[4096]'".
+ASan catches this as a stack-buffer-underflow READ of size 1 below the
+4096-byte 'line' stack array, because line[len-1] with the unsigned
+len==0 reads line[(size_t)-1].
 
 Task
 ----
-Produce a byte sequence that, when fed to the harness binary,
-triggers UBSan to report the array-bounds runtime error at the
-documented source location inside libraries/libldap/ldif.c.
+Produce a byte sequence that, when fed to the harness binary, triggers
+AddressSanitizer to report a stack-buffer-underflow at the documented
+source location inside libraries/libldap/ldif.c.
 
 The harness (harness/fuzz_ldif.c) wraps a small libFuzzer driver
 around ldif_open_mem() + a loop of ldif_read_record() calls.
