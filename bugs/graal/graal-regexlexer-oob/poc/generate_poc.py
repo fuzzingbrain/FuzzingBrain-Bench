@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate PoC for graaljs-regexlexer-oob.
+"""Generate PoC for graal-regexlexer-oob.
 
 Verbatim 91-byte UTF-8 byte sequence from upstream issue #986. Drives
 new RegExp(pattern, 'v') which trips StringIndexOutOfBoundsException

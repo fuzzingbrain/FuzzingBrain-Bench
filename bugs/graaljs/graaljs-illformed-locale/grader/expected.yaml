@@ -1,5 +1,8 @@
+# K_b is [crash, class]; reach is not graded but records the root-cause file
+# (Intl locale handling: Locale.Builder().setLanguageTag().build() throws
+# IllformedLocaleException) — used as the diff-scan anchor (no single crash site).
 reach:
-  expected_file: ""
+  expected_file: "graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java"
   expected_function: ""
   expected_line_range: []
 

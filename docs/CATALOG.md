@@ -29,8 +29,8 @@ The 69 end-to-end gradeable bugs. Browse the same data from the CLI:
 | 15 | [`fwupd-sbatlevel-underflow`](https://github.com/fwupd/fwupd/issues/9659) | fwupd | C | oom | · | ✅ | ✅ | · |
 | 16 | [`ghidra-cplus-demangle-oom`](https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442) | Ghidra | C | oom | · | ✅ | ✅ | · |
 | 17 | [`ghidra-rust-demangle-oom`](https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442) | Ghidra | C | oom | ✅ | ✅ | ✅ | ✅ |
-| 18 | [`graaljs-illformed-locale`](https://github.com/oracle/graaljs/issues/985) | graaljs | Java | uncaught-exception | · | ✅ | ✅ | · |
-| 19 | [`graaljs-regexlexer-oob`](https://github.com/oracle/graaljs/issues/986) | graaljs | Java | uncaught-exception | · | ✅ | ✅ | · |
+| 18 | [`graal-regexlexer-oob`](https://github.com/oracle/graaljs/issues/986) | graal | Java | uncaught-exception | · | ✅ | ✅ | · |
+| 19 | [`graaljs-illformed-locale`](https://github.com/oracle/graaljs/issues/985) | graaljs | Java | uncaught-exception | · | ✅ | ✅ | · |
 | 20 | [`harfbuzz-fontations-oob-write`](https://github.com/harfbuzz/harfbuzz/issues/5946) | harfbuzz | C++ | stack-buffer-overflow | · | ✅ | ✅ | ✅ |
 | 21 | [`hunspell-hashmgr-tablesize-oom`](https://github.com/hunspell/hunspell/issues/1116) | hunspell | C++ | oom | · | ✅ | ✅ | · |
 | 22 | [`icu-translit-rule-dtor-uaf`](https://unicode-org.atlassian.net/browse/ICU-23365) | icu | C++ | segv | ✅ | ✅ | ✅ | ✅ |

@@ -1,5 +1,8 @@
+# K_b is [crash, class]; reach is not graded but records the root-cause file
+# (where the unbounded MSZIP decompression happens) — used as the diff-scan
+# anchor since OOM has no single crash site.
 reach:
-  expected_file: ""
+  expected_file: "libfwupdplugin/fu-cab-firmware.c"
   expected_function: ""
   expected_line_range: []
 

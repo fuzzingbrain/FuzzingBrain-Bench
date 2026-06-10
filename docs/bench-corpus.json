@@ -343,10 +343,10 @@
       ]
     },
     {
-      "id": "graaljs-illformed-locale",
-      "project": "graaljs",
-      "title": "IllformedLocaleException treated as Internal Error in Intl API",
-      "upstream_report": "https://github.com/oracle/graaljs/issues/985",
+      "id": "graal-regexlexer-oob",
+      "project": "graal",
+      "title": "StringIndexOutOfBoundsException in RegexLexer.consumeChar causes Internal Error",
+      "upstream_report": "https://github.com/oracle/graaljs/issues/986",
       "status": "fixed",
       "bug_class": "uncaught-exception",
       "target": {
@@ -362,10 +362,10 @@
       ]
     },
     {
-      "id": "graaljs-regexlexer-oob",
+      "id": "graaljs-illformed-locale",
       "project": "graaljs",
-      "title": "StringIndexOutOfBoundsException in RegexLexer.consumeChar causes Internal Error",
-      "upstream_report": "https://github.com/oracle/graaljs/issues/986",
+      "title": "IllformedLocaleException treated as Internal Error in Intl API",
+      "upstream_report": "https://github.com/oracle/graaljs/issues/985",
       "status": "fixed",
       "bug_class": "uncaught-exception",
       "target": {

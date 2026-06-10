@@ -5,7 +5,7 @@ upstream_report: https://issues.chromium.org/issues/508075339
 
 target:
   repo:         https://skia.googlesource.com/skia
-  vuln_commit:  d3ea842c93e59fec607736bd605f77216264483e
+  vuln_commit:  07acef992f7b7eda984a8be271224f50fe63d566   # public pre-fix skia (chromium 149 DEPS pin, 2026-04-18); contains the unpatched eval_blur_passes (missing the `if (loopStart < loopEnd)` guard). The binary was built from chromium-vendored skia d3ea842 (same bug, not public-fetchable) — see NOTES.md.
   language:     cpp
   build_system: gn
 
