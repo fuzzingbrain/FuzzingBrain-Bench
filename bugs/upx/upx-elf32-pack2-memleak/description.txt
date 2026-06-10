@@ -6,8 +6,12 @@ Bug class:   memory-leak
 Sanitizer:   LeakSanitizer
 
 The harness writes the input to a temp file and runs upx's pack path on
-it as an ELF executable. ElfLinker::addLoader() (src/linker.cpp)
-allocates loader/section bookkeeping while assembling the packed stub.
-On certain malformed 32-bit ELF inputs the pack attempt aborts on an
-error path that returns without freeing those allocations, leaking
-memory that LeakSanitizer reports at exit.
+it as an ELF executable. ElfLinker::addLoader() duplicates the
+section-name token list with `strdup` into a local `begin`
+(src/linker.cpp:369), to be freed unconditionally at the end of the
+function (linker.cpp:421). For a malformed input whose stub references an
+unknown section, `findSection(sect)` (linker.cpp:394, called with the
+default `fatal=true`) throws InternalError. That exception unwinds the
+stack past the `::free(begin)` at the end, so the `strdup` buffer is
+never freed and leaks. The harness's `catch(...)` lets the process exit
+cleanly, and LeakSanitizer reports the leak at exit.

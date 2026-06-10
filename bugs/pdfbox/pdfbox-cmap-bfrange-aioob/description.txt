@@ -6,9 +6,10 @@ Bug class:   out-of-bounds-read (ArrayIndexOutOfBoundsException)
 Sanitizer:   JVM (uncaught exception)
 
 The harness parses the input as a CMap stream
-(`CMapParser.parse(RandomAccessReadBuffer(data))`). When handling a
-`bfrange` entry, CMapParser.increment() walks the start/end code byte
-arrays to produce the next code, assuming they have the expected length.
-A bfrange whose start and end byte strings have mismatched or zero
-length makes increment() index past the array bounds, throwing
-ArrayIndexOutOfBoundsException.
+(`CMapParser.parse(RandomAccessReadBuffer(data))`). A `bfrange` whose
+start code is an empty byte string `<>` (length 0) reaches
+addMappingFrombfrange, which calls `increment(startCode, startCode.length - 1, ...)`
+— i.e. `increment(emptyArray, -1, ...)`. CMapParser.increment() then
+accesses `data[position]` with `position == -1`, throwing
+ArrayIndexOutOfBoundsException. A concrete trigger is
+`1 beginbfrange\n<> <> <2223>\nendbfrange`.

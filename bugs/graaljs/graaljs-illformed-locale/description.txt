@@ -6,9 +6,13 @@ Bug class:   uncaught-exception (IllformedLocaleException)
 Sanitizer:   JVM (uncaught exception / "Internal Error")
 
 The harness reads the input as a UTF-8 string and passes it as a locale
-to the Intl API (`new Intl.Locale(tag)`). IntlUtil constructs a locale
-with `Locale.Builder().setLanguageTag(tag).build()`, which throws
-java.util.IllformedLocaleException on an ill-formed BCP-47 tag. That
-exception is not caught and converted to a JavaScript RangeError, so it
-escapes as an Internal Error. Any sufficiently malformed language tag
-triggers it.
+to the Intl API (`new Intl.Locale(tag)`). IntlUtil.canonicalizeLanguageTag()
+canonicalizes the tag via ICU's `new ULocale.Builder().setLocale(...)`,
+which throws ICU's `IllformedLocaleException` for a tag that passes the
+BCP-47 well-formedness gate (UTS35Validator) but is rejected by ICU's
+stricter variant rules. The surrounding `catch (IllformedLocaleException e)`
+catches `java.util.IllformedLocaleException`, a *different* class from
+ICU's shadowed `com.ibm.icu.util.IllformedLocaleException`, so the thrown
+exception is never matched and converted to a JavaScript RangeError — it
+escapes as an Internal Error. The trigger is a tag in that gap (well-formed
+BCP-47 but ICU-invalid, e.g. an ill-formed variant subtag).

@@ -2,12 +2,15 @@ Heap Buffer Overflow in OpenCV YAML parseKey handling empty keys
 ===============================================================
 
 Project:     opencv (modules/core persistence; persistence_yml.cpp)
-Bug class:   heap-buffer-overflow
+Bug class:   heap-buffer-overflow (OOB read)
 Sanitizer:   AddressSanitizer
 
-The harness loads the input through cv::FileStorage in YAML mode. The
-YAML key parser (parseKey in persistence_yml.cpp) advances and
-dereferences the read pointer while scanning a mapping key without
-handling the empty-key case (a `:` with no preceding key characters).
-A YAML document with an empty key drives the pointer past the end of the
-input buffer, a heap read overflow.
+The harness loads the input through cv::FileStorage in YAML mode. When a
+mapping line begins with an empty key (a `:` with no preceding key
+characters), parseKey() in persistence_yml.cpp enters its backward
+space-stripping loop `do c = *--endptr; while (c == ' ')` with
+`endptr == ptr == bufferStart()`. That loop has no lower-bound check, so
+the first decrement reads one byte *before the start* of the heap line
+buffer — a heap-buffer-overflow read (and it keeps walking backward while
+it sees spaces). The "An empty key" error check exists but runs only after
+this out-of-bounds read.

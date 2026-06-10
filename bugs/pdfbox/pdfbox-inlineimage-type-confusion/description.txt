@@ -5,9 +5,11 @@ Project:     pdfbox (pdmodel inline image)
 Bug class:   type-confusion (ClassCastException)
 Sanitizer:   JVM (uncaught exception)
 
-The harness builds a PDF inline image from the input and calls into
-PDInlineImage. getDecode() reads the inline image's `/D` (Decode) entry
-and casts it to a COSArray without checking its actual COS type. An
-inline image whose `/D` entry is a different COS object (e.g. a name or
-number rather than an array) triggers a ClassCastException, an unhandled
-type confusion.
+PDInlineImage.getDecode() reads the inline image's `/D` (Decode) entry
+with `(COSArray) parameters.getDictionaryObject(COSName.D, COSName.DECODE)`
+— an unchecked cast to COSArray with no COS type check. When the `/D`
+entry is a different COS object (e.g. a COSInteger rather than a COSArray)
+the cast throws ClassCastException, an unhandled type confusion. The
+harness ignores its byte input and unconditionally constructs a
+PDInlineImage whose `/D` entry is set to an integer, then calls
+getDecode() to drive the faulty cast.
