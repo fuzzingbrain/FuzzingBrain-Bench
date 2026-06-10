@@ -5,7 +5,7 @@ upstream_report: https://github.com/google/flatbuffers/issues/9008
 
 target:
   repo:         https://github.com/google/flatbuffers
-  vuln_commit:  ""   # no exact commit recorded for this bug; campaign-pinned tree was bab10754d93d74d1ff44d46de63558bc4127f7d8 (see NOTES.md)
+  vuln_commit:  bab10754d93d74d1ff44d46de63558bc4127f7d8   # campaign-pinned vulnerable tree (issue #9008); same commit the Dockerfile/binary build from
   language:     cpp
   build_system: cmake
 

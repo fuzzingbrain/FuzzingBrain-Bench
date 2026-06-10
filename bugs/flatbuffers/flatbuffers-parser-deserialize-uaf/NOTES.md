@@ -5,8 +5,10 @@
   has only dates and the GitHub issue link #9009). The flatbuffers chrome
   fuzzing campaign pinned its source tree at
   `bab10754d93d74d1ff44d46de63558bc4127f7d8` (from the repro-bundle
-  `method.yaml` files). `bench.yaml` leaves `vuln_commit: ""`; the
-  Dockerfile uses the campaign-pinned commit as a best-effort default.
+  `method.yaml` files). `bench.yaml` now pins that campaign tree as
+  `vuln_commit` (matching the Dockerfile/binary build), so the source
+  stages and grades consistently; it is the campaign-pinned vulnerable
+  snapshot, not a precisely-bisected introducing commit.
 - **poc.bin**: copied verbatim from the record's
   `crash-bfd486276e2e0976e0d141e7c31b9221bf2f84c8` (284 bytes), which is
   the libFuzzer-format input (2-byte flags/json-ratio header + .bfbs).

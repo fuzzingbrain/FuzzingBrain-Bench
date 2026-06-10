@@ -1,11 +1,11 @@
-bug_id: graaljs-regexlexer-oob
-project: graaljs
+bug_id: graal-regexlexer-oob
+project: graal
 title: "StringIndexOutOfBoundsException in RegexLexer.consumeChar causes Internal Error"
-upstream_report: https://github.com/oracle/graaljs/issues/986
+upstream_report: https://github.com/oracle/graaljs/issues/986   # reported via graaljs; the buggy code is in graal's Truffle regex engine (RegexLexer), reached from JS
 
 target:
-  repo:         https://github.com/oracle/graaljs
-  vuln_commit:  24.1.2
+  repo:         https://github.com/oracle/graal
+  vuln_commit:  vm-24.1.2
   language:     java
   build_system: maven
 
