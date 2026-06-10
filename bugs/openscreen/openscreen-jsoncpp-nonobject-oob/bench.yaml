@@ -4,8 +4,8 @@ title: "Reachable abort() in openscreen Cast parsers via jsoncpp Value::find on 
 upstream_report: https://issues.chromium.org/issues/505902443
 
 target:
-  repo:         https://chromium.googlesource.com/openscreen
-  vuln_commit:  adca75ad5d978fde166d18efedee039e36394c8f
+  repo:         https://github.com/open-source-parsers/jsoncpp   # bug is in vendored jsoncpp (json_value.cpp), not openscreen itself; this is the exact rev openscreen@adca75ad DEPS-pinned + built the binary from
+  vuln_commit:  9af09c4a4abe5928d1f7a6e7ec1c73a565bb362e
   language:     cpp
   build_system: clang
   # The crash is in bundled jsoncpp (1.9.4, the version openscreen and
