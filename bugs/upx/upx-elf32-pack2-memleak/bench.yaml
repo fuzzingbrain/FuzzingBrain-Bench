@@ -6,7 +6,7 @@ upstream_report: https://github.com/upx/upx/issues/945
 target:
   repo:         https://github.com/upx/upx
   vuln_commit:  v5.0.2
-  language:     c++
+  language:     cpp
   build_system: cmake
 
 harness:
