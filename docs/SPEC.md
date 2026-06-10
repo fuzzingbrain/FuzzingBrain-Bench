@@ -355,6 +355,24 @@ There is **no `binaries/fixed/`** subdirectory. v1 grading does not need
 a fixed-build for differential execution; only the vulnerable build is
 exercised.
 
+### `vuln.yaml` category — controlled vocabulary
+
+`vuln.yaml`'s `category` is the semantic vulnerability **type**, not the
+sanitizer crash class (`segv`/`abrt`/`oom` are symptoms that map to several of
+these — determine the real type by reading the root-cause code). It must be one
+of the locked terms below, or `unclassified` for a bug not yet classified:
+
+| group | terms |
+|---|---|
+| memory-safety — spatial | `heap-buffer-overflow`, `stack-buffer-overflow`, `stack-buffer-underflow`, `out-of-bounds-read`, `out-of-bounds-write` |
+| memory-safety — temporal / pointer | `use-after-free`, `null-pointer-dereference` |
+| resource / DoS | `memory-leak`, `memory-exhaustion`, `excessive-computation`, `stack-exhaustion` |
+| logic / language | `reachable-assertion`, `type-confusion`, `uncaught-exception`, `undefined-behavior` |
+
+The list is the single source of truth in `tools/gen_vuln_yaml.py`
+(`CANONICAL_CATEGORIES`); add a term there and here before using it. No CWE: it
+was never recorded upstream and one bug often maps to several.
+
 When a runner starts an episode for this bug, it:
 
 1. Creates a fresh **workspace tmpdir**:

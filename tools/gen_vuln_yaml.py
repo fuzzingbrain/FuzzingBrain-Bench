@@ -32,30 +32,44 @@ from fbbench.paths import REPO
 # candidates once their modelling is settled — see issue #14.
 DEACTIVATED: set[str] = set()
 
-# Crash/sanitizer class -> normalized semantic category. Coarse first pass;
-# refine per-bug under #12. (No CWE: never recorded upstream and too ambiguous
-# — one bug often maps to several.)
-_CLASS_MAP = {
-    "heap-buffer-overflow":   "heap-buffer-overflow",
-    "heap-use-after-free":    "use-after-free",
-    "use-after-free":         "use-after-free",
-    "stack-buffer-overflow":  "stack-buffer-overflow",
-    "stack-buffer-underflow": "stack-buffer-underflow",
-    "stack-overflow":         "stack-exhaustion",
-    "oob-read":               "out-of-bounds-read",
-    "out-of-bounds-access":   "out-of-bounds-access",
-    "segv":                   "null-pointer-dereference",
-    "null-pointer-dereference": "null-pointer-dereference",
-    "memory-leak":            "memory-leak",
-    "oom":                    "uncontrolled-resource-consumption",
-    "allocation-size-too-big": "excessive-allocation",
-    "timeout":                "excessive-iteration",
-    "undefined-behavior":     "undefined-behavior",
-    "misaligned-access":      "misaligned-access",
-    "uncaught-exception":     "uncaught-exception",
-    "class-cast":             "type-confusion",
-    "abrt":                   "reachable-assertion",
-    "abort":                  "reachable-assertion",
+# Controlled vocabulary for `category` — the ONLY allowed values (plus the
+# "unclassified" placeholder). The semantic vulnerability TYPE, NOT the sanitizer
+# crash class: `segv`/`abrt` are symptoms that map to several of these. Locked;
+# document in docs/SPEC.md. Add a term here (and to SPEC) before using it.
+CANONICAL_CATEGORIES = {
+    # memory-safety — spatial
+    "heap-buffer-overflow", "stack-buffer-overflow", "stack-buffer-underflow",
+    "out-of-bounds-read", "out-of-bounds-write",
+    # memory-safety — temporal / pointer
+    "use-after-free", "null-pointer-dereference",
+    # resource / DoS
+    "memory-leak", "memory-exhaustion", "excessive-computation", "stack-exhaustion",
+    # logic / language
+    "reachable-assertion", "type-confusion", "uncaught-exception",
+    "undefined-behavior",
+}
+UNCLASSIFIED = "unclassified"
+
+# Crash class -> canonical category, but ONLY where the crash class is itself
+# self-describing (the type == the symptom). Symptom-only classes (segv, abrt,
+# abort, uncaught-exception, out-of-bounds-access, empty) are deliberately absent
+# -> they resolve to `unclassified` and get a per-bug code-reading pass (#12),
+# because e.g. a `segv` may be a null-deref, a UAF, or an OOB read.
+_CONFIDENT_MAP = {
+    "heap-buffer-overflow":    "heap-buffer-overflow",
+    "heap-use-after-free":     "use-after-free",
+    "use-after-free":          "use-after-free",
+    "stack-buffer-overflow":   "stack-buffer-overflow",
+    "stack-buffer-underflow":  "stack-buffer-underflow",
+    "stack-overflow":          "stack-exhaustion",
+    "oob-read":                "out-of-bounds-read",
+    "memory-leak":             "memory-leak",
+    "oom":                     "memory-exhaustion",
+    "allocation-size-too-big": "memory-exhaustion",
+    "timeout":                 "excessive-computation",
+    "undefined-behavior":      "undefined-behavior",
+    "misaligned-access":       "undefined-behavior",
+    "class-cast":              "type-confusion",
 }
 
 _HEADER = (
@@ -89,9 +103,11 @@ def _compute(bug_dir: str) -> dict:
         exp = yaml.safe_load(open(exp_path)) or {}
     cls = (exp.get("class") or {})
     raw = cls.get("expected") or ""
-    sem = _CLASS_MAP.get(raw, raw or None)
+    category = _CONFIDENT_MAP.get(raw, UNCLASSIFIED)
+    assert category in CANONICAL_CATEGORIES or category == UNCLASSIFIED, \
+        f"{bug}: category {category!r} not in the controlled vocabulary"
     return {
-        "category": sem,
+        "category": category,
         "difficulty": "none",
         "metadata": {
             "sanitizer": cls.get("sanitizer") or None,

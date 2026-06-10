@@ -42,6 +42,26 @@ def test_list_bugs_excludes_inactive():
     assert active <= every  # never returns a parked bug the all-set lacks
 
 
+def test_vuln_yaml_category_in_controlled_vocabulary():
+    """Every vuln.yaml category is a locked canonical term (or `unclassified`)."""
+    import sys
+
+    from fbbench.paths import REPO
+    sys.path.insert(0, str(REPO / "tools"))
+    from gen_vuln_yaml import CANONICAL_CATEGORIES, UNCLASSIFIED
+
+    allowed = CANONICAL_CATEGORIES | {UNCLASSIFIED}
+    bad = []
+    for bug, d in list_bugs(include_inactive=True):
+        vp = d / "vuln.yaml"
+        if not vp.is_file():
+            continue
+        cat = read_bench(vp).get("category")
+        if cat not in allowed:
+            bad.append((bug, cat))
+    assert not bad, f"categories outside the controlled vocabulary: {bad}"
+
+
 def test_vuln_yaml_never_staged_to_agent():
     """vuln.yaml holds the hidden class answer; it must never reach the agent.
 
