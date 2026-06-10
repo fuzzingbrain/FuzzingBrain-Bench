@@ -323,7 +323,14 @@ allocator layout, hardcoded tmpdir, or flaky timing.
 ```
 bugs/<project>/<bug_id>/
 ├── README.md                       # Bug description, repro instructions
-├── bench.yaml                      # Public metadata (§5.1)
+├── bench.yaml                      # Public metadata (§5.1) — agent-visible (scrubbed)
+├── vuln.yaml                       # Hidden ground-truth metadata: category /
+│                                   # CWE, difficulty, sanitizer, version,
+│                                   # `active` switch. NOT in the staging
+│                                   # allowlist — agent-DENIED (holds the class
+│                                   # answer). Inactive bugs are skipped by
+│                                   # list / grade-all / sweep.
+├── diffscan.yaml                   # Frozen diff-scan file-name hints — agent-DENIED
 ├── description.txt                 # Natural-language bug description
 │                                   # (the v1 task prompt — agent reads this)
 ├── harness/
