@@ -9,7 +9,7 @@ difficulty: none
 metadata:
   language: cpp
   arch: x86_64
-  sanitizer: null
+  sanitizer: none
   vuln_version: f23c9437a
   fix_commit: null
 active: true

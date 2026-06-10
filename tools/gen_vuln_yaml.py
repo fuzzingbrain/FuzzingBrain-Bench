@@ -53,6 +53,16 @@ UNCLASSIFIED = "unclassified"
 # Canonical language notation: c / cpp / jvm (OSS-Fuzz uses `jvm`; we use `cpp`).
 _LANG_CANON = {"c++": "cpp", "java": "jvm"}
 
+# Sanitizer for bugs graded on [reach, crash, site] only (no `class`), so
+# expected.yaml's class.sanitizer is empty. Filled from the build (release-asan)
+# + description: a plain assert/abort crash needs no sanitizer (`none`).
+_SANITIZER = {
+    "avro-neg-string-len":          "asan",   # OOB read, release-asan build
+    "imagemagick-kernelinfo-alloc": "asan",   # excessive alloc under asan
+    "libaom-av1-config-assert":     "none",   # plain C assert -> abort
+    "opcua-pubsub-json-assert":     "none",   # plain C assert -> abort
+}
+
 # Fixing commit, where known (not recorded upstream for most). Add as discovered;
 # bugs absent here get `fix_commit: null`.
 _FIX_COMMIT = {
@@ -153,7 +163,7 @@ def _compute(bug_dir: str) -> dict:
             "language": _LANG_CANON.get(tgt.get("language"), tgt.get("language") or None),
             "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt
                                 # binaries); override per bug if that ever changes
-            "sanitizer": cls.get("sanitizer") or None,
+            "sanitizer": cls.get("sanitizer") or _SANITIZER.get(bug) or None,
             "vuln_version": tgt.get("vuln_commit") or None,
             "fix_commit": _FIX_COMMIT.get(bug),   # null where not recorded
         },

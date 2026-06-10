@@ -9,7 +9,7 @@ difficulty: none
 metadata:
   language: c
   arch: x86_64
-  sanitizer: null
+  sanitizer: none
   vuln_version: 0b75ea2c5a78e72dc3c04302be7ec3546a556958
   fix_commit: null
 active: true
