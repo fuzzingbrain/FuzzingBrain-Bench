@@ -6,7 +6,7 @@ upstream_report: https://github.com/harfbuzz/harfbuzz/issues/5946
 target:
   repo:         https://github.com/harfbuzz/harfbuzz
   vuln_commit:  edc8c18ef88262fc467a30ab74f05080d6aea6cf
-  language:     cpp
+  language:     c++
   build_system: meson
 
 harness:

@@ -6,7 +6,7 @@ upstream_report: https://github.com/stleary/JSON-java/issues/1036
 target:
   repo:         https://github.com/stleary/JSON-java
   vuln_commit:  e635f4023811c80c02b38428ec58e42b397f820f
-  language:     jvm
+  language:     java
   build_system: maven
 
 harness:

@@ -6,7 +6,7 @@ upstream_report: https://github.com/oracle/graaljs/issues/986   # reported via g
 target:
   repo:         https://github.com/oracle/graal
   vuln_commit:  vm-24.1.2
-  language:     jvm
+  language:     java
   build_system: maven
 
 harness:

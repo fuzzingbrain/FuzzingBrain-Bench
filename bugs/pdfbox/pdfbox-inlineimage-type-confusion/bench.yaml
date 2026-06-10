@@ -6,7 +6,7 @@ upstream_report: https://github.com/apache/pdfbox/pull/410
 target:
   repo:         https://github.com/apache/pdfbox
   vuln_commit:  c83691fd49a05b854918381dac08df7ec6db57ec
-  language:     jvm
+  language:     java
   build_system: maven
 
 harness:

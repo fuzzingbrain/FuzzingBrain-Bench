@@ -6,7 +6,7 @@ upstream_report: https://github.com/AOMediaCodec/libavif/issues/3177
 target:
   repo:         https://github.com/AOMediaCodec/libavif
   vuln_commit:  b357f083ea5ae0ee7b09a65a48621f345e710588
-  language:     cpp
+  language:     c++
   build_system: cmake
 
 harness:
