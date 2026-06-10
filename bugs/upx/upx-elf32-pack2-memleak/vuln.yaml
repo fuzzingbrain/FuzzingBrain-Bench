@@ -7,6 +7,7 @@
 category: memory-leak
 difficulty: none
 metadata:
+  language: cpp
   arch: x86_64
   sanitizer: lsan
   disclosed: 2025-12-09

@@ -50,6 +50,9 @@ CANONICAL_CATEGORIES = {
 }
 UNCLASSIFIED = "unclassified"
 
+# Canonical language notation: c / cpp / jvm (OSS-Fuzz uses `jvm`; we use `cpp`).
+_LANG_CANON = {"c++": "cpp", "java": "jvm"}
+
 # Crash class -> canonical category, but ONLY where the crash class is itself
 # self-describing (the type == the symptom). Symptom-only classes (segv, abrt,
 # abort, uncaught-exception, out-of-bounds-access, empty) are deliberately absent
@@ -141,6 +144,7 @@ def _compute(bug_dir: str) -> dict:
         "category": category,
         "difficulty": "none",
         "metadata": {
+            "language": _LANG_CANON.get(tgt.get("language"), tgt.get("language") or None),
             "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt
                                 # binaries); override per bug if that ever changes
             "sanitizer": cls.get("sanitizer") or None,

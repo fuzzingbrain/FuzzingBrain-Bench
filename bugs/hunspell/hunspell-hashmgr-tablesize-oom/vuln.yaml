@@ -7,6 +7,7 @@
 category: memory-exhaustion
 difficulty: none
 metadata:
+  language: cpp
   arch: x86_64
   sanitizer: libfuzzer-oom
   disclosed: 2026-05-05

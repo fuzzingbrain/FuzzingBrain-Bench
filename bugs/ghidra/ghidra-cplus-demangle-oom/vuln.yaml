@@ -7,6 +7,7 @@
 category: memory-exhaustion
 difficulty: none
 metadata:
+  language: c
   arch: x86_64
   sanitizer: runtime
   disclosed: null

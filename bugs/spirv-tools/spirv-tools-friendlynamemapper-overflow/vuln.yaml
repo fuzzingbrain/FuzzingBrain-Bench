@@ -7,6 +7,7 @@
 category: heap-buffer-overflow
 difficulty: none
 metadata:
+  language: cpp
   arch: x86_64
   sanitizer: asan
   disclosed: 2026-04-24

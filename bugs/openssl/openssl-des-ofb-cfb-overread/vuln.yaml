@@ -7,6 +7,7 @@
 category: stack-buffer-overflow
 difficulty: none
 metadata:
+  language: c
   arch: x86_64
   sanitizer: asan
   disclosed: 2026-03-09
