@@ -79,7 +79,7 @@ _FIX_COMMIT = {
 # abrt/uncaught-exception/empty) where the crash class doesn't reveal the type.
 # Each is grounded in the reach/site source (see commit / PR notes).
 _CURATED = {
-    "avro-neg-string-len":            "out-of-bounds-read",      # negative key_size -> OOB string read
+    "avro-neg-string-len":            "memory-exhaustion",       # neg length -> huge realloc, ASan allocation-size-too-big (verified by running)
     "graal-regexlexer-oob":           "out-of-bounds-read",      # pattern.charAt(position) no bounds check
     "graaljs-illformed-locale":       "uncaught-exception",      # IllformedLocaleException from Locale.Builder
     "icu-translit-rule-dtor-uaf":     "use-after-free",          # dtor frees pointers of a partial rule
@@ -163,6 +163,9 @@ def _compute(bug_dir: str) -> dict:
             "language": _LANG_CANON.get(tgt.get("language"), tgt.get("language") or None),
             "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt
                                 # binaries); override per bug if that ever changes
+            # sanitizer the bug was DETECTED/reproduced under (the fuzzing build
+            # that found it), NOT the minimal one needed: a null-deref found under
+            # an ASan build is `asan`, a plain assert/abort build is `none`.
             "sanitizer": cls.get("sanitizer") or _SANITIZER.get(bug) or None,
             "vuln_version": tgt.get("vuln_commit") or None,
             "fix_commit": _FIX_COMMIT.get(bug),   # null where not recorded
