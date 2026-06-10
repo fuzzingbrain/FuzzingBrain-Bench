@@ -6,6 +6,16 @@
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: null-pointer-dereference
 difficulty: none
+supports:
+  grades:
+  - reach
+  - crash
+  - class
+  - site
+  modes:
+  - normal
+  - full-scan
+  - diff-scan
 metadata:
   language: cpp
   arch: x86_64

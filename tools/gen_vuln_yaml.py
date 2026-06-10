@@ -156,9 +156,22 @@ def _compute(bug_dir: str) -> dict:
     category = _CURATED.get(bug) or _CONFIDENT_MAP.get(raw, UNCLASSIFIED)
     assert category in CANONICAL_CATEGORIES or category == UNCLASSIFIED, \
         f"{bug}: category {category!r} not in the controlled vocabulary"
+    # supported grades (K_b) + run modes:
+    #   normal    — needs a real description.txt (the task prompt)
+    #   full-scan — always (description withheld; harness is the task)
+    #   diff-scan — needs a frozen diffscan.yaml (file-name hints)
+    grades = bench.get("capability_set") or []
+    modes = []
+    desc = os.path.join(bug_dir, "description.txt")
+    if os.path.exists(desc) and os.path.getsize(desc) > 0:
+        modes.append("normal")
+    modes.append("full-scan")
+    if os.path.exists(os.path.join(bug_dir, "diffscan.yaml")):
+        modes.append("diff-scan")
     return {
         "category": category,
         "difficulty": "none",
+        "supports": {"grades": grades, "modes": modes},
         "metadata": {
             "language": _LANG_CANON.get(tgt.get("language"), tgt.get("language") or None),
             "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt

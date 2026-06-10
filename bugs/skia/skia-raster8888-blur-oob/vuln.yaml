@@ -6,6 +6,13 @@
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: out-of-bounds-read
 difficulty: none
+supports:
+  grades:
+  - crash
+  modes:
+  - normal
+  - full-scan
+  - diff-scan
 metadata:
   language: cpp
   arch: x86_64

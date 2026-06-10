@@ -6,6 +6,14 @@
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: heap-buffer-overflow
 difficulty: none
+supports:
+  grades:
+  - crash
+  - class
+  - site
+  modes:
+  - full-scan
+  - diff-scan
 metadata:
   language: cpp
   arch: x86_64

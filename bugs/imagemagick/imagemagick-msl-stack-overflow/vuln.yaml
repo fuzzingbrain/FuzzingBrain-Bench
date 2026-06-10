@@ -6,6 +6,13 @@
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: stack-exhaustion
 difficulty: none
+supports:
+  grades:
+  - crash
+  - class
+  modes:
+  - full-scan
+  - diff-scan
 metadata:
   language: c
   arch: x86_64

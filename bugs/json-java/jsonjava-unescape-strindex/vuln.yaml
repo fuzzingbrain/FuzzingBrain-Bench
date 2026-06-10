@@ -6,6 +6,16 @@
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: out-of-bounds-read
 difficulty: none
+supports:
+  grades:
+  - reach
+  - crash
+  - class
+  - site
+  modes:
+  - normal
+  - full-scan
+  - diff-scan
 metadata:
   language: jvm
   arch: x86_64
