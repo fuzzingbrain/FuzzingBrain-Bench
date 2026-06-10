@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - lib/misc/lhp.c
-  '1':
-  - lib/misc/lhp.c
-  - lib/misc/dir.c
-  '2':
-  - lib/misc/base64-decode.c
-  - lib/misc/dir.c
-  - lib/misc/lhp.c
-  '3':
-  - lib/misc/lhp.c
-  - lib/misc/romfs.h
-  - lib/misc/dir.c
-  - lib/misc/base64-decode.c
 metadata:
   language: c
   arch: x86_64

@@ -14,21 +14,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/shared/pe-binary.c
-  '1':
-  - src/shared/pe-binary.c
-  - src/shared/btrfs-util.c
-  '2':
-  - src/shared/libcrypt-util.h
-  - src/shared/pe-binary.c
-  - src/shared/btrfs-util.c
-  '3':
-  - src/shared/btrfs-util.c
-  - src/shared/pe-binary.c
-  - src/shared/password-quality-util-passwdqc.h
-  - src/shared/libcrypt-util.h
 metadata:
   language: c
   arch: x86_64

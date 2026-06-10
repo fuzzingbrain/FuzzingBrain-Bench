@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/mux/muxedit.c
-  '1':
-  - src/mux/muxedit.c
-  - src/mux/muxi.h
-  '2':
-  - src/mux/muxread.c
-  - src/mux/muxi.h
-  - src/mux/muxedit.c
-  '3':
-  - src/mux/muxedit.c
-  - src/mux/muxread.c
-  - src/mux/muxi.h
-  - src/mux/anim_encode.c
 metadata:
   language: c
   arch: x86_64

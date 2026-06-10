@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - include/simdutf/scalar/utf16_to_utf8/utf16_to_utf8.h
-  '1':
-  - include/simdutf/scalar/utf16_to_utf8/utf16_to_utf8.h
-  - include/simdutf/scalar/utf16_to_utf8/valid_utf16_to_utf8.h
-  '2':
-  - include/simdutf/simdutf_version.h
-  - include/simdutf/scalar/utf16_to_utf8/utf16_to_utf8.h
-  - include/simdutf/scalar/utf16_to_utf8/valid_utf16_to_utf8.h
-  '3':
-  - include/simdutf/simdutf_version.h
-  - include/simdutf/scalar/utf16_to_utf8/utf16_to_utf8.h
-  - include/simdutf/encoding_types.h
-  - include/simdutf/scalar/utf16_to_utf8/valid_utf16_to_utf8.h
 metadata:
   language: cpp
   arch: x86_64

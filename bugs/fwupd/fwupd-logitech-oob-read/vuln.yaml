@@ -14,21 +14,6 @@ supports:
   modes:
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
-  '1':
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-common.h
-  '2':
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-common.c
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-common.h
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
-  '3':
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-plugin.h
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-common.h
-  - plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-common.c
 metadata:
   language: c
   arch: x86_64

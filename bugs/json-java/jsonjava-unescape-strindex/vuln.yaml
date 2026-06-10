@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/main/java/org/json/XMLTokener.java
-  '1':
-  - src/main/java/org/json/XMLTokener.java
-  - src/main/java/org/json/CookieList.java
-  '2':
-  - src/main/java/org/json/XMLTokener.java
-  - src/main/java/org/json/CookieList.java
-  - src/main/java/org/json/JSONPropertyName.java
-  '3':
-  - src/main/java/org/json/CookieList.java
-  - src/main/java/org/json/XMLTokener.java
-  - src/main/java/org/json/HTTP.java
-  - src/main/java/org/json/JSONPropertyName.java
 metadata:
   language: jvm
   arch: x86_64

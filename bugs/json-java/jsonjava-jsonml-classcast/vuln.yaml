@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/main/java/org/json/JSONML.java
-  '1':
-  - src/main/java/org/json/JSONWriter.java
-  - src/main/java/org/json/JSONML.java
-  '2':
-  - src/main/java/org/json/CookieList.java
-  - src/main/java/org/json/JSONWriter.java
-  - src/main/java/org/json/JSONML.java
-  '3':
-  - src/main/java/org/json/JSONWriter.java
-  - src/main/java/org/json/JSONML.java
-  - src/main/java/org/json/CookieList.java
-  - src/main/java/org/json/CDL.java
 metadata:
   language: jvm
   arch: x86_64

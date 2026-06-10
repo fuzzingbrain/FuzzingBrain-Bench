@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - lang/c/src/datafile.c
-  '1':
-  - lang/c/src/datum_skip.c
-  - lang/c/src/datafile.c
-  '2':
-  - lang/c/src/datafile.c
-  - lang/c/src/codec.h
-  - lang/c/src/datum_skip.c
-  '3':
-  - lang/c/src/datafile.c
-  - lang/c/src/codec.h
-  - lang/c/src/datum_skip.c
-  - lang/c/src/avro_private.h
 metadata:
   language: c
   arch: x86_64

@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - source/disassemble.cpp
-  '1':
-  - source/ext_inst.h
-  - source/disassemble.cpp
-  '2':
-  - source/disassemble.cpp
-  - source/ext_inst.h
-  - source/software_version.cpp
-  '3':
-  - source/software_version.cpp
-  - source/disassemble.cpp
-  - source/disassemble.h
-  - source/ext_inst.h
 metadata:
   language: cpp
   arch: x86_64

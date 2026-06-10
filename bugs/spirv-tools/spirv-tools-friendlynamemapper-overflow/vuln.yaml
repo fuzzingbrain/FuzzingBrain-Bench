@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - source/name_mapper.cpp
-  '1':
-  - source/spirv_validator_options.h
-  - source/name_mapper.cpp
-  '2':
-  - source/name_mapper.cpp
-  - source/spirv_target_env.h
-  - source/spirv_validator_options.h
-  '3':
-  - source/spirv_target_env.h
-  - source/name_mapper.cpp
-  - source/spirv_validator_options.h
-  - source/software_version.cpp
 metadata:
   language: cpp
   arch: x86_64

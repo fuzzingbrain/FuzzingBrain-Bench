@@ -14,21 +14,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - libiberty/rust-demangle.c
-  '1':
-  - libiberty/ffs.c
-  - libiberty/rust-demangle.c
-  '2':
-  - libiberty/tmpnam.c
-  - libiberty/ffs.c
-  - libiberty/rust-demangle.c
-  '3':
-  - libiberty/tmpnam.c
-  - libiberty/rust-demangle.c
-  - libiberty/memmove.c
-  - libiberty/ffs.c
 metadata:
   language: c
   arch: x86_64

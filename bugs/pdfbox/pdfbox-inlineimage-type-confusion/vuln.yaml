@@ -15,21 +15,6 @@ supports:
   modes:
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDInlineImage.java
-  '1':
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDInlineImage.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDImageXObject.java
-  '2':
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PNGConverter.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDImageXObject.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDInlineImage.java
-  '3':
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/CustomFactory.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDImageXObject.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PNGConverter.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDInlineImage.java
 metadata:
   language: jvm
   arch: x86_64

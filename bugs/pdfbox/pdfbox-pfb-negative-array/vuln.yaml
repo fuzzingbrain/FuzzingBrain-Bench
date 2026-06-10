@@ -15,21 +15,6 @@ supports:
   modes:
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
-  '1':
-  - fontbox/src/main/java/org/apache/fontbox/EncodedFont.java
-  - fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
-  '2':
-  - fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
-  - fontbox/src/main/java/org/apache/fontbox/FontBoxFont.java
-  - fontbox/src/main/java/org/apache/fontbox/EncodedFont.java
-  '3':
-  - fontbox/src/main/java/org/apache/fontbox/FontBoxFont.java
-  - pdfbox/src/main/java/org/apache/pdfbox/pdmodel/font/FileSystemFontProvider.java
-  - fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
-  - fontbox/src/main/java/org/apache/fontbox/EncodedFont.java
 metadata:
   language: jvm
   arch: x86_64

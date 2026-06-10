@@ -14,21 +14,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - vpx/src/vpx_image.c
-  '1':
-  - vpx/src/vpx_decoder.c
-  - vpx/src/vpx_image.c
-  '2':
-  - vpx/src/vpx_codec.c
-  - vpx/src/vpx_decoder.c
-  - vpx/src/vpx_image.c
-  '3':
-  - vpx/src/vpx_codec.c
-  - vpx/src/vpx_decoder.c
-  - vpx/src/vpx_encoder.c
-  - vpx/src/vpx_image.c
 metadata:
   language: cpp
   arch: x86_64

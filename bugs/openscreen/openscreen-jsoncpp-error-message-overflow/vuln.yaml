@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/lib_json/json_reader.cpp
-  '1':
-  - src/lib_json/json_reader.cpp
-  - src/lib_json/json_tool.h
-  '2':
-  - src/lib_json/json_tool.h
-  - src/lib_json/json_writer.cpp
-  - src/lib_json/json_reader.cpp
-  '3':
-  - src/lib_json/json_tool.h
-  - src/lib_json/json_value.cpp
-  - src/lib_json/json_reader.cpp
-  - src/lib_json/json_writer.cpp
 metadata:
   language: cpp
   arch: x86_64

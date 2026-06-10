@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/p_lx_elf.cpp
-  '1':
-  - src/packmast.cpp
-  - src/p_lx_elf.cpp
-  '2':
-  - src/p_exe.h
-  - src/p_lx_elf.cpp
-  - src/packmast.cpp
-  '3':
-  - src/pefile.h
-  - src/p_exe.h
-  - src/packmast.cpp
-  - src/p_lx_elf.cpp
 metadata:
   language: cpp
   arch: x86_64

@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - libraries/libldap/ldif.c
-  '1':
-  - libraries/libldap/init.c
-  - libraries/libldap/ldif.c
-  '2':
-  - libraries/libldap/ldif.c
-  - libraries/libldap/sortctrl.c
-  - libraries/libldap/init.c
-  '3':
-  - libraries/libldap/init.c
-  - libraries/libldap/tls_g.c
-  - libraries/libldap/sortctrl.c
-  - libraries/libldap/ldif.c
 metadata:
   language: c
   arch: x86_64

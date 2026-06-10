@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - icu4c/source/i18n/rbt_rule.cpp
-  '1':
-  - icu4c/source/i18n/rbt_rule.cpp
-  - icu4c/source/i18n/number_mapper.h
-  '2':
-  - icu4c/source/i18n/number_mapper.h
-  - icu4c/source/i18n/number_skeletons.cpp
-  - icu4c/source/i18n/rbt_rule.cpp
-  '3':
-  - icu4c/source/i18n/number_skeletons.cpp
-  - icu4c/source/i18n/formattedval_iterimpl.cpp
-  - icu4c/source/i18n/number_mapper.h
-  - icu4c/source/i18n/rbt_rule.cpp
 metadata:
   language: cpp
   arch: x86_64

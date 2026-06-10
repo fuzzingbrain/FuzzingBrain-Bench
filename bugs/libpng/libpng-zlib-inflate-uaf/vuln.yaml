@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - pngrutil.c
-  '1':
-  - png.h
-  - pngrutil.c
-  '2':
-  - pngrutil.c
-  - png.h
-  - png.c
-  '3':
-  - png.h
-  - pngstruct.h
-  - png.c
-  - pngrutil.c
 metadata:
   language: c
   arch: x86_64

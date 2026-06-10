@@ -166,19 +166,15 @@ def _compute(bug_dir: str) -> dict:
     if os.path.exists(desc) and os.path.getsize(desc) > 0:
         modes.append("normal")
     modes.append("full-scan")
-    # diff-scan file-name hints per level, mirrored from the frozen diffscan.yaml
-    # (source of truth: tools/diffscan_freeze.py). Empty {} if the bug has none.
-    diff_files: dict = {}
-    dpath = os.path.join(bug_dir, "diffscan.yaml")
-    if os.path.exists(dpath):
+    # diff-scan is supported when the bug ships the frozen diffscan.yaml — which
+    # stays the single source of the per-level file lists (decoupled; not mirrored
+    # here). See tools/diffscan_freeze.py.
+    if os.path.exists(os.path.join(bug_dir, "diffscan.yaml")):
         modes.append("diff-scan")
-        dlv = (yaml.safe_load(open(dpath)) or {}).get("levels") or {}
-        diff_files = {k: (dlv.get(k) or {}).get("files") or [] for k in ("0", "1", "2", "3") if k in dlv}
     return {
         "category": category,
         "difficulty": "none",
         "supports": {"grades": grades, "modes": modes},
-        "diff_files": diff_files,
         "metadata": {
             "language": _LANG_CANON.get(tgt.get("language"), tgt.get("language") or None),
             "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt

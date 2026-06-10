@@ -15,21 +15,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/rust/font.rs
-  '1':
-  - src/rust/font.rs
-  - src/rust/hb.rs
-  '2':
-  - src/rust/font.rs
-  - src/rust/lib.rs
-  - src/rust/hb.rs
-  '3':
-  - src/rust/lib.rs
-  - src/rust/font.rs
-  - src/rust/hb.rs
-  - src/rust/shape.rs
 metadata:
   language: cpp
   arch: x86_64

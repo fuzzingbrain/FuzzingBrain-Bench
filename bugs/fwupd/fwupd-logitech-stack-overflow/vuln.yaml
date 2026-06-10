@@ -13,21 +13,6 @@ supports:
   modes:
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - libfwupd/fwupd-json-parser.c
-  '1':
-  - libfwupd/fwupd-json-parser.c
-  - libfwupd/fwupd-enums-private.h
-  '2':
-  - libfwupd/fwupd-enums-private.h
-  - libfwupd/fwupd-json-parser.c
-  - libfwupd/fwupd-device.c
-  '3':
-  - libfwupd/fwupd-enums-private.h
-  - libfwupd/fwupd-device.c
-  - libfwupd/fwupd-client-sync.c
-  - libfwupd/fwupd-json-parser.c
 metadata:
   language: c
   arch: x86_64

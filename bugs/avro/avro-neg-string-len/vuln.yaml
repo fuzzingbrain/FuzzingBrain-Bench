@@ -15,21 +15,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - lang/c/src/value-read.c
-  '1':
-  - lang/c/src/memoize.c
-  - lang/c/src/value-read.c
-  '2':
-  - lang/c/src/memoize.c
-  - lang/c/src/value-read.c
-  - lang/c/src/schema.c
-  '3':
-  - lang/c/src/value-read.c
-  - lang/c/src/schema.c
-  - lang/c/src/encoding_binary.c
-  - lang/c/src/memoize.c
 metadata:
   language: c
   arch: x86_64

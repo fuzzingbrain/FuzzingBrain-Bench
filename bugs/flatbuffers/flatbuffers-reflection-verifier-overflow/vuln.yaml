@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - include/flatbuffers/base.h
-  '1':
-  - include/flatbuffers/flatbuffers.h
-  - include/flatbuffers/base.h
-  '2':
-  - include/flatbuffers/detached_buffer.h
-  - include/flatbuffers/flatbuffers.h
-  - include/flatbuffers/base.h
-  '3':
-  - include/flatbuffers/grpc.h
-  - include/flatbuffers/base.h
-  - include/flatbuffers/detached_buffer.h
-  - include/flatbuffers/flatbuffers.h
 metadata:
   language: cpp
   arch: x86_64

@@ -13,21 +13,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - av1/common/resize.c
-  '1':
-  - av1/common/convolve.h
-  - av1/common/resize.c
-  '2':
-  - av1/common/convolve.h
-  - av1/common/av1_inv_txfm1d.c
-  - av1/common/resize.c
-  '3':
-  - av1/common/resize.c
-  - av1/common/convolve.h
-  - av1/common/txb_common.h
-  - av1/common/av1_inv_txfm1d.c
 metadata:
   language: cpp
   arch: x86_64

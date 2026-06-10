@@ -15,21 +15,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - vp9/encoder/vp9_aq_complexity.c
-  '1':
-  - vp9/encoder/vp9_aq_complexity.c
-  - vp9/encoder/vp9_firstpass.h
-  '2':
-  - vp9/encoder/vp9_aq_complexity.c
-  - vp9/encoder/vp9_segmentation.c
-  - vp9/encoder/vp9_firstpass.h
-  '3':
-  - vp9/encoder/vp9_firstpass.h
-  - vp9/encoder/vp9_context_tree.h
-  - vp9/encoder/vp9_aq_complexity.c
-  - vp9/encoder/vp9_segmentation.c
 metadata:
   language: c
   arch: x86_64

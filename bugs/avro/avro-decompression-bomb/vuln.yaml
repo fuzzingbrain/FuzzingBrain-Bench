@@ -14,21 +14,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
-  '1':
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
-  '2':
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
-  - lang/java/avro/src/main/java/org/apache/avro/file/ZstandardLoader.java
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
-  '3':
-  - lang/java/avro/src/main/java/org/apache/avro/file/BZip2Codec.java
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
-  - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
-  - lang/java/avro/src/main/java/org/apache/avro/file/ZstandardLoader.java
 metadata:
   language: jvm
   arch: x86_64

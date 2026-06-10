@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - sharpyuv/sharpyuv_gamma.c
-  '1':
-  - sharpyuv/sharpyuv_gamma.c
-  - sharpyuv/sharpyuv_csp.h
-  '2':
-  - sharpyuv/sharpyuv_neon.c
-  - sharpyuv/sharpyuv_csp.h
-  - sharpyuv/sharpyuv_gamma.c
-  '3':
-  - sharpyuv/sharpyuv_gamma.c
-  - sharpyuv/sharpyuv_csp.h
-  - sharpyuv/sharpyuv_csp.c
-  - sharpyuv/sharpyuv_neon.c
 metadata:
   language: c
   arch: x86_64

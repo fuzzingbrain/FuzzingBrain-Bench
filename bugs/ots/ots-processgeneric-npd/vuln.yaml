@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - src/ots.cc
-  '1':
-  - src/cvt.h
-  - src/ots.cc
-  '2':
-  - src/head.cc
-  - src/ots.cc
-  - src/cvt.h
-  '3':
-  - src/cvt.h
-  - src/head.cc
-  - src/ots.cc
-  - src/hvar.cc
 metadata:
   language: cpp
   arch: x86_64

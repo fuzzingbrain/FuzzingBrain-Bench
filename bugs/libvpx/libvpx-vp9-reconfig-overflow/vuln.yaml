@@ -16,21 +16,6 @@ supports:
   - normal
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - vp9/encoder/vp9_encodeframe.c
-  '1':
-  - vp9/encoder/vp9_encodeframe.c
-  - vp9/encoder/vp9_skin_detection.c
-  '2':
-  - vp9/encoder/vp9_encodeframe.c
-  - vp9/encoder/vp9_skin_detection.c
-  - vp9/encoder/vp9_ethread.c
-  '3':
-  - vp9/encoder/vp9_skin_detection.c
-  - vp9/encoder/vp9_ethread.c
-  - vp9/encoder/vp9_encodeframe.c
-  - vp9/encoder/vp9_ratectrl.c
 metadata:
   language: cpp
   arch: x86_64

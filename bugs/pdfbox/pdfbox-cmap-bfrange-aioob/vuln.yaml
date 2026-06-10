@@ -15,21 +15,6 @@ supports:
   modes:
   - full-scan
   - diff-scan
-diff_files:
-  '0':
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
-  '1':
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CodespaceRange.java
-  '2':
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CodespaceRange.java
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CMap.java
-  '3':
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CMap.java
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CIDRange.java
-  - fontbox/src/main/java/org/apache/fontbox/cmap/CodespaceRange.java
 metadata:
   language: jvm
   arch: x86_64
