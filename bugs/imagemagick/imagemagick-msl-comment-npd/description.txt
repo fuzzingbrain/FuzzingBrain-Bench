@@ -5,9 +5,12 @@ Project:     ImageMagick (Magick++ + MagickCore + coders/msl.c)
 Bug class:   NULL-pointer dereference (assertion abort)
 Sanitizer:   none
 
-When an MSL ("Magick Scripting Language") document contains a
-`<comment>` end-element before any `<image>` has been created,
-`MSLEndElement` (coders/msl.c:7091) calls
+When an MSL ("Magick Scripting Language") document contains an
+`<image>` element whose image pointer is still NULL — the `<image>`
+start element pushes a NULL placeholder into the image slot via
+`MSLPushImage` (coders/msl.c:3067 -> 236) — and a `<comment>`
+end-element is then processed before any image data has been rendered
+into that slot, `MSLEndElement` (coders/msl.c:7091) calls
 `DeleteImageProperty(msl_info->image[n], "comment")` with a NULL
 image pointer — the image slot is never validated, although the
 comment body itself IS guarded against NULL on the next line

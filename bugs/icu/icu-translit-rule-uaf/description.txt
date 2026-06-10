@@ -5,13 +5,16 @@ Project:     unicode-org/icu (icu4c)
 Bug class:   memory-leak
 Sanitizer:   LeakSanitizer
 
-`icu::Transliterator::createFromRules()` invokes
-`TransliteratorIDParser::parseFilterID()` while parsing a filter
-clause inside a transliteration rules string. On certain malformed
-rules, `parseFilterID()` (tridpars.cpp:229) calls `specsToID`, which
-allocates a 200-byte `SingleID` object (via `new SingleID`, routed
-through `UMemory::operator new` -> `uprv_malloc()`) but never frees it
-on the error/abandon path.
+`icu::Transliterator::createFromRules()` parses a transliteration
+rules string. While parsing a function-reference clause
+(`FUNCTION` / `ALT_FUNCTION`, e.g. `&Name(` / `^Name(`),
+`RuleHalf::parseSection` (rbt_pars.cpp:570) calls
+`TransliteratorIDParser::parseFilterID()`, which allocates a ~200-byte
+`SingleID` via `specsToID` -> `new SingleID` (tridpars.cpp:229 -> 842,
+routed through `UMemory::operator new` -> `uprv_malloc()`). If
+parseFilterID succeeds but the next character is not `SEGMENT_OPEN`,
+the caller returns `syntaxError(U_INVALID_FUNCTION)` (rbt_pars.cpp:573)
+without `delete single`, leaking the SingleID.
 
 The leak is observed every run on the recorded PoC and is reported
 by LeakSanitizer at exit.

@@ -15,14 +15,17 @@ A public-API libaom AV1 encoder caller that accepts attacker-controlled
 aom_svc_params_t can be driven into a non-terminating / crashing state. On
 frame 2 of a small (64x64, ss=1, ts=2, 4-frame) SVC stream, aom_codec_encode
 enters the encoder recode/resize path: encode_with_recode_loop_and_filter ->
-av1_realloc_and_scale_if_required -> av1_resize_and_extend_frame_nonnormative
--> av1_resize_plane -> interpolate. For the (scale=1/4, 64x64) configuration
-the resize step computes a zero scaling denominator, so interpolate_core
-performs an integer divide-by-zero. Under the libFuzzer build the outer
-wall-clock alarm preempts the FPE first, so the discovery crash was tagged as
-a 25-second timeout; the standalone public-API reproduction (no libFuzzer
-runtime) takes the deterministic SIGFPE on the same code path. The first two
-frames encode in 1-2 ms each.
+encode_with_recode_loop / encode_without_recode -> av1_realloc_and_scale_if_required
+-> av1_resize_and_extend_frame_nonnormative -> av1_resize_plane -> resize_multistep
+-> interpolate -> interpolate_core. For the (scale=1/4, 64x64) configuration the
+resize output dimension `out_length` is zero, so interpolate_core's `/ out_length`
+divisions (av1/common/resize.c:237-238) are an integer divide-by-zero, and the
+associated `while ((y >> RS_SCALE_SUBPEL_BITS) < (interp_taps/2 - 1))` loop
+(resize.c:254) is the potentially-unbounded construct behind the timeout.
+`av1_resize_plane` asserts width2>0 / height2>0, so the deterministic SIGFPE
+appears only on the assert-disabled standalone public-API repro; the
+assert-enabled fuzzer build instead surfaces a libFuzzer wall-clock timeout
+(tagged ~25 s). The first two frames encode in 1-2 ms each.
 
 Task
 ----
