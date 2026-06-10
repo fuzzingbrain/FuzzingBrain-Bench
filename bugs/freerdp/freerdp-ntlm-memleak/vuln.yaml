@@ -7,6 +7,7 @@
 category: memory-leak
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: lsan
   disclosed: 2026-04-16
   vuln_version: d0418739c27fe95b0d38fc6aa2e3cb22b7ac1cee

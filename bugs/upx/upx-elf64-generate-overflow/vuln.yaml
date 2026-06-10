@@ -7,6 +7,7 @@
 category: heap-buffer-overflow
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: asan
   disclosed: null
   vuln_version: 1ebd3356f36780960a03354a8ded23410ebc7e79

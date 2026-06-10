@@ -7,6 +7,7 @@
 category: null-pointer-dereference
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: none
   disclosed: 2026-01-20
   vuln_version: cbc802d38b2d37a4ae101c6ef80a465678cc6a49

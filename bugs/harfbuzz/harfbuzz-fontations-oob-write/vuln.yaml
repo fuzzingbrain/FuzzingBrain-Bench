@@ -7,6 +7,7 @@
 category: stack-buffer-overflow
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: asan
   disclosed: 2026-04-18
   vuln_version: edc8c18ef88262fc467a30ab74f05080d6aea6cf

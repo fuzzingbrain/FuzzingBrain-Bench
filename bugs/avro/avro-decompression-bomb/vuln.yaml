@@ -7,6 +7,7 @@
 category: memory-exhaustion
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: jvm
   disclosed: 2026-01-14
   vuln_version: 4502c1ba1c453702fd26966a5e5c10441e0d1384

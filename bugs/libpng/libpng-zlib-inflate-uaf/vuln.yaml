@@ -7,6 +7,7 @@
 category: use-after-free
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: asan
   disclosed: 2026-05-01
   vuln_version: 614ab644f8092128719264775795c5243e06878e

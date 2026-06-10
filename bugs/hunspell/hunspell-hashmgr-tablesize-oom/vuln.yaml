@@ -7,6 +7,7 @@
 category: memory-exhaustion
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: libfuzzer-oom
   disclosed: 2026-05-05
   vuln_version: f23fcd33052c7c8a307eaa3e1b1a4c0cdcf45651

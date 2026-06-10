@@ -7,6 +7,7 @@
 category: undefined-behavior
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: ubsan
   disclosed: 2026-01-27
   vuln_version: a26ef6400bd845beb6e7f369809ca1c42d856904

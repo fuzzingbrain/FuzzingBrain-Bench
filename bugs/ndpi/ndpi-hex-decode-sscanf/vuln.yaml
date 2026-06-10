@@ -7,6 +7,7 @@
 category: out-of-bounds-read
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: asan
   disclosed: 2026-02-19
   vuln_version: 68c7159a72dee1c42988eed65c7bfa08c510002e

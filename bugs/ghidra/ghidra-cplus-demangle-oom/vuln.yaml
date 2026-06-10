@@ -7,6 +7,7 @@
 category: memory-exhaustion
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: runtime
   disclosed: null
   vuln_version: caeeac88ddb5b004736de440db86380ff6e61229

@@ -141,6 +141,8 @@ def _compute(bug_dir: str) -> dict:
         "category": category,
         "difficulty": "none",
         "metadata": {
+            "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt
+                                # binaries); override per bug if that ever changes
             "sanitizer": cls.get("sanitizer") or None,
             "disclosed": bench.get("disclosed"),
             "vuln_version": tgt.get("vuln_commit") or None,

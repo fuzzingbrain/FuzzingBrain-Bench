@@ -7,6 +7,7 @@
 category: reachable-assertion
 difficulty: none
 metadata:
+  arch: x86_64
   sanitizer: null
   disclosed: 2026-01-28
   vuln_version: 0b75ea2c5a78e72dc3c04302be7ec3546a556958
