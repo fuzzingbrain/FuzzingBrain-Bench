@@ -3,7 +3,7 @@ Assertion Failure in open62541 PubSub JSON NetworkMessage Decoder
 
 Project:     open62541 (OPC UA stack — PubSub JSON decoding)
 Bug class:   reachable-assertion (plain C assert -> SIGABRT)
-Sanitizer:   none (plain C assert -> abort)
+Sanitizer:   libFuzzer (C assert -> SIGABRT, caught as "libFuzzer: deadly signal")
 
 Summary
 -------

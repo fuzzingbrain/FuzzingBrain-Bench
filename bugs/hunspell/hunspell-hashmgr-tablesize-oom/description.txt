@@ -4,7 +4,7 @@ Unbounded heap allocation (~1.6 GB) in HashMgr::load_tables via unvalidated tabl
 Project:     hunspell/hunspell (src/hunspell — HashMgr dictionary loader)
 Bug class:   out-of-memory (CWE-789 Memory Allocation with Excessive Size Value;
              also CWE-1284 Improper Validation of Specified Quantity in Input)
-Sanitizer:   libfuzzer-oom (libFuzzer rss_limit_mb out-of-memory)
+Sanitizer:   libFuzzer (out-of-memory oracle; libFuzzer rss_limit_mb)
 
 `HashMgr::load_tables()` (`src/hunspell/hashmgr.cxx:602`) reads the first line of
 the `.dic` file via `FileMgr::getline` (`hashmgr.cxx:610`), strips a UTF-8 BOM,

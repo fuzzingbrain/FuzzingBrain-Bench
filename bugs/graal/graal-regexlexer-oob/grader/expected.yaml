@@ -9,7 +9,7 @@ reach:
 
 class:
   expected: uncaught-exception
-  sanitizer: jvm
+  sanitizer: jazzer
 
 site:
   expected_file: "regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java"

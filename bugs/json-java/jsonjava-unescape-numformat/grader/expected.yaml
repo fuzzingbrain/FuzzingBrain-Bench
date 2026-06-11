@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: uncaught-exception
-  sanitizer: jvm
+  sanitizer: jazzer
 
 site:
   expected_file: XMLTokener.java

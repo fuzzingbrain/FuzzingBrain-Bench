@@ -78,8 +78,10 @@
         "disclosed": null
       },
       "capability_set": [
+        "class",
         "crash",
-        "class"
+        "reach",
+        "site"
       ]
     },
     {
@@ -199,8 +201,9 @@
         "disclosed": "2026-04-16"
       },
       "capability_set": [
-        "reach",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -259,8 +262,9 @@
         "disclosed": "2025-12-11"
       },
       "capability_set": [
-        "crash",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -279,8 +283,10 @@
         "disclosed": "2025-12-11"
       },
       "capability_set": [
+        "class",
         "crash",
-        "class"
+        "reach",
+        "site"
       ]
     },
     {
@@ -298,8 +304,9 @@
         "disclosed": "2025-12-10"
       },
       "capability_set": [
+        "class",
         "crash",
-        "class"
+        "reach"
       ]
     },
     {
@@ -338,8 +345,10 @@
         "disclosed": "2026-01-13"
       },
       "capability_set": [
+        "class",
         "crash",
-        "class"
+        "reach",
+        "site"
       ]
     },
     {
@@ -357,8 +366,9 @@
         "disclosed": "2026-01-13"
       },
       "capability_set": [
+        "class",
         "crash",
-        "class"
+        "reach"
       ]
     },
     {
@@ -376,8 +386,9 @@
         "disclosed": "2026-04-18"
       },
       "capability_set": [
-        "crash",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -396,8 +407,10 @@
         "disclosed": "2026-05-05"
       },
       "capability_set": [
+        "class",
         "crash",
-        "class"
+        "reach",
+        "site"
       ]
     },
     {
@@ -436,8 +449,9 @@
         "disclosed": null
       },
       "capability_set": [
-        "reach",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -496,8 +510,9 @@
         "disclosed": "2026-01-19"
       },
       "capability_set": [
-        "crash",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -641,7 +656,8 @@
         "disclosed": "2026-04-24"
       },
       "capability_set": [
-        "crash"
+        "crash",
+        "reach"
       ]
     },
     {
@@ -659,8 +675,9 @@
         "disclosed": "2026-04-18"
       },
       "capability_set": [
-        "crash",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -1009,8 +1026,9 @@
         "disclosed": "2026-05-12"
       },
       "capability_set": [
-        "crash",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },
@@ -1357,8 +1375,9 @@
         "disclosed": "2025-12-09"
       },
       "capability_set": [
-        "reach",
         "class",
+        "crash",
+        "reach",
         "site"
       ]
     },

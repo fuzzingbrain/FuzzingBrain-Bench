@@ -59,8 +59,11 @@ _LANG_CANON = {"c++": "cpp", "java": "jvm"}
 _SANITIZER = {
     "avro-neg-string-len":          "asan",   # OOB read, release-asan build
     "imagemagick-kernelinfo-alloc": "asan",   # excessive alloc under asan
-    "libaom-av1-config-assert":     "none",   # plain C assert -> abort
-    "opcua-pubsub-json-assert":     "none",   # plain C assert -> abort
+    # sanitizer = the oracle that CAPTURES the bug at reproduction (not the
+    # build config). A C assert -> SIGABRT is caught by the libFuzzer engine
+    # ("libFuzzer: deadly signal"); no compiler sanitizer reports it.
+    "libaom-av1-config-assert":     "libfuzzer",  # assert -> libFuzzer deadly signal
+    "opcua-pubsub-json-assert":     "libfuzzer",  # assert -> libFuzzer deadly signal
 }
 
 # Fixing commit, where known (not recorded upstream for most). Add as discovered;

@@ -3,7 +3,7 @@ NegativeArraySizeException in fontbox PfbParser.parsePfb via Crafted PFB Header 
 
 Project:     pdfbox (fontbox PFB parser)
 Bug class:   uncaught-exception (NegativeArraySizeException)
-Sanitizer:   JVM (uncaught exception)
+Sanitizer:   Jazzer (uncaught exception)
 
 The harness PfbFuzzer.fuzzerTestOneInput passes the raw fuzz bytes straight
 into `new PfbParser(data)`; the byte[] constructor (PfbParser.java:110)

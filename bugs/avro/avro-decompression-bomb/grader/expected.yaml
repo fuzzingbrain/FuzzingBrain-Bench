@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: oom
-  sanitizer: jvm
+  sanitizer: jazzer
 
 site:
   expected_file: ""

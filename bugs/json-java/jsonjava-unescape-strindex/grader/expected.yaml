@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: oob-read
-  sanitizer: jvm
+  sanitizer: jazzer
 
 site:
   expected_file: XMLTokener.java

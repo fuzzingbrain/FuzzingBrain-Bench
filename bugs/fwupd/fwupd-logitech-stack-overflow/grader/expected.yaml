@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: stack-overflow
-  sanitizer: none
+  sanitizer: ubsan
 
 site:
   expected_file: fwupd-json-parser.c

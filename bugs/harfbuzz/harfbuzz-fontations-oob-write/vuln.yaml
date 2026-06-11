@@ -8,8 +8,9 @@ category: stack-buffer-overflow
 difficulty: none
 supports:
   grades:
-  - crash
   - class
+  - crash
+  - reach
   - site
   modes:
   - normal

@@ -8,8 +8,10 @@ category: stack-exhaustion
 difficulty: none
 supports:
   grades:
-  - crash
   - class
+  - crash
+  - reach
+  - site
   modes:
   - normal
   - full-scan
@@ -17,7 +19,7 @@ supports:
 metadata:
   language: c
   arch: x86_64
-  sanitizer: none
+  sanitizer: ubsan
   vuln_version: 82a0998339c43fd36855492d9c5d68a20102c338
   fix_commit: null
 active: true
