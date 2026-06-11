@@ -1,10 +1,13 @@
-# K_b is [crash, class]; reach is not graded but records the root-cause file
-# (where the unbounded MSZIP decompression happens) — used as the diff-scan
-# anchor since OOM has no single crash site.
+# K_b is [class, crash, reach]; the OOM has no single crash site, so reach is
+# graded at whole-file granularity (the unbounded MSZIP decompression in
+# fu-cab-firmware.c). The unit is OOM-killed before atexit, so the coverage
+# binary is built with -fprofile-continuous and run with the %c profile marker
+# (counters mmap'd live) — the decompression coverage survives the kill.
 reach:
   expected_file: "libfwupdplugin/fu-cab-firmware.c"
   expected_function: ""
   expected_line_range: []
+  coverage_continuous: true
 
 class:
   expected: oom

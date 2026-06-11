@@ -1,4 +1,29 @@
-# fwupd-cab-mszip-bomb — partial build infra, deferred
+# fwupd-cab-mszip-bomb — coverage build resolved (2026-06-11)
+
+UPDATE 2026-06-11 — the build is NOT infeasible; the 2026-05-19 blockers below
+were the wrong options + an over-broad dep set. The coverage binary was built
+and reach is now graded ([crash, class] -> [class, crash, reach]). Recipe:
+
+1. The unknown-option errors (`plugin_uefi_capsule` etc.) are just stale option
+   names — DROP them. fwupd 2.0.18 configures fine on the system deps already
+   present (glib, gio, json-glib, xmlb/jcat subprojects, gusb, gnutls, libcurl);
+   the `.gir` introspection targets fail under Python 3.12 but are irrelevant —
+   `ninja -k0` still produces libfwupdplugin.a + libfwupd.a.
+2. `meson compile cab_fuzzer` does NOT work on 2.0.18 — the fuzzers are built by
+   `contrib/ci/oss-fuzz.py`, not a meson target. Instead: generate the fuzzer
+   from `libfwupdplugin/fu-fuzzer-firmware.c.in` (@INCLUDE@=fu-cab-firmware.h,
+   @FIRMWARENEW@=g_object_new(FU_TYPE_CAB_FIRMWARE, NULL)) and hand-link it
+   against the static libs + system deps (-lcbor -lz -lzstd -llzma).
+3. OOM coverage: the unit is OOM-killed before atexit, so the cov binary is
+   built with -fprofile-instr-generate -fcoverage-mapping -fprofile-continuous
+   and the grader runs it with the %c profile marker (counters mmap'd live) ->
+   the MSZIP decompression coverage in fu-cab-firmware.c survives the kill.
+   Opt-in is explicit: expected.yaml `reach.coverage_continuous: true`.
+
+The 2026-05-19 deferral notes are kept below for history (the daemon/tool build
+is still heavy; only the cab_fuzzer + libfwupdplugin path is needed here).
+
+---
 
 Build attempt status (2026-05-19):
 

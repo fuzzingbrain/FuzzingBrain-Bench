@@ -18,7 +18,10 @@ import (
 // gdb fallback is deferred to a future revision; for now we surface the
 // llvm-cov result and fall back to "not_fired" if it fails.
 func reachFired(covBin string, invocation []string, pocPath, runDir string, expected *expectedYAML) bool {
-	if expected.Reach.ExpectedFunction == "" {
+	// llvmCovHit matches by file suffix + line range, not by function symbol, so a
+	// file-only reach (no expected_function) is gradeable — e.g. whole-file OOM
+	// bombs. Require at least a file or a function.
+	if expected.Reach.ExpectedFunction == "" && expected.Reach.ExpectedFile == "" {
 		return false
 	}
 	if _, err := os.Stat(covBin); err != nil {
@@ -35,10 +38,21 @@ func reachFired(covBin string, invocation []string, pocPath, runDir string, expe
 			args = append(args, a)
 		}
 	}
+	// Continuous-mode coverage: a binary built with -fprofile-continuous mmaps its
+	// counters live to the profile file, so an OOM/timeout-killed run still leaves
+	// coverage on disk. The %c marker enables it and is consumed from the filename
+	// (the file is still `profraw`). Plain binaries MUST NOT get %c — it aborts
+	// profile writing. We can't reliably sniff this from the binary (the symbol
+	// name appears in every coverage binary's runtime), so it's an explicit
+	// per-bug opt-in via expected.yaml `reach.coverage_continuous: true`.
+	profileEnv := profraw
+	if expected.Reach.Continuous {
+		profileEnv = filepath.Join(runDir, "default%c.profraw")
+	}
 	cmd := exec.Command(covBin, args...)
 	cmd.Dir = runDir
 	cmd.Env = append(os.Environ(),
-		"LLVM_PROFILE_FILE="+profraw,
+		"LLVM_PROFILE_FILE="+profileEnv,
 		"ASAN_OPTIONS=abort_on_error=0:detect_leaks=0",
 		"TMPDIR="+runDir,
 	)
