@@ -5,20 +5,23 @@ Project:     sourceware/binutils-gdb (libiberty)
 Bug class:   out-of-memory (CWE-400, Uncontrolled Resource Consumption)
 Sanitizer:   libFuzzer out-of-memory (rss_limit_mb)
 
-`demangle_binder()` in `libiberty/rust-demangle.c` parses a bound
-lifetime count from the Rust v0 mangled symbol via parse_opt_integer_62()
-as a base-62 integer, with no upper bound, then loops that many times
-appending lifetime text to an output buffer. `str_buf_reserve()` doubles
-the output buffer capacity without any maximum size, so a crafted symbol
-with a 13-digit base-62 lifetime count drives ~35,000,000x output
-amplification (61 bytes -> >2 GB) until the process exhausts memory and
-libFuzzer aborts with an out-of-memory report.
+`demangle_binder()` in `libiberty/rust-demangle.c` reads a bound
+lifetime count from the Rust v0 mangled symbol via
+parse_opt_integer_62(rdm, 'G') as an attacker-controlled, unbounded
+base-62 integer, then loops that many times appending lifetime text to
+the output buffer through print_lifetime_from_index -> str_buf_append.
+`str_buf_reserve()` doubles the output buffer capacity (with only
+overflow checks, no maximum-size cap), so a crafted symbol with a large
+base-62 lifetime count drives massive output amplification until the
+realloc exhausts memory and libFuzzer reports out-of-memory. This
+benchmark caps the run at -rss_limit_mb=256; the >2 GB / 2048 MB figures
+are the upstream-original report's limit.
 
 Reached via:
 
     rust_demangle              libiberty/rust-demangle.c
-    └─ demangle_type / demangle_path
+    └─ demangle_path -> demangle_type   (binder via 'F'/'D' cases)
        └─ demangle_binder      libiberty/rust-demangle.c:646  (unbounded loop)
           └─ print_lifetime_from_index
              └─ str_buf_append
-                └─ str_buf_reserve   libiberty/rust-demangle.c:1553  ← OOM realloc
+                └─ str_buf_reserve   libiberty/rust-demangle.c:1549  ← OOM realloc

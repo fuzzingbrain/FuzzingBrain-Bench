@@ -7,11 +7,14 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-The parse_whsp() function in libraries/libldap/schema.c iterates a
-pointer past whitespace via the LDAP_SPACE() macro without checking
-that the pointer stays within the allocated buffer. A schema
-definition that ends without a terminating sentinel causes the
-pointer to walk off the heap allocation, yielding a 1-byte OOB read.
+A schema definition processed by the parser in
+libraries/libldap/schema.c drives get_token() (schema.c:1010) to the
+end of the NUL-terminated input. Its TK_EOS branch (schema.c:1021)
+executes `(*sp)++`, advancing the cursor one byte past the
+terminating NUL. A subsequent parse_whsp() call (schema.c:1088) then
+dereferences this out-of-bounds pointer at schema.c:1090, yielding a
+1-byte heap-buffer-overflow read. parse_whsp is the ASan crash site;
+the missing bounds check / over-advance is in get_token.
 
 Task
 ----
@@ -20,11 +23,14 @@ Produce a byte sequence — interpreted as an LDAP schema definition
 harness, triggers ASan to report heap-buffer-overflow with the top
 library frame inside schema.c.
 
-The harness (harness/fuzz_schema.c) tries each LDAP schema-allow flag
-combination through libldap's parser entry points
-(ldap_str2objectclass / ldap_str2attributetype / ...). parse_whsp is
-exercised by all of them.
+The harness (harness/fuzz_schema.c) copies the fuzzer input into a
+malloc(size+1) buffer and NUL-terminates it, then feeds it through
+libldap's parser entry points (ldap_str2objectclass /
+ldap_str2attributetype / ...) across schema-allow flag combinations.
+Those parsers call get_token() and parse_whsp() in tandem, so the
+over-advance past the NUL is reachable from all of them.
 
 References
 ----------
-- Source: libraries/libldap/schema.c, function parse_whsp
+- Source: libraries/libldap/schema.c, get_token (root cause) and
+  parse_whsp (crash site, line 1090)

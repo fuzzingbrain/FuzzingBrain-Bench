@@ -1,0 +1,31 @@
+StringIndexOutOfBoundsException in RegexLexer.consumeChar
+========================================================
+
+Project:     oracle/graal (Truffle regex engine), reached via GraalJS
+Bug class:   out-of-bounds-read (surfaced as StringIndexOutOfBoundsException)
+Sanitizer:   jvm (uncaught exception / "Internal Error")
+
+The harness (RegExpFuzzer.fuzzerTestOneInput) decodes the fuzzer bytes as a
+UTF-8 string, escapes them, and evaluates `new RegExp('<pattern>', 'v')`,
+`'u'`, and `''` in a GraalJS polyglot Context; any PolyglotException whose
+isInternalError() is true is rethrown as a RuntimeException, turning a JVM
+crash into a reportable failure. Compiling the pattern routes into graal's
+Truffle regex lexer, RegexLexer.
+
+The fault is in RegexLexer.consumeChar() at
+regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java:543.
+Its body reads the next pattern character with no bounds check:
+line 544 `final char c = pattern.charAt(position);` (where `pattern` is the
+`protected final String pattern` declared at line 75 and `position` the
+`protected int position = 0` at line 82), then calls advance() (line 452,
+which does `position++`) at line 545 and returns the char at line 546. When a
+parse path has already advanced `position` to `pattern.length()` and then
+invokes consumeChar() once more, `pattern.charAt(position)` indexes one past
+the end and throws StringIndexOutOfBoundsException. Unlike the guarded caller
+at line 497 (`consumeChar() == '\\' && !atEnd()`), the lexer here omits the
+atEnd()/length check, so the exception escapes as an uncaught error rather
+than a normal SyntaxError, and GraalJS reports it as an Internal Error.
+
+Call chain (verified file:line):
+  RegexLexer.consumeChar  RegexLexer.java:543 (decl), faulting read at :544
+  advance()               RegexLexer.java:452  (position++)

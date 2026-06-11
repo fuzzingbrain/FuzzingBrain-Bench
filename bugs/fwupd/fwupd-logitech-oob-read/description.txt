@@ -1,0 +1,39 @@
+OOB Read in Logitech Bulkcontroller sync response parsing
+=========================================================
+
+Project:     fwupd (plugins/logitech-bulkcontroller)
+Bug class:   heap-buffer-overflow (OOB read)
+Sanitizer:   AddressSanitizer
+
+The harness builds a real FuLogitechBulkcontrollerDevice and calls the
+fuzz-only wrapper fu_logitech_bulkcontroller_device_sync_wait_any_fuzz()
+(plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c:264),
+which stashes the input bytes and invokes the production parser
+fu_logitech_bulkcontroller_device_sync_wait_any() (same file, line 213).
+That function allocates a fixed receive buffer `buf = g_malloc0(self->transfer_bufsz)`
+at line 218; for a device created with no quirk, transfer_bufsz is the
+default 8 * 1024 = 8 KiB set in fu_logitech_bulkcontroller_device_init()
+at line 1490. The harness's __wrap_fu_usb_device_bulk_transfer shim
+(harness/protocol_fuzzer.c) memcpy's MIN(fuzz_size, transfer_bufsz) input
+bytes into `buf` in place of the real USB read.
+
+The 12-byte response header (cmd:u32, payload_length:u32le, sequence_id:u32le
+- FuStructLogitechBulkcontrollerSendSyncRes, fu-logitech-bulkcontroller.rs:65)
+is parsed at line 236. The attacker-controlled `payload_length` (input bytes
+4..7) is then used verbatim, with no bound against transfer_bufsz, in the
+g_byte_array_append at lines 244-246:
+
+    g_byte_array_append(response->data,
+                        buf + st->buf->len,                  /* buf + 12 */
+                        ..._get_payload_length(st));         /* attacker u32 */
+
+g_byte_array_append copies `payload_length` bytes starting at buf+12. Whenever
+payload_length exceeds transfer_bufsz - 12 (8180), the copy reads past the end
+of the 8 KiB heap allocation, producing the ASan heap-buffer-overflow at line 244.
+The harness requires size >= 12 so a full header (and thus a controllable
+payload_length) is always present.
+
+Call chain:
+- LLVMFuzzerTestOneInput -> fu_logitech_bulkcontroller_device_sync_wait_any_fuzz  (fu-logitech-bulkcontroller-device.c:264)
+- fu_logitech_bulkcontroller_device_sync_wait_any                                  (fu-logitech-bulkcontroller-device.c:213)
+- g_byte_array_append(response->data, buf + 12, payload_length)  [OOB read]        (fu-logitech-bulkcontroller-device.c:244)

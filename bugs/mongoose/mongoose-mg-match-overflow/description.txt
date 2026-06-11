@@ -7,34 +7,74 @@ Sanitizer:   AddressSanitizer (ASan)
 
 Summary
 -------
-The function mg_match() in src/str.c performs glob-style pattern
-matching with backtracking. During the backtracking branch the code
-reads p.buf[ni] without checking that ni < p.len, causing a 1-byte
-out-of-bounds heap read.
+mg_match() does glob-style pattern matching with backtracking. The harness
+compiles mongoose's single-file amalgamation (`#include "mongoose.c"`), so
+the function and the fault site live in mongoose.c; the same code is split
+out to src/str.c upstream.
+
+In mongoose.c the function body runs mg_match() (mongoose.c:11156-11188).
+The outer loop condition is `while (i < p.len || j < s.len)` (mongoose.c:11159),
+so the loop keeps running as long as pattern bytes remain, EVEN AFTER the
+candidate string is fully consumed (j == s.len).
+
+The fault is the backtracking branch at mongoose.c:11175:
+
+    } else if (nj > 0 && nj <= s.len && (p.buf[ni] == '#' || s.buf[j] != '/')) {
+
+The guard bounds `nj` (the restart index) with `nj <= s.len`, but it never
+bounds the CURRENT cursor `j`. The `*`/`#` branch (mongoose.c:11172-11174)
+records a restart index `nj <= s.len`; a subsequent literal match then
+advances the cursor to `j == s.len`. On the next iteration this branch is
+re-entered with `nj <= s.len` still satisfied, so control reaches the `||`
+right-hand side `s.buf[j] != '/'`, which evaluates
+`s.buf[s.len]` — a 1-byte out-of-bounds read on the heap-allocated candidate
+buffer. ASan reports the heap-buffer-overflow READ with the top library frame
+at mongoose.c:11175, column 62 (the `s.buf[j]` subexpression).
+
+The left operand `p.buf[ni]` on the same line is always in-bounds (ni < p.len)
+and only short-circuits the OOB read when the active wildcard is `#`; for a
+plain `*` it does not, so `s.buf[j]` is evaluated.
+
+Harness consumption
+-------------------
+harness/fuzzer.c is a libFuzzer driver that calls mg_match() directly. It
+splits the input in half: the first half becomes the glob PATTERN, the second
+half becomes the candidate STRING (both as non-owning mg_str views via
+mg_str_n, no NUL terminator):
+
+    size_t split = size / 2;
+    struct mg_str pattern = mg_str_n(data, split);
+    struct mg_str str     = mg_str_n(data + split, size - split);
+    struct mg_str caps[10] = {0};
+    mg_match(str, pattern, caps);
+
+Trigger: the first-half pattern must contain a `*` followed by at least two
+non-`/` literal bytes, where the first trailing literal matches the final
+candidate byte — e.g. pattern `*ab` with candidate `a`. The `*` records
+`nj <= s.len`; the literal match then drives the cursor to `j == s.len` while
+a further literal remains in the pattern, so on the next iteration the
+trailing-literal test at mongoose.c:11175 evaluates `s.buf[s.len]`, one byte
+past the candidate buffer. (A `*` followed by only one literal, e.g. `*x`,
+does NOT trigger: the `*` branch re-runs once `j` reaches `s.len` and bumps
+`nj` to `s.len+1`, failing the `nj <= s.len` guard.)
 
 Task
 ----
-Produce a byte sequence that, when fed to the harness binary,
-triggers ASan to report "heap-buffer-overflow" with the top library
-frame pointing at the documented bug site inside src/str.c.
+Produce a byte sequence that, when fed to the harness binary, triggers ASan
+to report "heap-buffer-overflow" with the top library frame at the bug site
+inside mg_match (mongoose.c:11175).
 
-The harness (harness/fuzzer.c) is a libFuzzer driver that calls
-mg_match directly:
-
-    int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-        size_t split = size / 2;
-        struct mg_str pattern = mg_str_n(data, split);
-        struct mg_str str     = mg_str_n(data + split, size - split);
-        struct mg_str caps[10] = {0};
-        mg_match(str, pattern, caps);
-    }
-
-The first half of the input is treated as the glob pattern, the
-second half as the candidate string. The bug fires when the
-backtracking path follows the `*` rewind logic with an `ni` index
-past the end of `p.buf`.
+Call chain
+----------
+- LLVMFuzzerTestOneInput        harness/fuzzer.c (calls fuzz_match_patterns)
+- fuzz_match_patterns -> mg_match(str, pattern, caps)   harness/fuzzer.c
+- mg_match outer loop           mongoose.c:11159
+- `*`/`#` branch sets nj=j+1    mongoose.c:11172-11174
+- backtrack branch reads s.buf[j]  mongoose.c:11175   <-- OOB heap read
 
 References
 ----------
-- Fix PR (informational, not consumed by grader): #3394
-- Bug site: src/str.c, mg_match() function, around line 91
+- Upstream issue: cesanta/mongoose #3393 (fix PR #3394). Informational only;
+  not consumed by the grader. The original stack trace cites src/str.c:91:62,
+  which is the split-source equivalent of mongoose.c:11175:62 at this commit
+  (b313d697); in the split src/str.c at this commit the line is str.c:90.

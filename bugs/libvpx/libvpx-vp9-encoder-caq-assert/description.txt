@@ -7,19 +7,57 @@ Sanitizer:   AddressSanitizer (asan-only; the abort surfaces as an ASan ABRT)
 
 Summary
 -------
-libvpx's VP9 complexity-adaptive quantization (CAQ) keeps an internal
-invariant `cpi->rc.sb64_target_rate < INT_MAX / 256`. Certain combinations
-of encoder configuration parameters (bitrate, resolution, AQ mode) are
-accepted by vpx_codec_enc_init() without being validated or clamped, yet
-later overflow `sb64_target_rate` during encoding, violating the invariant.
-In a debug build (asserts compiled in) this aborts the process; in a release
-build the assert is compiled out and the integer overflow is undefined
-behavior.
+The VP9 complexity-adaptive-quantization (AQ mode 2 / COMPLEXITY_AQ) path
+relies on the invariant `cpi->rc.sb64_target_rate < INT_MAX / 256`. That
+invariant is asserted in vp9_caq_select_segment() at
+vp9/encoder/vp9_aq_complexity.c:128:
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, drives the
-VP9 encoder through a configuration that overflows sb64_target_rate and
-trips the assertion in vp9_caq_select_segment (vp9_aq_complexity.c).
-The harness decodes the input into encoder config parameters, calls
-vpx_codec_enc_init() + vpx_codec_encode(), and reaches the CAQ path.
+    assert(cpi->rc.sb64_target_rate < INT_MAX / 256);
+
+immediately before the value is scaled up by 256 to form `target_rate`
+(vp9_aq_complexity.c:129-131). In a debug build (--enable-debug, asserts
+compiled in) a violation calls abort(), which ASan reports as ABRT; in a
+release build the assert is gone and the `* 256` multiply at line 130 is the
+undefined integer overflow.
+
+sb64_target_rate is the per-64x64-superblock target, computed in
+vp9_rc_set_frame_target() at vp9/encoder/vp9_ratectrl.c:1742-1744:
+
+    const int64_t sb64_target_rate =
+        ((int64_t)rc->this_frame_target * 64 * 64) / (cm->width * cm->height);
+    rc->sb64_target_rate = (int)VPXMIN(sb64_target_rate, INT_MAX);
+
+It divides the whole-frame target (driven by rc_target_bitrate) by the frame
+area. The result is only clamped to INT_MAX — never to INT_MAX/256 — so for a
+very small frame (denominator cm->width*cm->height ~ 1-4) combined with a
+non-trivial target bitrate, sb64_target_rate lands in [INT_MAX/256, INT_MAX]
+and the invariant at vp9_aq_complexity.c:128 is violated. These parameters are
+accepted by vpx_codec_enc_init() without being rejected or re-clamped, so the
+bad value only surfaces during encoding.
+
+The CAQ path is entered from the superblock encode path in
+vp9/encoder/vp9_encodeframe.c:2087, guarded by
+`aq_mode == COMPLEXITY_AQ && bsize >= BLOCK_16X16` plus a
+key/alt-ref/golden-frame condition (vp9_encodeframe.c:2083-2086).
+
+How the harness drives it
+-------------------------
+harness/vp9_encoder_config_fuzzer.cc consumes the first FUZZ_HDR_SZ (48) bytes
+as an encoder-config header (input must exceed 48 bytes). The fields that
+matter here:
+  - data[1] & 0x07 selects g_w/g_h; case 6 -> 1x1, case 0 -> 2x2 give the tiny
+    frame area that drives the overflow (cc lines 80-89).
+  - data[4]/data[5] set cfg.rc_target_bitrate = ((data[4]<<8)|data[5]) % 2000 + 10
+    (cc line ~117), feeding this_frame_target.
+  - data[15] & 0x03 == 2 sets AQ mode via vpx_codec_control(VP9E_SET_AQ_MODE)
+    (cc line ~187), selecting the COMPLEXITY_AQ path.
+The remaining bytes (from offset 48 on) are tiled into the raw YUV frame and
+the harness loops vpx_codec_encode() over the frames, reaching CAQ and the
+assert.
+
+Call chain
+----------
+  LLVMFuzzerTestOneInput     harness/vp9_encoder_config_fuzzer.cc (vpx_codec_encode loop)
+  vp9_rc_set_frame_target    vp9/encoder/vp9_ratectrl.c:1742-1744 (sb64_target_rate set, only clamped to INT_MAX)
+  <superblock encode path>   vp9/encoder/vp9_encodeframe.c:2087 (COMPLEXITY_AQ gate)
+  vp9_caq_select_segment     vp9/encoder/vp9_aq_complexity.c:128 (assert fires) -> abort()

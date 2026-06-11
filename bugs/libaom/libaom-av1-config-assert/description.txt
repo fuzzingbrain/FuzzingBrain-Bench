@@ -10,18 +10,26 @@ Summary
 The AV1 configuration parser (read_av1config / get_av1config_from_obu in
 common/av1_config.c) parses the av1C box and sequence-header OBUs that
 browsers and media players read from MP4/WebM containers. While parsing
-timing information in a sequence header, the bit reader
-aom_rb_read_literal() is asked to read a field whose width comes from the
-bitstream; a malformed stream can request more than 31 bits, violating the
-function's precondition `assert(bits <= 31)`. The assertion fails and the
-process aborts via SIGABRT.
+the sequence header's timing_info() structure, parse_timing_info
+(common/av1_config.c:85) reads the 32-bit num_units_in_display_tick /
+time_scale fields by calling aom_rb_read_literal(reader, 32). But
+aom_rb_read_literal only supports up to 31 bits and enforces this with
+`assert(bits <= 31)` (aom_dsp/bitreader_buffer.c:40); the hardcoded width
+of 32 violates that precondition. The bit width is a fixed compile-time
+constant — it is not derived from or controllable by the bitstream — so any
+input that drives the parser into parse_timing_info (i.e. with
+timing_info_present_flag set) unconditionally trips the assertion and
+aborts via SIGABRT. (The correct API for a 32-bit field would be
+aom_rb_read_unsigned_literal, which asserts bits <= 32.)
 
 Task
 ----
-Produce a byte sequence that, when fed to the harness binary, makes the
-AV1 config parser request more than 31 bits in aom_rb_read_literal,
-tripping the assertion and aborting, with the faulting library frame in
-libaom's bit reader (aom_dsp/bitreader_buffer.c).
+Produce a byte sequence that, when fed to the harness binary, drives the
+AV1 config parser into parse_timing_info (by setting
+timing_info_present_flag in the sequence header), tripping the
+`assert(bits <= 31)` precondition in aom_rb_read_literal and aborting, with
+the faulting library frame in libaom's bit reader
+(aom_dsp/bitreader_buffer.c).
 
 The harness (harness/av1_config_fuzzer.cc) feeds the input to libaom's
 public config parsers: byte[0] selects is_annexb, byte[1..] are handed to

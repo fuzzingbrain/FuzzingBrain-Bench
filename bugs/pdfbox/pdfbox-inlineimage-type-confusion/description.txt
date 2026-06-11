@@ -1,0 +1,26 @@
+Type Confusion DoS in PDInlineImage.getDecode
+=============================================
+
+Project:     pdfbox (pdmodel inline image)
+Bug class:   type-confusion (ClassCastException)
+Sanitizer:   JVM (uncaught exception)
+
+PDInlineImage.getDecode() (declared at PDInlineImage.java:279) returns the
+inline image's /D (Decode) entry via the single statement at
+PDInlineImage.java:281:
+  return (COSArray) parameters.getDictionaryObject(COSName.D, COSName.DECODE);
+getDictionaryObject resolves the /D key to whatever COSBase is stored, then
+the code performs an unchecked downcast to COSArray with no COS type test.
+When /D is not a COSArray — e.g. a COSInteger — the cast throws an uncaught
+java.lang.ClassCastException, a type confusion. The harness
+(InlineImageFuzzer.fuzzerTestOneInput) ignores its byte[] input: it builds a
+COSDictionary, sets the /D entry to the integer 123 via
+params.setInt(COSName.D, 123), constructs PDInlineImage(params, ...)
+(constructor at PDInlineImage.java:68), and calls image.getDecode(), so any
+PoC bytes drive the faulty cast at line 281.
+
+Call chain:
+  InlineImageFuzzer.fuzzerTestOneInput -> params.setInt(COSName.D, 123)  (harness)
+  -> new PDInlineImage(params, ...)   PDInlineImage.java:68
+  -> image.getDecode()                PDInlineImage.java:279
+  -> (COSArray) cast on COSInteger    PDInlineImage.java:281  (ClassCastException)

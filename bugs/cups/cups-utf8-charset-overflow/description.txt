@@ -1,22 +1,41 @@
 Heap Buffer Overflow (out-of-bounds read) in cupsUTF8ToCharset
 ==============================================================
 
-Project:   CUPS (OpenPrinting) — cups/transcode.c
-Bug class: heap-buffer-overflow (OOB read), AddressSanitizer
+Project:     CUPS (OpenPrinting) (cups/transcode.c)
+Bug class:   heap-buffer-overflow (OOB read)
+Sanitizer:   asan
 
-Summary
--------
-cupsUTF8ToCharset() decodes a NUL-terminated UTF-8 string. When the input
-ends with a 2-byte UTF-8 lead byte (0xC0–0xDF) and no continuation byte, the
-decoder reads the NUL terminator as the continuation byte and advances the
-source pointer past it; the next loop iteration dereferences one byte beyond
-the end of the heap buffer.
+Mechanism
+---------
+cupsUTF8ToCharset() (cups/transcode.c, function starts at line 194) converts a
+NUL-terminated UTF-8 source string. For the CUPS_ISO8859_1 / US-ASCII path
+(entered at line 236) it walks the input with the loop guarded at line 245:
 
-Task
-----
-Produce a byte sequence that, when fed to the harness, drives
-cupsUTF8ToCharset() past the end of its source buffer. The harness copies the
-input into a heap buffer of exactly len+1 bytes (NUL-terminated) and calls
-cupsUTF8ToCharset(dest, src, sizeof(dest), CUPS_ISO8859_1) — a valid API call;
-the overflow is internal to the decoder. A minimal trigger is a byte string
-ending in a bare 2-byte lead such as 0xC1.
+    while (*src && destptr < destend)   // transcode.c:245
+      ch = *src++;                      // transcode.c:247 (read lead byte)
+      if ((ch & 0xe0) == 0xc0)          // transcode.c:249 (2-byte lead 0xC0-0xDF)
+        ch = ((ch & 0x1f) << 6) | (*src++ & 0x3f);  // transcode.c:251
+
+The decoder treats a 2-byte lead byte as committing to a continuation byte: at
+line 251 it does *src++ unconditionally, without re-checking the loop's
+terminating NUL. When the input ends with a bare 2-byte lead (0xC0-0xDF) and no
+continuation byte, line 251 reads the NUL terminator as the continuation byte
+(still in bounds: it is the last byte of the len+1 buffer) and advances src one
+position past the NUL — i.e. one byte past the end of the heap allocation. The
+next loop iteration re-evaluates the condition *src at line 245, dereferencing
+that out-of-bounds byte. That read is the ASan heap-buffer-overflow fault site
+(transcode.c:245; expected site line 245).
+
+The harness (harness/fuzz_transcode.cc, LLVMFuzzerTestOneInput) copies the fuzz
+input into a heap buffer of exactly size+1 bytes via malloc(size + 1), sets
+src[size] = 0, and calls cupsUTF8ToCharset(dest, src, sizeof(dest),
+CUPS_ISO8859_1) with a 2048-byte stack dest. The API call is well-formed (valid
+dest and maxout); the overflow is entirely internal to the decoder. Heap-
+allocating the exact-length NUL-terminated copy lets ASan guard the byte just
+past the terminator. A minimal trigger is any input ending in a single 2-byte
+lead byte such as 0xC1.
+
+Call chain:
+- harness/fuzz_transcode.cc: LLVMFuzzerTestOneInput -> cupsUTF8ToCharset(...)
+- cups/transcode.c:251  *src++ consumes the NUL terminator after a trailing 2-byte lead
+- cups/transcode.c:245  while (*src ...) dereferences one byte past the heap buffer (fault site)

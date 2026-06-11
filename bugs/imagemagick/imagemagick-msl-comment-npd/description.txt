@@ -1,14 +1,22 @@
-NULL Pointer Dereference Parsing MSL <comment>
+NULL Image Assertion Abort Parsing MSL <comment>
 ================================================
 
 Project:     ImageMagick (Magick++ + MagickCore + coders/msl.c)
-Bug class:   null-deref
-Sanitizer:   AddressSanitizer
+Bug class:   NULL-pointer dereference (assertion abort)
+Sanitizer:   none
 
-The MSL ("Magick Scripting Language") parser does not validate that
-a `<comment>` element body is non-empty before dereferencing it. A
-crafted MSL document with an empty / NULL comment body crashes
-ImageMagick during `image.read(blob)`.
+When an MSL ("Magick Scripting Language") document contains an
+`<image>` element whose image pointer is still NULL — the `<image>`
+start element pushes a NULL placeholder into the image slot via
+`MSLPushImage` (coders/msl.c:3067 -> 236) — and a `<comment>`
+end-element is then processed before any image data has been rendered
+into that slot, `MSLEndElement` (coders/msl.c:7091) calls
+`DeleteImageProperty(msl_info->image[n], "comment")` with a NULL
+image pointer — the image slot is never validated, although the
+comment body itself IS guarded against NULL on the next line
+(coders/msl.c:7092). `DeleteImageProperty` asserts
+`image != (Image *) NULL` (MagickCore/property.c:297), so the NULL
+image trips the assertion and the process aborts (SIGABRT).
 
 The harness drives `Magick::Image::read(blob)` with `magick("MSL")`
 and `fileName("MSL:")` — the standard OSS-Fuzz MSL harness pattern.

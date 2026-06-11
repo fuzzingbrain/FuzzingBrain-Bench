@@ -12,6 +12,7 @@ supports:
   - class
   - site
   modes:
+  - normal
   - full-scan
   - diff-scan
 metadata:

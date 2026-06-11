@@ -1,0 +1,37 @@
+NegativeArraySizeException in fontbox PfbParser.parsePfb via Crafted PFB Header Size Field
+=========================================================================================
+
+Project:     pdfbox (fontbox PFB parser)
+Bug class:   uncaught-exception (NegativeArraySizeException)
+Sanitizer:   JVM (uncaught exception)
+
+The harness PfbFuzzer.fuzzerTestOneInput passes the raw fuzz bytes straight
+into `new PfbParser(data)`; the byte[] constructor (PfbParser.java:110)
+calls parsePfb(bytes) at line 112. In parsePfb
+(fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java), after the
+start/record-type markers are accepted, the 4-byte little-endian segment
+size is assembled at lines 152-155:
+
+    int size = in.read();
+    size += in.read() << 8;
+    size += in.read() << 16;
+    size += in.read() << 24;   // line 155 — high byte shifted into the sign bit
+
+Because `size` is a signed int, a header whose 4th size byte has its top
+bit set (e.g. 0xFF) drives line 155 to set bit 31, yielding a negative
+value (the bundled PoC produces size = -16777215). The OOM guard at
+line 157 only rejects `size > pfb.length`, so a negative size slips
+through. The negative length then reaches the array allocation at
+PfbParser.java:162:
+
+    byte[] ar = new byte[size];   // line 162 — NegativeArraySizeException
+
+which throws NegativeArraySizeException (message = the negative size) and
+propagates uncaught out of the harness. The length is never validated as
+non-negative before allocation.
+
+Call chain:
+  PfbFuzzer.fuzzerTestOneInput        harness/PfbFuzzer.java  -> new PfbParser(data)
+  PfbParser.<init>(byte[])            PfbParser.java:112      -> parsePfb(bytes)
+  PfbParser.parsePfb                  PfbParser.java:152-155  -> size sign-overflows negative
+  PfbParser.parsePfb                  PfbParser.java:162      -> new byte[size]  (faulting line)

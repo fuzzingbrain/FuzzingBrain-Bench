@@ -7,30 +7,64 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-libpng shares a single scratch buffer (png_ptr->read_buffer) across
-several ancillary-chunk handlers, reallocating it through
-png_read_buffer(). When an ancillary text chunk populates that buffer
-and the inflate state records its address, a later chunk handler can
-call png_read_buffer() again with a different size — freeing the old
-buffer — without updating the inflate state's input pointer. A
-subsequent step in the read pipeline then dereferences that stale
-pointer, producing a heap-use-after-free READ inside
-png_zlib_inflate().
+libpng routes every compressed/buffered ancillary chunk through a single
+scratch buffer, png_ptr->read_buffer, handed out (and grown in place) by
+png_read_buffer() in pngrutil.c. png_read_buffer() frees and reallocates
+that buffer whenever a caller asks for a size larger than the current
+read_buffer_size (pngrutil.c:382-388; png_free of the old block at
+pngrutil.c:386), but it does NOT touch the zlib stream. The decompression
+engine, meanwhile, stores the address of read_buffer directly into
+png_ptr->zstream.next_in: in png_inflate() the line
+"png_ptr->zstream.next_in = input;" (pngrutil.c:556) is reached with
+input = png_ptr->read_buffer + prefix_size (the caller png_decompress_chunk
+passes that at pngrutil.c:693 and again at pngrutil.c:723). When a
+compressed text chunk (zTXt/iTXt) populates read_buffer and leaves the
+stream armed — png_inflate_claim() sets png_ptr->zstream_start = 1 at
+pngrutil.c:456 — and a later chunk handler calls png_read_buffer() again
+with a larger length, the old allocation backing next_in is freed while
+next_in is never updated. The next entry into the inflate engine reaches
+png_zlib_inflate() (pngrutil.c:507), whose guard
+"if (png_ptr->zstream_start && png_ptr->zstream.avail_in > 0)"
+(pngrutil.c:509) is true, so it evaluates "(*png_ptr->zstream.next_in >> 4)
+> 7" at pngrutil.c:511. That dereference of the dangling next_in is the
+faulting expression, and ASan reports a heap-use-after-free READ with the
+top library frame in png_zlib_inflate.
 
-Task
-----
-Produce a byte sequence — interpreted as a PNG image stream — that,
-when fed to the harness binary, drives the chunk-handling pipeline so
-that ASan reports a heap-use-after-free with the faulting library
-frame inside png_zlib_inflate (pngrutil.c).
+The shared buffer is what makes this cross-chunk: png_handle_pCAL calls
+png_read_buffer(png_ptr, length+1) at pngrutil.c:2142 (and the other
+ancillary handlers, e.g. png_handle_zTXt at pngrutil.c:2463, reuse the same
+field), so a pCAL chunk whose length exceeds the prior zTXt allocation
+triggers the free in png_read_buffer while the zstream still references the
+old block.
 
-The harness (harness/libpng_unknown_chunk_dispatch_fuzzer.cc) is a
-libFuzzer driver over libpng's public read API: it configures the
-unknown-chunk keep/skip policy and an optional user-chunk callback
-from a short fuzz-controlled prefix, then feeds the remaining bytes
-through png_read_info() and png_read_end(). A valid 8-byte PNG
-signature is required for the bytes to reach chunk handling.
+Task / harness
+--------------
+Produce a byte sequence — interpreted as a PNG image stream — that drives
+the chunk-handling pipeline so ASan reports a heap-use-after-free with the
+faulting library frame inside png_zlib_inflate (pngrutil.c:511).
+
+The harness (harness/libpng_unknown_chunk_dispatch_fuzzer.cc) is a libFuzzer
+driver over libpng's public read API. It consumes a short fuzz-controlled
+prefix via FuzzedDataProvider to pick the unknown-chunk keep policy
+(png_set_keep_unknown_chunks), an optional user-chunk callback
+(png_set_read_user_chunk_fn), and user limits, then treats the remaining
+bytes as a raw PNG stream. The bytes must begin with a valid 8-byte PNG
+signature (png_sig_cmp check) or the input is rejected before chunk
+handling. The stream is fed through a custom read callback into
+png_read_info() and png_read_end(); a chunk sequence that decompresses a
+text chunk (claiming the zstream and seeding next_in into read_buffer) and
+then forces a larger png_read_buffer() allocation drives the engine back
+into png_zlib_inflate() with a stale next_in.
+
+Call chain
+----------
+- png_inflate_claim   pngrutil.c:456  (sets zstream_start = 1)
+- png_inflate         pngrutil.c:556  (next_in = read_buffer + prefix_size)
+- png_read_buffer     pngrutil.c:386  (png_free of the old read_buffer)
+- png_zlib_inflate    pngrutil.c:509  (guard true)
+- png_zlib_inflate    pngrutil.c:511  (*next_in dereference — FAULT)
 
 References
 ----------
-- Source: pngrutil.c, function png_zlib_inflate
+- Source: pngrutil.c, function png_zlib_inflate (faulting read at line 511)
+- Advisory: GHSA-qvg3-h654-xq3j (CVE-2026-46675)

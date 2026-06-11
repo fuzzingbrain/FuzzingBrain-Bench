@@ -1,25 +1,65 @@
 Heap Buffer Overflow in convert_utf16_to_utf8_safe (write-before-check)
 =======================================================================
 
-Project:     simdutf (Unicode conversion library)
+Project:     simdutf (scalar UTF-16 to UTF-8 converter)
 Bug class:   heap-buffer-overflow (write)
 Sanitizer:   AddressSanitizer
 
 Summary
 -------
-The "safe" UTF-16-to-UTF-8 conversion path (convert_utf16_to_utf8_safe)
-has two ASCII-fast-path branches that write to the output buffer
-*before* checking whether the output buffer still has space. With a
-short output buffer and ASCII-range input characters, those writes
-overrun the destination.
+simdutf::convert_utf16_to_utf8_safe is supposed to never write past the
+caller-supplied output buffer (utf8_len). After it consumes the bulk of
+the input with the fast SIMD path, it hands the tail (read_len <= 16
+char16_t) to the scalar checked converter
+scalar::utf16_to_utf8::convert_with_errors<endianness, /*check_output=*/true>
+(src/implementation.cpp:1818-1820). That converter has two ASCII
+fast-path branches that store an output byte *before* re-checking the
+remaining capacity, so when the buffer is one byte short of the bytes an
+ASCII character requires, the store overruns the heap allocation.
 
-Task
-----
-Produce a byte sequence that the harness binary feeds into
-simdutf::convert_utf16_to_utf8_safe with a short output buffer,
-triggering ASan to report heap-buffer-overflow inside simdutf's
-scalar UTF-16-to-UTF-8 converter.
+Mechanism
+---------
+In include/simdutf/scalar/utf16_to_utf8/utf16_to_utf8.h, function
+convert_with_errors (declared at line 97), the two write-before-check
+sites are:
 
-References
+  1. Single ASCII word path (word & 0xFF80 == 0):
+       line 141:  *utf8_output++ = char(word);   // unconditional store
+       line 143:  if (check_output && size_t(end - utf8_output) == 0) ...
+     The bounds test at 143 runs only AFTER the store at 141. If
+     utf8_output already equals end (zero capacity left) on entry, the
+     store at line 141 writes one byte past the buffer.
+
+  2. 8-byte ASCII block fast path (lines 120-133):
+       line 123:  *utf8_output++ = ... char(data[pos]);   // store
+       line 127:  if (check_output && size_t(end - utf8_output) == 0) ...
+     Same ordering defect: the store at 123 precedes the capacity check
+     at 127.
+
+By contrast the 2-/3-/4-byte branches check capacity first (lines 150,
+161, 171), so only the ASCII paths are vulnerable. The reporter's PoV
+(harness/poc.cpp) takes branch 1: input {0x00E9 ('e'-acute, 2 UTF-8
+bytes), 'A' (1 byte)} into a 2-byte buffer. The two-byte branch fills the
+buffer exactly (end - utf8_output == 0), then on the next iteration 'A'
+is ASCII and the store at line 141 writes the 3rd byte into the 2-byte
+allocation -> ASan heap-buffer-overflow WRITE.
+
+Harness
+-------
+harness/fuzz_find_safe.cpp is a libFuzzer target. LLVMFuzzerTestOneInput
+reads a 1-byte test_case selector, 1 unused byte, a little-endian uint16
+limit_mod, then reinterprets the remaining bytes as a char16_t array.
+When test_case % 5 == 3, fuzz_convert_utf16_to_utf8_safe sizes the output
+buffer as std::min(output_limit, utf8_length_from_utf16(input)+1) -- which
+can be smaller than the bytes the conversion actually needs -- and calls
+simdutf::convert_utf16_to_utf8_safe(input, len, output, actual_limit),
+driving the overflowing scalar tail conversion.
+
+Call chain
 ----------
-- Bug class: heap-buffer-overflow (write-before-check pattern)
+- harness/fuzz_find_safe.cpp:fuzz_convert_utf16_to_utf8_safe
+    -> simdutf::convert_utf16_to_utf8_safe
+       src/implementation.cpp:1774
+- src/implementation.cpp:1818  scalar::utf16_to_utf8::convert_with_errors<LITTLE, true>(...)
+- include/simdutf/scalar/utf16_to_utf8/utf16_to_utf8.h:141  *utf8_output++ = char(word);   (faulting store, ASCII single-byte path)
+    (alt site) utf16_to_utf8.h:123  *utf8_output++ = ...               (ASCII 8-byte block path)

@@ -5,9 +5,12 @@ Project:     stleary/JSON-java
 Bug class:   class-cast (Java uncaught-exception)
 Sanitizer:   JVM (no native sanitizer)
 
-`JSONML.parse()` performs an unguarded down-cast from `Object` to
-`JSONObject` (or similar) when consuming the running token stream. A
-malformed XML document where a nested element resolves to a `String`
-instead of the expected `JSONObject` triggers `ClassCastException`,
-which is not caught by the harness wrapper and propagates to crash the
-JVM.
+The public `JSONML.toJSONArray(String)` method casts the result of the
+internal `parse()` helper to `JSONArray` (JSONML.java:279,
+`return (JSONArray)parse(...)`). `parse()` is declared to return
+`Object`: when the input begins with a closing tag (e.g. `</a>`), it
+takes its close-tag branch and returns a plain `String` (the tag name)
+rather than a `JSONArray`. The unguarded `(JSONArray)` cast on that
+`String` throws `ClassCastException`, which the harness does not catch
+(it only catches `JSONException`), so the exception propagates and
+crashes the JVM.

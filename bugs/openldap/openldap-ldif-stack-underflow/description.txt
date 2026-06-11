@@ -3,30 +3,62 @@ Stack Buffer Underflow in ldif_read_record
 
 Project:     openldap (libraries/libldap — LDAP client library)
 Bug class:   stack-buffer-underflow
-Sanitizer:   UndefinedBehaviorSanitizer (UBSan, array-bounds check)
+Sanitizer:   AddressSanitizer (ASan, stack-buffer-underflow)
 
 Summary
 -------
-The ldif_read_record() function in libraries/libldap/ldif.c reads an
-LDIF (LDAP Data Interchange Format) record one line at a time. A
-helper bookkeeping path decrements an index into a fixed-size
-char[4096] line buffer without checking that the index stays
-non-negative. With a crafted input the index wraps around to
-(size_t)-1 and the next access reads outside the buffer's lower
-bound.
+ldif_read_record() in libraries/libldap/ldif.c reads an LDIF record one
+line at a time into a fixed 4096-byte stack buffer:
 
-UBSan's array-bounds check catches this as
-"index 18446744073709551615 out of bounds for type 'char[4096]'".
+  794  #define LDIF_MAXLINE 4096
+  807      char        line[LDIF_MAXLINE], *nbufp;
+  808      ber_len_t   lcur = 0, len;
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary,
-triggers UBSan to report the array-bounds runtime error at the
-documented source location inside libraries/libldap/ldif.c.
+The body is driven by a for-loop whose *increment* expression re-reads
+the last character of the line just processed (ldif.c:811):
 
-The harness (harness/fuzz_ldif.c) wraps a small libFuzzer driver
-around ldif_open_mem() + a loop of ldif_read_record() calls.
+  811      for ( stop = 0;  !stop;  last_ch = line[len-1] ) {
+
+len is a ber_len_t, i.e. unsigned (include/lber_types.h:55,
+`typedef unsigned LBER_LEN_T ber_len_t`). Inside the loop, len is set
+from the freshly read line at ldif.c:836 (`len = strlen( line )`).
+Because ldif_open_mem() backs the LDIFFP with an in-memory buffer,
+fgets() (ldif.c:828) can return a line that begins with an embedded NUL
+byte; strlen() then returns 0, so len == 0. That line is not the blank
+"\n" record (line[0]=='\0', not '\n'), so the line-861 fast path does
+not break/continue out early, and control falls through to the bottom
+of the loop. The increment then evaluates line[len-1] with the unsigned
+len == 0, which wraps to line[(size_t)-1] — a read one byte below the
+lower bound of the 4096-byte 'line' stack array.
+
+ASan reports this as a stack-buffer-underflow READ of size 1 at
+ldif.c:811, below the 'line' frame variable in ldif_read_record.
+
+Trigger
+-------
+Feed an LDIF buffer in which a line read by fgets() yields strlen()==0
+(an embedded '\0' at the start of a line so the line is non-empty in
+the buffer but zero-length as a C string), without first hitting the
+blank-line break. The loop tail `last_ch = line[len-1]` then underflows.
+
+Harness
+-------
+harness/fuzz_ldif.c is a libFuzzer driver: LLVMFuzzerTestOneInput copies
+the raw input into a NUL-terminated heap buffer, calls
+ldif_open_mem(mem_copy, size, "r"), then loops up to 100 times over
+ldif_read_record(fp, &lineno, &buf, &buflen) until it returns <= 0. The
+fuzzer input bytes are the LDIF record text passed straight into
+ldif_open_mem, so the input controls exactly what fgets() inside
+ldif_read_record sees.
+
+Call chain
+----------
+- LLVMFuzzerTestOneInput            harness/fuzz_ldif.c (ldif_open_mem + ldif_read_record loop)
+- ldif_read_record                  libraries/libldap/ldif.c:801
+- loop increment last_ch = line[len-1]   libraries/libldap/ldif.c:811   <-- ASan stack-buffer-underflow (len==0 => line[-1])
 
 References
 ----------
-- Source: libraries/libldap/ldif.c, function ldif_read_record
+- Source: libraries/libldap/ldif.c, function ldif_read_record (ldif.c:801),
+  faulting expression at ldif.c:811.
+- Upstream: https://bugs.openldap.org/show_bug.cgi?id=10431

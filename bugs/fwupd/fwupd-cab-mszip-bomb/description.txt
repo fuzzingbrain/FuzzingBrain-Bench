@@ -1,0 +1,38 @@
+Decompression Bomb in CAB MSZIP Parser causes excessive memory allocation
+=========================================================================
+
+Project:     fwupd (libfwupdplugin)
+Bug class:   decompression-bomb / out-of-memory
+Sanitizer:   libfuzzer (OOM, -rss_limit_mb=256)
+
+The harness builds a bare FU_TYPE_CAB_FIRMWARE object and wraps the raw
+fuzzer bytes in a static GBytes (LLVMFuzzerTestOneInput in
+fu-fuzzer-firmware.c.in), then hands them to fu_fuzzer_test_input, which
+parses the blob as a CAB archive through FuCabFirmware's parse vfunc,
+fu_cab_firmware_parse (libfwupdplugin/fu-cab-firmware.c:548).
+
+fu_cab_firmware_parse loops over every CFFOLDER at line 644, calling
+fu_cab_firmware_parse_folder (:365), which in turn loops over each CFDATA
+block (:403/:409) and calls fu_cab_firmware_parse_data (:196). For an
+MSZIP folder (helper->compression == FU_CAB_COMPRESSION_MSZIP, checked at
+:278) the per-block inflate loop at lines 312-330 repeatedly inflates a
+0x4000-byte window (FU_CAB_FIRMWARE_DECOMPRESS_BUFSZ, :36) and
+unconditionally appends the output to the GByteArray buf via
+g_byte_array_append at line 318, then attaches the fully decompressed
+bytes to the composite stream (fu_composite_input_stream_add_bytes, :351).
+
+The only output cap is the guard at line 225:
+    if (size_max > 0 && helper->size_total > size_max)
+where size_max = fu_firmware_get_size_max(FU_FIRMWARE(self)) is read at
+line 205. The fuzzer creates the FuCabFirmware with no size limit set, so
+size_max is 0 and the bound is inert: helper->size_total keeps growing at
+line 224 but is never enforced, and the inflate output at line 318 is
+appended without any ratio or absolute cap. A small CAB whose MSZIP
+blocks expand enormously therefore makes the parser allocate far more
+memory than the input size, driving RSS past the 256 MB limit (OOM).
+
+Call chain:
+  fu_cab_firmware_parse         libfwupdplugin/fu-cab-firmware.c:548
+  fu_cab_firmware_parse_folder  libfwupdplugin/fu-cab-firmware.c:365 (call at :646)
+  fu_cab_firmware_parse_data    libfwupdplugin/fu-cab-firmware.c:196 (call at :404/:410)
+  inflate + g_byte_array_append libfwupdplugin/fu-cab-firmware.c:315-320 (unbounded; cap at :225 inert)

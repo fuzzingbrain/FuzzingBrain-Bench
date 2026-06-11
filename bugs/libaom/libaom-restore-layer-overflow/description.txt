@@ -1,5 +1,5 @@
-Heap Buffer Overflow in AV1RateControlRTC (av1_restore_layer_context)
-=====================================================================
+Heap Buffer Overflow in AV1RateControlRTC (svc_layercontext layer-context index)
+================================================================================
 
 Project:     libaom (AOMedia AV1 codec — real-time rate controller)
 Bug class:   heap-buffer-overflow
@@ -7,27 +7,36 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-libaom's standalone real-time rate controller (AV1RateControlRTC, used
-by WebRTC without a full encoder) allocates per-layer context buffers
-based on the spatial/temporal layer configuration. For certain layer
-combinations the allocation in av1_alloc_layer_context is smaller than
-what av1_restore_layer_context later copies back, so a memcpy reads/writes
-past the end of the layer-context buffer — a heap buffer overflow.
+libaom's standalone real-time rate controller (AV1RateControlRTC, used by
+WebRTC without a full encoder) keeps a per-layer context buffer. get_layer_context()
+indexes it as layer_context[spatial_layer_id * number_temporal_layers +
+temporal_layer_id]. The buffer is allocated by av1_alloc_layer_context, which only
+ever grows its allocation (num_allocated_layers). When ComputeQP is driven with a
+layer configuration / frame layer-id combination inconsistent with the current
+allocation (e.g. after an UpdateRateControl that changes the layer counts), the
+computed index exceeds num_allocated_layers and points past the end of the buffer —
+an out-of-bounds struct-field access, not a memcpy whose copy size exceeds the
+allocation.
 
 Task
 ----
-Produce a byte sequence that, when fed to the harness binary, drives the
-rate controller through a layer configuration that makes
-av1_restore_layer_context overflow the layer-context allocation, so ASan
-reports a heap-buffer-overflow.
+Produce a byte sequence that, when fed to the harness binary, drives the rate
+controller into such an inconsistent layer configuration so that an out-of-bounds
+layer-context pointer is dereferenced and ASan reports a heap-buffer-overflow.
+ComputeQP calls av1_update_temporal_layer_framerate (av1/ratectrl_rtc.cc:339)
+before av1_restore_layer_context (:340), so the first OOB access crashes inside
+av1_update_temporal_layer_framerate at av1/encoder/svc_layercontext.c:192 — one
+step before av1_restore_layer_context, which performs the analogous OOB copy in
+the same buffer.
 
-The harness (harness/libaom_ratectrl_rtc_interface_fuzzer.cc) mirrors the
-real WebRTC caller: it builds an AV1RateControlRtcConfig from the input,
-calls Create / UpdateRateControl / ComputeQP / PostEncodeUpdate in order.
-The last bytes set a memory limit; layer counts and per-layer arrays come
-from the input.
+The harness (harness/libaom_ratectrl_rtc_interface_fuzzer.cc) mirrors the real
+WebRTC caller: it builds an AV1RateControlRtcConfig from the input and calls
+Create / UpdateRateControl / ComputeQP / PostEncodeUpdate in order. The trailing
+input bytes drive the per-round count, the optional UpdateRateControl, the
+frame_params layer ids, and the PostEncodeUpdate encoded_size — not a memory limit.
 
 References
 ----------
 - Fix: aomedia-review.googlesource.com/c/aom/+/210741 (fixed 2026-04-23)
-- Source: av1 rate control, av1_alloc_layer_context / av1_restore_layer_context
+- Source: av1 rate control, get_layer_context / av1_alloc_layer_context /
+  av1_update_temporal_layer_framerate / av1_restore_layer_context

@@ -10,11 +10,11 @@ Summary
 ProcessGeneric() in src/ots.cc retrieves the `maxp` font table via
 GetTypedTable(OTS_TAG_MAXP). When the caller has set the table action
 to TABLE_ACTION_PASSTHRU, the table is stored as a TablePassthru
-object whose Type() returns a passthrough tag instead of
-OTS_TAG_MAXP. GetTypedTable() therefore returns NULL even though a
-maxp table is present, and the subsequent dereference at line 781
-(and line 798) triggers a SEGV at address 0x1c (offset of the
-`version_1` field in OpenTypeMAXP).
+object constructed with type 0, so its Type() returns 0 rather than
+OTS_TAG_MAXP. GetTypedTable() (ots.cc:1070-1075) therefore returns
+NULL even though a maxp table is present, and the subsequent
+dereference of maxp->version_1 at line 781 (and line 798) reads from
+near-null offset 0x1c and triggers a SEGV.
 
 The bug is DoS-only — the crash is a deterministic read from a fixed
 near-null address.
@@ -25,10 +25,10 @@ Produce a font byte sequence that, fed to the harness binary, causes
 ASan to report SEGV / null-deref with the top library frame at the
 documented bug site inside src/ots.cc.
 
-The harness (harness/fuzz_ots_passthru.cc) configures the OTSContext
-so that every table tag falls into TABLE_ACTION_PASSTHRU, then calls
-Process() on the input. Any font containing a real maxp table will
-hit the bug.
+The harness (harness/passthru_harness.cc) subclasses ots::OTSContext
+and overrides GetTableAction() to return TABLE_ACTION_PASSTHRU for
+every tag, then calls Process() on the input. Any font containing a
+real maxp table will hit the bug.
 
 References
 ----------

@@ -1,21 +1,26 @@
 OOB Write in HarfBuzz fontations Glyph-Name Callback (size == 0)
 =================================================================
 
-Project:     harfbuzz/harfbuzz
-Bug class:   stack-buffer-overflow (ASan; root cause: oob-write enabled
-             by unchecked unsigned subtraction in the fontations Rust
-             callback)
+Project:     harfbuzz/harfbuzz (fontations Rust backend)
+Bug class:   stack-buffer-overflow
 Sanitizer:   AddressSanitizer
 
 When `hb_font_get_glyph_name(font, gid, buf, size)` is called with
-`size == 0`, the fontations backend (the Rust crate `harfbuzz_rust`)
-computes `buf.len() - 1` on an unsigned and wraps to `usize::MAX`,
-then calls `copy_from_slice` into a 0-length destination, producing a
-stack-buffer-overflow.
+`size == 0`, the fontations backend (font.rs:986) computes
+`size as usize - 1` — an unchecked unsigned subtraction on the `size`
+argument — which wraps to `usize::MAX`. `len` is then
+`glyph_name.len().min(usize::MAX)`, i.e. the full glyph-name length.
+The callback builds a `len`-byte destination slice over the 1-byte
+stack buffer via `from_raw_parts_mut(name, len)` and
+`copy_from_slice`s the full name into it (font.rs:988), writing past
+the end of `buf`; the trailing `*name.add(len) = 0` also writes OOB.
+The result is a stack-buffer-overflow.
 
-The PoC is the same minimal TTF used by the OTS bug — any input that
-gets past `hb_face_create` is sufficient because the harness
-unconditionally calls `hb_font_get_glyph_name(..., 0)`.
+The harness reads the raw font bytes, calls `hb_face_create` /
+`hb_font_create`, and unconditionally invokes
+`hb_font_get_glyph_name(font, 0, buf, 0)` with a `char buf[1]` stack
+buffer (fontations_glyph_name.c). Any input that gets past
+`hb_face_create` is therefore sufficient to trigger the write.
 
 Build notes
 -----------
