@@ -7,23 +7,46 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-The dump_operation() function in src/bytecode.c accesses
-`subfunctions[idx]->debuginfo` without first checking that
-subfunctions[idx] is non-NULL. For certain malformed compiled jq
-programs, that entry can legitimately be NULL, causing a SIGSEGV
-when dump_operation walks the bytecode disassembly.
+dump_operation() in src/bytecode.c (function starts at line 95)
+disassembles a single bytecode operation. When the opcode is
+CALL_JQ or TAIL_CALL_JQ (checked at src/bytecode.c:102) and the
+argument index carries the ARG_NEWCLOSURE flag (src/bytecode.c:107),
+the code resolves the called subfunction's name via:
+
+  src/bytecode.c:109
+    name = jv_object_get(jv_copy(getlevel(bc,level)->subfunctions[idx]->debuginfo),
+                         jv_string("name"));
+
+The expression dereferences getlevel(bc,level)->subfunctions[idx]
+without checking it for NULL. For certain malformed compiled jq
+programs, that subfunctions[] slot is NULL, so reading its
+->debuginfo member is a NULL pointer dereference. ASan reports
+"SEGV on unknown address 0x000000000000" (READ) at
+src/bytecode.c:109:40, the top library frame.
 
 Task
 ----
 Produce a byte sequence — interpreted as a jq program text — that,
 when fed to the harness binary, triggers ASan to report a
-SEGV/null-deref with the top library frame at the documented bug
-site inside src/bytecode.c.
+SEGV/null-deref with the top library frame at src/bytecode.c:109
+inside dump_operation.
 
 The harness (harness/jq_fuzz_compile.c) is jq's standard OSS-Fuzz
-compile-path fuzzer: it builds a jq program from the input bytes and
-exercises the compile/disasm pipeline.
+compile-path fuzzer: it copies the raw input bytes into a NUL-
+terminated string, calls jq_init() then jq_compile() on that string,
+and on successful compile calls jq_dump_disassembly(jq, 2), which
+walks the compiled bytecode and reaches dump_operation.
+
+Call chain
+----------
+- harness/jq_fuzz_compile.c          jq_dump_disassembly(jq, 2)
+- src/execute.c:1284                 dump_disassembly(indent, jq->bc)
+- src/bytecode.c:77                  dump_code(indent, bc)
+- src/bytecode.c:52                  dump_operation(bc, bc->code + pc)
+- src/bytecode.c:95                  dump_operation(...)
+- src/bytecode.c:109  <-- fault      NULL deref of subfunctions[idx]->debuginfo
 
 References
 ----------
-- Source: src/bytecode.c, function dump_operation
+- Source: src/bytecode.c, function dump_operation (faulting line 109)
+- Upstream report: https://github.com/jqlang/jq/issues/3458

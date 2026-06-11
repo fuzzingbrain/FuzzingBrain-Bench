@@ -1,17 +1,21 @@
 Pre-Auth Memory Leak in FreeRDP NTLM SSPI Lifecycle
-====================================================
+===================================================
 
 Project:     FreeRDP/FreeRDP (winpr/libwinpr/sspi/NTLM)
 Bug class:   memory-leak
-Sanitizer:   LeakSanitizer / AddressSanitizer
+Sanitizer:   LeakSanitizer
 
-The NTLM Security Support Provider Interface (SSPI) leaks an internal
-context allocation when the AuthenticateMessage parse path bails out
-before AcceptSecurityContext's owner chain has had a chance to free
-the context. The harness drives `AcceptSecurityContext()` (server-side
-NTLM step) with a fuzz-controlled inbound token; sufficiently
-malformed tokens take the early-return path that leaks the 1064-byte
-NTLM context allocated at `ntlm.c:244` inside `ntlm_ContextNew()`.
+The harness drives the server-side `AcceptSecurityContext()` with a
+fuzz-controlled inbound token; the dispatch byte `data[0] % 3` selects
+the negotiate/challenge/authenticate branch, and the canonical PoC
+takes the NEGOTIATE branch. A malformed NEGOTIATE token makes
+`ntlm_read_NegotiateMessage()` fail (ntlm.c:564), so the server step
+returns an error early at ntlm.c:566 — after it has already allocated
+the NTLM context at `ntlm.c:244` in `ntlm_ContextNew()` (via
+ntlm.c:523). Because the harness only frees the context
+(`DeleteSecurityContext`) when the prior step succeeded, the error
+early-return leaves `haveContext` FALSE and leaks the ~1064-byte
+NTLM_CONTEXT allocation.
 
-The leak is reachable pre-auth and triggers on any RDP server using
-WinPR's NTLM SSPI to verify client tokens.
+The leak is reachable pre-auth on any RDP server using WinPR's NTLM
+SSPI to verify client tokens.

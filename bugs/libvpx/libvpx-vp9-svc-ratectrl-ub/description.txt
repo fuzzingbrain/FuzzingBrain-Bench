@@ -7,35 +7,58 @@ Sanitizer:   UndefinedBehaviorSanitizer
 
 Summary
 -------
-saturate_cast_double_to_int() in vpx_dsp/vpx_dsp_common.h only guards the
-d > INT_MAX corner and otherwise performs a bare (int)d. (int)NaN is undefined
-behavior in C/C++. In vp9_update_buffer_level_svc_preencode()
-(vp9/encoder/vp9_ratectrl.c) the encoder divides a per-layer
-target_bandwidth by a per-layer framerate for every SVC LAYER_CONTEXT slot.
-On an unconfigured layer slot both operands are 0, so the division yields
-0.0/0.0 = NaN, round(NaN) = NaN, and that NaN is passed through
-saturate_cast_double_to_int — tripping UBSan with
-"runtime error: -nan is outside the range of representable values of type
-'int'". In a release (NDEBUG, no UBSan) build the cast silently folds the NaN
-into an implementation-defined integer that corrupts the rate controller's
-bits_off_target / buffer_level state for the rest of the stream.
+saturate_cast_double_to_int() in vpx_dsp/vpx_dsp_common.h:87 only guards the
+d > INT_MAX corner (line 88) and otherwise performs a bare `(int)d` at
+vpx_dsp/vpx_dsp_common.h:89. (int)NaN is undefined behavior in C/C++, so this
+return is the UBSan fault site.
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, drives the VP9
-encoder through a multi-layer SVC configuration that reaches an unconfigured
-layer slot on a later superframe, so UBSan reports the NaN-to-int undefined
-behavior in vpx_dsp/vpx_dsp_common.h via
-vp9_update_buffer_level_svc_preencode.
+The NaN is produced one frame up the stack. In
+vp9_update_buffer_level_svc_preencode() (vp9/encoder/vp9_ratectrl.c:274) the
+encoder loops over every SVC temporal LAYER_CONTEXT slot from
+svc->temporal_layer_id to svc->number_temporal_layers (loop opens at
+vp9_ratectrl.c:282). For each layer it updates lrc->bits_off_target. The
+general (else) path at vp9_ratectrl.c:295-296 evaluates
+`saturate_cast_double_to_int(round(lc->target_bandwidth / lc->framerate))`.
+On a LAYER_CONTEXT slot that was never configured for the active SVC geometry,
+both lc->target_bandwidth and lc->framerate are 0, so the division computes
+0.0/0.0 = NaN, round(NaN) = NaN, and that NaN flows into
+saturate_cast_double_to_int() where the `(int)d` cast at vpx_dsp_common.h:89
+trips UBSan with "runtime error: -nan is outside the range of representable
+values of type 'int'". In a release (NDEBUG, no UBSan) build the cast silently
+folds the NaN into an implementation-defined integer that corrupts the rate
+controller's bits_off_target / buffer_level state for the rest of the stream.
 
-The harness (harness/vp9_encoder_svc_layer_config_fuzzer.cc) builds a
-contract-compliant SVC config (monotonic bitrate ladders, ts_periodicity a
-multiple of ts_number_layers, even W/H) and runs
-vpx_codec_enc_config_default -> vpx_codec_enc_init -> VP9E_SET_SVC -> a loop of
-VP9E_SET_SVC_LAYER_ID / VP9E_SET_SVC_REF_FRAME_CONFIG + vpx_codec_encode.
+How the harness consumes input
+------------------------------
+The harness (harness/vp9_encoder_svc_layer_config_fuzzer.cc) requires at least
+16 input bytes and treats the first 16 as a config header: h[0] picks
+ss_number_layers (1..4), h[1] picks ts_number_layers (clamped to 1..3), h[2]
+is the bitrate-ladder seed, h[3] the frame count (1..8), h[4] a layer-id seed,
+h[5] a ref-frame-config seed, h[6]/h[7] select even g_w/g_h from fixed tables
+(bytes 8..15 reserved). It builds a contract-compliant CBR SVC config
+(monotonic ss/ts bitrate ladders, ts_rate_decimator {4,2,1}/{2,1}/{1},
+ts_periodicity 8 or 12 chosen as a multiple of ts_number_layers,
+rc_target_bitrate >= top layer), then runs vpx_codec_enc_config_default ->
+vpx_codec_enc_init -> VP9E_SET_SVC(1) and a per-frame loop of
+VP9E_SET_SVC_LAYER_ID (spatial/temporal ids derived from h[4]) + sometimes
+VP9E_SET_SVC_REF_FRAME_CONFIG (gated bit-by-bit by h[5]) followed by
+vpx_codec_encode and a get_cx_data drain. Varying the spatial/temporal layer
+ids and ref-frame-config sequence across superframes steers encoding onto a
+temporal LAYER_CONTEXT slot that the active config never initialized, so the
+0/0 division yields NaN.
+
+Call chain (verified at vuln_commit 3c456eb6):
+  vpx_dsp/vpx_dsp_common.h:89          (int)d on NaN  <- UBSan fault site
+  vp9/encoder/vp9_ratectrl.c:295-296   round(target_bandwidth / framerate) -> NaN
+  vp9/encoder/vp9_ratectrl.c:274       vp9_update_buffer_level_svc_preencode
+  vp9/encoder/vp9_ratectrl.c:2464      call inside vp9_rc_get_svc_params
+  vp9/encoder/vp9_encoder.c:5668       vp9_rc_get_svc_params(cpi)
+  vp9/encoder/vp9_encoder.c:6136       vp9_get_compressed_data
+  vp9/vp9_cx_iface.c                   encoder_encode -> vpx_codec_encode (public API)
 
 References
 ----------
 - Upstream report: issues.webmproject.org/issues/508317885 (filed 2026-04-30)
-- Source: vpx_dsp/vpx_dsp_common.h (saturate_cast_double_to_int),
-  vp9/encoder/vp9_ratectrl.c (vp9_update_buffer_level_svc_preencode)
+- Source: vpx_dsp/vpx_dsp_common.h:89 (saturate_cast_double_to_int),
+  vp9/encoder/vp9_ratectrl.c:274,295-296
+  (vp9_update_buffer_level_svc_preencode)

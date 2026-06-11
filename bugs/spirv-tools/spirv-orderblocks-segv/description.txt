@@ -2,32 +2,57 @@ SEGV in spirv-tools OrderBlocks (empty CFG)
 ===========================================
 
 Project:     SPIRV-Tools (KhronosGroup — SPIR-V disassembler)
-Bug class:   SEGV / out-of-bounds write
+Bug class:   SEGV / out-of-bounds (empty-vector) access
 Sanitizer:   AddressSanitizer
 
 Summary
 -------
 When the SPIR-V disassembler runs with block reordering enabled, it
 defers per-instruction emission and drives a small control-flow-graph
-state machine: each OpLabel pushes a block, and each OpFunctionEnd
-finalizes the function by ordering its blocks. The block-ordering
-routine unconditionally writes to the first element of the block
-vector without first checking that any block was collected. A module
-that emits OpFunctionEnd with no preceding OpLabel leaves the vector
-empty, so the write lands past the end of an empty container — a wild
-write that crashes with SIGSEGV.
+state machine in Disassembler::HandleInstruction
+(source/disassemble.cpp:195). Each OpLabel pushes a new SingleBlock onto
+current_function_cfg_.blocks (source/disassemble.cpp:202), and
+OpFunctionEnd finalizes the current function by calling
+Disassembler::EmitCFG (source/disassemble.cpp:207).
 
-Task
-----
-Produce a SPIR-V binary that, when disassembled by the harness with
-block reordering, drives the OpFunctionEnd-without-OpLabel path and
-makes the sanitizer report a SEGV whose faulting library frame is in
-source/disassemble.cpp.
+EmitCFG walks the blocks in reverse post-order via OrderBlocks
+(call at source/disassemble.cpp:495). OrderBlocks unconditionally
+dereferences the first block before any DFS:
 
-The harness (harness/spirv_disasm_fuzzer.cc) calls the public C API
-spvBinaryToText() with SPV_BINARY_TO_TEXT_OPTION_REORDER_BLOCKS set on
-the input bytes (interpreted as a stream of 32-bit SPIR-V words).
+    cfg.blocks[0].nest_level = 0;            // source/disassemble.cpp:416
+    cfg.blocks[0].nest_level_assigned = true;// source/disassemble.cpp:417
+
+There is no guard for an empty cfg.blocks. A module whose function
+emits OpFunctionEnd without any preceding OpLabel leaves
+current_function_cfg_.blocks empty, so OrderBlocks indexes blocks[0]
+on an empty std::vector. That operator[] returns a reference past the
+empty backing storage and the subsequent write to .nest_level lands in
+unmapped memory — a wild write that ASan reports as SEGV. The faulting
+library frame is OrderBlocks at source/disassemble.cpp:416.
+
+Trigger condition
+-----------------
+A well-enough-formed SPIR-V stream that reaches an OpFunctionEnd opcode
+while current_function_cfg_.blocks is empty (i.e. no OpLabel was parsed
+for that function), with REORDER_BLOCKS enabled.
+
+Harness
+-------
+harness/spirv_disasm_fuzzer.cc reinterprets the input bytes as a stream
+of 32-bit SPIR-V words (rejecting inputs whose size is < 4 or not a
+multiple of 4) and calls the public C API spvBinaryToText() with
+SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES |
+SPV_BINARY_TO_TEXT_OPTION_REORDER_BLOCKS. The REORDER_BLOCKS flag is
+what enables the deferred-CFG path (reorder_blocks_) and thus the
+vulnerable OrderBlocks call.
+
+Call chain
+----------
+- Disassembler::HandleInstruction  source/disassemble.cpp:205-207  (OpFunctionEnd case)
+- Disassembler::EmitCFG            source/disassemble.cpp:495       (calls OrderBlocks)
+- OrderBlocks                      source/disassemble.cpp:416       (cfg.blocks[0] write — fault site)
 
 References
 ----------
-- Source: source/disassemble.cpp, function OrderBlocks
+- Source: source/disassemble.cpp, function OrderBlocks (line 416)
+- Upstream issue: KhronosGroup/SPIRV-Tools #6663

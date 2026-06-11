@@ -1,5 +1,5 @@
-Out-of-Bounds Reads in the sd-hwdb Binary Trie Walker
-=====================================================
+Out-of-Bounds Read in the sd-hwdb Binary Trie Walker
+====================================================
 
 Project:     systemd (libsystemd / sd-hwdb)
 Bug class:   out-of-bounds-read
@@ -10,29 +10,49 @@ Summary
 sd-hwdb consumes an mmap'd `hwdb.bin` (produced by `systemd-hwdb
 update`). The file is walked by chasing attacker-controlled `uint64_t`
 offsets into struct trie_node_f / trie_child_entry_f / trie_value_entry_f
-records. The trie walker computes a pointer from one of these offsets
-(`hwdb->map + le64toh(off)`) and dereferences it BEFORE validating that
-the resulting pointer stays inside the mapped region. A malformed file
-can therefore steer the walker outside the mmap and trigger an
-out-of-bounds read.
+records. trie_node_from_off() at src/libsystemd/sd-hwdb/sd-hwdb.c:82-84
+turns a raw file offset into a node pointer with `hwdb->map +
+le64toh(off)` and performs NO bounds check, so the returned pointer can
+land outside the mapped region.
 
-The crash family spans several sibling helpers that all share the same
-"compute pointer from attacker-controlled offset, then dereference
-without bounds-checking against hwdb->st.st_size" shape:
+Mechanism
+---------
+The faulting frame is trie_fnmatch_f() at
+src/libsystemd/sd-hwdb/sd-hwdb.c:176-215. Its `node` argument is produced
+by an unvalidated trie_node_from_off() (e.g. the recursive call at
+line 200, `trie_node_from_off(hwdb, child->child_off)`, or the child
+nodes resolved in trie_search_f at lines 245/254/263). The very first
+thing trie_fnmatch_f does with that pointer is dereference it:
 
-    trie_fnmatch_f       le64toh(node->prefix_off) on an OOB node
-    trie_search_f        trie_string(...)[p] byte loop
-    node_lookup_f        bsearch over OOB child entries
-    hwdb_add_property    key[0] != ' ' on an OOB key
+    187:  uint64_t file_size = hwdb->st.st_size, prefix_off = le64toh(node->prefix_off);
+    188:  if (prefix_off >= file_size || p >= file_size - prefix_off)
+    189:          return -EINVAL;
 
-`hwdb.bin` is consumed by anything that maps it (sd_hwdb /
-systemd-hwdb, udev rules using HWDB lookups), so a hostile file yields a
-deterministic out-of-bounds read / SEGV (DoS).
+The read of `node->prefix_off` at line 187 happens BEFORE any check that
+`node` itself is inside the mmap — the bounds test on line 188 only
+validates the prefix offset value, not the node pointer it was loaded
+from. When `child->child_off` steers `node` past `hwdb->map +
+hwdb->st.st_size`, line 187 reads 8 bytes out of bounds and ASan reports
+a SEGV / out-of-bounds read. (Sibling helpers share the same shape:
+trie_string(...)[p] at line 233, node->children_count in node_lookup_f at
+line 102, and key[0] in hwdb_add_property at line 121.)
 
-Task
-----
-Produce a byte sequence that the harness binary (fuzz-hwdb.c) writes to
-a temp file and maps via sd_hwdb_new_from_path, then drives through
-sd_hwdb_get / sd_hwdb_seek / sd_hwdb_enumerate, causing AddressSanitizer
-to report an out-of-bounds read inside the sd-hwdb trie walker in
-src/libsystemd/sd-hwdb/sd-hwdb.c.
+How the harness drives it
+-------------------------
+fuzz-hwdb.c writes the fuzzer bytes to a temp file, opens it with
+sd_hwdb_new_from_path (which mmaps the file and records st.st_size), then
+calls sd_hwdb_get(hwdb, modalias, "ID_VENDOR", ...) for each of a small
+set of modaliases. sd_hwdb_get -> properties_prepare -> trie_search_f
+walks the trie from `head->nodes_root_off` and recurses into
+trie_fnmatch_f, reaching the OOB dereference. A malformed file that
+points a child offset outside the mapping yields a deterministic
+out-of-bounds read (DoS).
+
+Call chain
+----------
+  fuzz-hwdb.c LLVMFuzzerTestOneInput -> sd_hwdb_get
+  src/libsystemd/sd-hwdb/sd-hwdb.c:382  sd_hwdb_get
+  src/libsystemd/sd-hwdb/sd-hwdb.c:379  properties_prepare -> trie_search_f
+  src/libsystemd/sd-hwdb/sd-hwdb.c:217  trie_search_f (node_lookup_f / trie_node_from_off, lines 242-263)
+  src/libsystemd/sd-hwdb/sd-hwdb.c:176  trie_fnmatch_f
+  src/libsystemd/sd-hwdb/sd-hwdb.c:187  le64toh(node->prefix_off)  <-- OOB read on out-of-bounds node

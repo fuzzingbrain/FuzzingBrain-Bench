@@ -1,16 +1,41 @@
 StringIndexOutOfBoundsException in XMLTokener.unescapeEntity (JSON-java)
 ==========================================================================
 
-Project:     stleary/JSON-java
-Bug class:   uncaught-exception (Java)
+Project:     stleary/JSON-java (org.json XML parser)
+Bug class:   uncaught-exception / out-of-bounds string index (Java)
 Sanitizer:   JVM (no native sanitizer; bug surfaces as an unhandled exception)
 
-`XMLTokener.unescapeEntity()` is missing a length check when extracting
-the numeric portion of an XML character reference `&#NNNN;`. Inputs
-where the entity body is empty or shorter than the parser expects cause
-`String.substring` / `String.charAt` to throw
-`StringIndexOutOfBoundsException`, which is not caught by the harness
-wrapper and propagates to crash the JVM.
+`XMLTokener.unescapeEntity(String e)` (src/main/java/org/json/XMLTokener.java:156)
+handles numeric character references `&#NNNN;`. After confirming the entity
+starts with '#' at line 162 (`e.charAt(0) == '#'`), it immediately reads the
+second character at line 164 (`e.charAt(1) == 'x' || e.charAt(1) == 'X'`)
+WITHOUT first checking that the string has length >= 2. When the entity body is
+exactly the single character "#" (i.e. the input contains `&#;`), `e` has
+length 1, `charAt(0)` succeeds, and `charAt(1)` at line 164 indexes one past the
+end of the string and throws `StringIndexOutOfBoundsException`. The only
+preceding guard is the null/empty check at line 158, which an entity body of "#"
+passes.
 
-This is a sister bug to jsonjava-unescape-numformat (same function,
-different malformed-input shape, different exception class).
+The entity body reaches this code via `nextEntity()`
+(XMLTokener.java:135): the loop at lines 137-146 accumulates the characters
+between `&` and `;` into `sb`, so the input `&#;` produces the body string "#",
+which is passed to `unescapeEntity` at line 148.
+
+Harness: `XmlToJsonFuzzer.fuzzerTestOneInput(byte[])` decodes the fuzz bytes as
+UTF-8 and calls `XML.toJSONObject(input)`. It catches only `JSONException`;
+`StringIndexOutOfBoundsException` (a RuntimeException) is not caught, so it
+propagates out of the harness and crashes the JVM. A minimal trigger is XML text
+content containing the entity `&#;`, e.g. `<a>&#;</a>`.
+
+This is a sister bug to jsonjava-unescape-numformat (same function: an entity
+body of "#x" reaches `Integer.parseInt(e.substring(2),16)` at line 166 with an
+empty string and throws NumberFormatException instead).
+
+Call chain:
+  XmlToJsonFuzzer.fuzzerTestOneInput        (XmlToJsonFuzzer.java)
+  XML.toJSONObject(String)                  (XML.java:668)
+  XML.toJSONObject(Reader, config) -> parse (XML.java:778, 784)
+  XMLTokener.nextContent                    (XMLTokener.java:93)
+    -> nextEntity(c)                        (XMLTokener.java:117)
+  XMLTokener.nextEntity -> unescapeEntity   (XMLTokener.java:148)
+  XMLTokener.unescapeEntity: e.charAt(1)    (XMLTokener.java:164)  <-- throws

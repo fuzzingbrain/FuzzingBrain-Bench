@@ -1,26 +1,27 @@
-Unbounded Recursion / OOM in Ghidra Bundled rust_demangle
-==========================================================
+Unbounded Binder Iteration / OOM in Ghidra Bundled rust_demangle
+===============================================================
 
 Project:     NationalSecurityAgency/ghidra (bundled GPL libiberty)
-Bug class:   oom (unbounded recursion via demangle_binder lifetime count)
+Bug class:   oom (unbounded iteration / output amplification)
 Sanitizer:   runtime (libFuzzer timeout)
 
 `demangle_binder()` in the vendored libiberty `rust-demangle.c` reads
-a lifetime count from the input but does not bound it against any
-reasonable limit. A v0 Rust symbol with a deeply-nested binder /
-type tree drives recursion through
-
-    rust_demangle → rust_demangle_callback → demangle_path
-    → demangle_type → demangle_path → demangle_type
-    → demangle_binder → print_str
-
-deep enough to exceed libFuzzer's per-input wall-clock cap, the
-process is killed by libFuzzer's SIGALRM handler, and stderr ends
-with `SUMMARY: libFuzzer: timeout`.
-
-Advisory pairs this with cplus_demangle; the harness as written
-calls only `rust_demangle()`, but the recorded PoC drives the
-unbounded path that the advisory characterizes as OOM.
+a base-62 lifetime count via `parse_opt_integer_62(rdm, 'G')`
+(rust-demangle.c:657), which returns an unbounded uint64 from a `'G'`
+binder field. The plain for-loop at rust-demangle.c:661-667
+(`for (i = 0; i < bound_lifetimes; i++)`) then iterates that many
+times, each iteration appending lifetime text through
+`print_lifetime_from_index → print_str`. The output buffer is grown
+repeatedly by `str_buf_reserve`'s realloc (rust-demangle.c:1553, the
+recorded site), so a v0 Rust symbol (`_R...`) with an enormous `G`
+lifetime count exhausts memory / exceeds libFuzzer's per-input
+wall-clock cap; the process is killed and stderr ends with
+`SUMMARY: libFuzzer: timeout`. This is unbounded iteration plus
+output amplification, NOT unbounded recursion — the
+demangle_path/demangle_type recursion is capped at
+RUST_MAX_RECURSION_COUNT = 1024. The harness
+(fuzz_rust_demangle.c) null-terminates the raw input and calls
+`rust_demangle(mangled, DMGL_VERBOSE)`.
 
 References
 ----------

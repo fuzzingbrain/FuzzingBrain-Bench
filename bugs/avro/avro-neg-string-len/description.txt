@@ -1,27 +1,29 @@
-NULL Pointer Member Access in Avro C Schema Union Parser
-==========================================================
+Negative String Length OOB in Avro C Binary Value Reader
+========================================================
 
 Project:     apache/avro (lang/c)
-Bug class:   null-deref (UBSan: member access within null pointer)
-Sanitizer:   UBSan
+Bug class:   memory-exhaustion (allocation-size-too-big)
+Sanitizer:   AddressSanitizer
 
-The Avro C schema parser's union-handling code dereferences an
-internal `struct avro_union_schema_t*` without checking that it was
-fully constructed. A union schema with certain malformed branch
-references causes `avro_schema_union_append()` to UBSan-fail at
-schema.c:392.
+The Avro C binary value reader trusts an unvalidated, signed varint
+string length. The harness picks one of several predefined valid
+schemas using the first input byte, builds a generic value for it, then
+calls `avro_value_read()` on the remaining bytes. For a string or
+map-key field, `read_string()` (lang/c/src/encoding_binary.c:172) decodes
+a signed varint length without bounds-checking it, computes
+`*len = str_len + 1`, and passes that to `avro_malloc(*len)`. A negative
+varint length wraps to a near-SIZE_MAX request (e.g. 0xffffffffffffffe9),
+which AddressSanitizer rejects with "requested allocation size ...
+exceeds maximum supported size". `read_string()` is inlined into
+`read_map_value`, so the closest library frame the sanitizer reports is
+lang/c/src/value-read.c:103.
 
-The harness exposes this indirectly: it picks a built-in schema using
-the first input byte, then feeds the rest as a binary value to decode.
-When the selected schema is a union, the parser path itself hits the
-null deref before any value-reading work begins.
+Call chain:
 
-Call chain on the 2-byte PoC (selects union schema, then garbage):
-
-    avro_schema_from_json_length     lang/c/src/schema.c:1285
-    └─ avro_schema_from_json_root    lang/c/src/schema.c:1240
-       └─ avro_schema_from_json_t    lang/c/src/schema.c:1157
-          └─ avro_schema_union_append lang/c/src/schema.c:392  ← UBSan fires
+    avro_value_read        lang/c/src/value-read.c:391
+    └─ read_value          lang/c/src/value-read.c:368
+       └─ read_map_value   lang/c/src/value-read.c:103  (read_string inlined)
+          └─ avro_malloc -> avro_default_allocator  lang/c/src/allocation.c:36  ← ASan fires
 
 References
 ----------

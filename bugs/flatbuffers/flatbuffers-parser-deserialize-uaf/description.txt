@@ -15,26 +15,30 @@ list it does:
       return false;
     }
 
-SymbolTable::Add() unconditionally pushes the pointer into its internal
-vector (vec.emplace_back(e)) BEFORE checking the name dictionary. When a
-duplicate enum name is detected, Add() returns true and the caller deletes
-the EnumDef -- but the dangling pointer is still in vec. When the Parser
-goes out of scope, ~SymbolTable() iterates vec and delete-s every entry,
-including the already-freed pointer, producing a double-free / heap
-use-after-free.
+SymbolTable::Add() (include/flatbuffers/idl.h:247) unconditionally pushes the
+pointer into its internal vector (vec.emplace_back(e), idl.h:248) BEFORE
+checking the name dictionary. When a duplicate enum name is detected, Add()
+returns true and the caller deletes the EnumDef -- but the dangling pointer is
+still in vec. When the Parser goes out of scope, ~SymbolTable() iterates vec
+and delete-s every entry, including the already-freed pointer, producing a
+double-free / heap use-after-free.
 
 Call chain on a crafted .bfbs schema with duplicate enum names:
 
     LLVMFuzzerTestOneInput
-    └─ Parser::Deserialize(data, size)        src/idl_parser.cpp:4433
-       └─ Parser::Deserialize(Schema*)        src/idl_parser.cpp:4467  <- delete enum_def
+    └─ Parser::Deserialize(data, size)        src/idl_parser.cpp:4423
+       └─ Parser::Deserialize(Schema*)        src/idl_parser.cpp:4444
+          └─ delete enum_def                  src/idl_parser.cpp:4470  <- first free
     ... later, on Parser teardown:
     └─ ~Parser / ~SymbolTable                 include/flatbuffers/idl.h:243  <- second delete
 
-The harness verifies the input as a schema buffer (reflection::VerifySchemaBuffer)
-and only then calls Parser::Deserialize on it. The first two input bytes are a
-flags byte and a json-ratio byte consumed by the harness; the remainder is the
-schema buffer.
+Harness input layout: the input must be >= 8 bytes. data[0] is a flags byte
+(it sets parser IDLOptions) and data[1] is a json_ratio byte; both are consumed
+and stripped. The remaining bytes are split into a bfbs (schema) portion of
+length size - (size * json_ratio / 256) and an optional trailing JSON portion;
+the bfbs portion must be >= 4 bytes. Set json_ratio (byte 1) to 0 so the entire
+remainder is the schema buffer. The harness verifies that bfbs portion with
+reflection::VerifySchemaBuffer and only then passes it to Parser::Deserialize.
 
 Task
 ----

@@ -1,0 +1,36 @@
+ArrayIndexOutOfBoundsException in fontbox CMapParser.increment via Malformed bfrange
+===================================================================================
+
+Project:     pdfbox (fontbox CMap parser)
+Bug class:   out-of-bounds-read (ArrayIndexOutOfBoundsException)
+Sanitizer:   jvm (uncaught exception)
+
+The harness CMapFuzzer.fuzzerTestOneInput(byte[]) wraps the raw input in a
+RandomAccessReadBuffer and calls CMapParser.parse(...), so the entire byte[]
+is parsed as a CMap stream. On seeing the "beginbfrange" operator,
+CMapParser.parse dispatches to parseBeginbfrange (CMapParser.java:118).
+
+parseBeginbfrange reads three tokens per entry: startCode, endCode, and a
+destination value. With the trigger "1 beginbfrange\n<> <> <2223>\nendbfrange",
+the empty hex literal "<>" parses to a zero-length byte[] for startCode (and
+endCode), so start==end==0 and the end<start guard at CMapParser.java:397 does
+not fire. The value "<2223>" parses to a 2-byte array, which is not the
+all-zero identity special case (line 423), so parseBeginbfrange falls through to
+CMapParser.java:437: addMappingFrombfrange(result, startCode, end-start+1=1,
+tokenBytes).
+
+In that overload (CMapParser.java:454) the loop runs once and then calls
+increment(startCode, startCode.length - 1, false) at CMapParser.java:466. Since
+startCode is the empty array, position == -1 is passed in. In
+CMapParser.increment (CMapParser.java:798) the guard `position > 0` at line 800
+is false for position == -1, so control reaches the else branch at
+CMapParser.java:813, which evaluates `data[position]`, i.e. `data[-1]`. This
+index -1 access on the zero-length array throws ArrayIndexOutOfBoundsException,
+which propagates uncaught out of parse().
+
+Call chain:
+  CMapFuzzer.fuzzerTestOneInput     CMapFuzzer.java:8   (parser.parse)
+  CMapParser.parse                  CMapParser.java:118 (parseBeginbfrange)
+  CMapParser.parseBeginbfrange      CMapParser.java:437 (addMappingFrombfrange)
+  CMapParser.addMappingFrombfrange  CMapParser.java:466 (increment, position = length-1 = -1)
+  CMapParser.increment              CMapParser.java:813 (data[-1] -> AIOOBE)

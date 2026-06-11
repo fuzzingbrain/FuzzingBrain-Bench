@@ -1,0 +1,30 @@
+Heap Buffer Overflow in OpenCV YAML parseKey handling empty keys
+===============================================================
+
+Project:     opencv (modules/core persistence; persistence_yml.cpp)
+Bug class:   heap-buffer-overflow (OOB read)
+Sanitizer:   AddressSanitizer
+
+The libFuzzer harness (yaml_fuzzer.cpp) writes the input bytes to a
+temporary `.yaml` file and opens it with `cv::FileStorage(tmpf,
+cv::FileStorage::READ)`, which routes a YAML document into the parser in
+modules/core/src/persistence_yml.cpp. The fault is in
+`parseKey(char* ptr, ...)` at persistence_yml.cpp:417. On entry `ptr`
+points at the first character of the key on the current line buffer and
+`endptr = ptr - 1` (line 423). The forward scan `do c = *++endptr; while(
+cv_isprint(c) && c != ':' );` (lines 428-429) leaves `endptr` pointing at
+the terminating ':'. When the key is empty (the line begins with ':' so the
+very first scanned character is the colon), `endptr` ends up equal to `ptr`,
+i.e. the start of the line buffer. The backward space-stripping loop then
+runs: `do c = *--endptr; while( c == ' ' );` at persistence_yml.cpp:435.
+Its first iteration decrements `endptr` below `ptr` and dereferences
+`*(ptr-1)`, reading one byte before the start of the heap-allocated line
+buffer — an AddressSanitizer heap-buffer-overflow read (line 435). If that
+preceding byte happens to be a space the loop keeps walking further
+backward. The "An empty key" guard at lines 439-440 only fires *after* this
+out-of-bounds read, so it cannot prevent the overflow.
+
+Call chain:
+  - LLVMFuzzerTestOneInput  (harness/yaml_fuzzer.cpp) -> cv::FileStorage READ
+  - parseKey                (modules/core/src/persistence_yml.cpp:417)
+  - backward strip loop     (modules/core/src/persistence_yml.cpp:435)  <-- OOB read of *(ptr-1)

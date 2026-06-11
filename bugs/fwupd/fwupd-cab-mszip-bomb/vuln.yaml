@@ -11,6 +11,7 @@ supports:
   - crash
   - class
   modes:
+  - normal
   - full-scan
   - diff-scan
 metadata:

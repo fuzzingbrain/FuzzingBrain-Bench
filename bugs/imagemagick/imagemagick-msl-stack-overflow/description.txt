@@ -1,0 +1,36 @@
+Stack overflow via recursive MSL read
+=====================================
+
+Project:     ImageMagick (coders/msl.c)
+Bug class:   stack-exhaustion (unbounded recursion)
+Sanitizer:   AddressSanitizer (stack-overflow)
+
+The libFuzzer harness (harness/msl_fuzzer.cc) wraps the input bytes in a
+Magick::Blob, forces the coder with image.magick("MSL") /
+image.fileName("MSL:"), and calls image.read(blob), which dispatches into
+the MSL decoder ReadMSLImage() (coders/msl.c:7464). ReadMSLImage() calls
+ProcessMSLScript() (coders/msl.c:7480; defined at 7305), which sets up a
+libxml2 SAX parser whose startElement callback is MSLStartElement
+(installed at coders/msl.c:7387, function at coders/msl.c:287) and feeds the
+document to the parser via xmlParseChunk.
+
+When the parser hits a `<read>` element, MSLStartElement reaches the "read"
+branch at coders/msl.c:4754 and, for the filename attribute, copies the
+value into msl_info->image_info[n]->filename and calls
+ReadImage(msl_info->image_info[n],exception) at coders/msl.c:4779. There is
+no recursion-depth guard: if the filename names another MSL stream (the PoC
+is `<image><read filename="msl:fd:0"/></image>`, which re-reads the same
+fuzz input from stdin), ReadImage dispatches back into ReadMSLImage ->
+ProcessMSLScript -> MSLStartElement -> ReadImage again. The `<image>` branch
+(coders/msl.c:3065, ReadImage at coders/msl.c:3091) gives an equivalent
+self-referential cycle. Each nesting level pushes the full
+ReadMSLImage/ProcessMSLScript/SAX frame set onto the call stack, and the
+self-referential read recurses without bound until the stack is exhausted.
+ASan reports stack-overflow at whichever frame in coders/msl.c happens to
+hit the guard page, so the faulting frame depth varies between runs.
+
+Call chain:
+  ReadMSLImage          coders/msl.c:7464  (MSL decoder entry)
+  ProcessMSLScript      coders/msl.c:7305  (called at 7480; SAX driver)
+  MSLStartElement       coders/msl.c:287   (SAX startElement callback)
+  <read> -> ReadImage   coders/msl.c:4779  (recurse back into the MSL coder)

@@ -2,29 +2,57 @@ Assertion Failure in open62541 PubSub JSON NetworkMessage Decoder
 =================================================================
 
 Project:     open62541 (OPC UA stack — PubSub JSON decoding)
-Bug class:   assertion-failure (reachable assertion / SIGABRT)
+Bug class:   reachable-assertion (plain C assert -> SIGABRT)
 Sanitizer:   none (plain C assert -> abort)
 
 Summary
 -------
-The PubSub JSON NetworkMessage decoder uses an assertion where it should
-do input validation. When decoding malformed JSON whose top-level value
-is not an object (for example an empty array "[]"), the look-ahead helper
-asserts that the current token is a JSON object. The assertion fails and
-the process aborts via SIGABRT. Untrusted network input must never be
-able to reach an assertion.
+The PubSub JSON NetworkMessage decoder uses an assertion where it must
+instead validate untrusted input. The look-ahead helper assumes the
+current token is a JSON object, but the top-level token type is never
+validated before the helper runs. When the decoded JSON's top-level
+value is not an object (for example an empty array "[]"), the assertion
+fails and the process aborts via SIGABRT.
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, makes the
-PubSub JSON decoder hit the failing assertion and abort, with the
-faulting library frame in open62541's JSON decoding code.
+Mechanism
+---------
+The harness (harness/fuzz_pubsub_json.cc) requires size >= 4, consumes
+the last 4 bytes as an open62541 fuzz memory-limit marker
+(UA_memoryManager_setLimitFromLast4Bytes), wraps the remaining bytes in a
+UA_ByteString, and calls the public
+UA_NetworkMessage_decodeJson(&buf, &nm, NULL, NULL).
 
-The harness (harness/fuzz_pubsub_json.cc) calls the public
-UA_NetworkMessage_decodeJson() on the input. The last 4 bytes are
-consumed as a memory-limit marker (open62541's fuzz convention), and the
-remaining bytes are the JSON message.
+UA_NetworkMessage_decodeJson (src/pubsub/ua_pubsub_networkmessage_json.c:525)
+first tokenizes the whole input via tokenize() at line 543. Tokenizing
+"[]" succeeds (it is well-formed JSON), so control reaches
+NetworkMessage_decodeJsonInternal() at line 547. That function does NOT
+check the top-level token type; with ctx->index still 0 it directly calls
+lookAheadForKey(&ctx->ctx, UA_DECODEKEY_MESSAGES, ...) at
+src/pubsub/ua_pubsub_networkmessage_json.c:460.
 
-References
+lookAheadForKey (src/ua_types_encoding_json_105.c:1432) opens with the
+faulting check:
+
+    src/ua_types_encoding_json_105.c:1435
+        UA_assert(currentTokenType(ctx) == CJ5_TOKEN_OBJECT);
+
+The comment above it (lines 1433-1434) states the caller must guarantee
+the current index points at an object, but for top-level array input the
+current token is CJ5_TOKEN_ARRAY, so the predicate is false. UA_assert
+expands to the C library assert() (include/open62541/config.h.in:379),
+so the failed assertion calls abort() and the harness dies with SIGABRT;
+libFuzzer prints the symbolized stack with lookAheadForKey at line 1435
+as the faulting frame.
+
+Trigger condition
+-----------------
+Any well-formed JSON whose top-level value tokenizes to something other
+than an object (array "[]", a bare string, number, etc.), padded with the
+4-byte memory-limit trailer the harness strips.
+
+Call chain
 ----------
-- Source: open62541 PubSub JSON decoder, lookAheadForKey()
+- LLVMFuzzerTestOneInput            harness/fuzz_pubsub_json.cc
+- UA_NetworkMessage_decodeJson      src/pubsub/ua_pubsub_networkmessage_json.c:543 (tokenize) -> 547
+- NetworkMessage_decodeJsonInternal src/pubsub/ua_pubsub_networkmessage_json.c:460
+- lookAheadForKey                   src/ua_types_encoding_json_105.c:1435  <- failing assert -> abort

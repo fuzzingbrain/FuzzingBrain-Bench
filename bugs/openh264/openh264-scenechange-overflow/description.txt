@@ -9,31 +9,70 @@ Summary
 -------
 OpenH264's video pre-processing module exposes a scene-change detector
 (METHOD_SCENE_CHANGE_DETECTION_VIDEO) through the public IWelsVP API.
-When the detector runs on a source/destination pixmap pair whose
-dimensions do not match the block grid the SAD routine assumes, the
-8x8 Sum-of-Absolute-Differences kernel WelsSampleSad8x8_c
-(codec/common/src/sad_common.cpp) walks the source/reference pointers
-by stride past the end of the allocated plane, producing an
-out-of-bounds heap read. CVpFrameWork::Process dispatches into the
-detector without validating that the pixmap dimensions are large enough
-for the block-wise SAD scan.
+The detector sizes its block scan from the SOURCE pixmap but reads the
+8x8 SAD reference samples out of the DESTINATION pixmap, which the caller
+may pass much smaller than the source. The 8x8 Sum-of-Absolute-Differences
+kernel WelsSampleSad8x8_c then walks the destination plane far past its
+allocation, producing an out-of-bounds heap read.
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, causes
-ASan to report a heap-buffer-overflow READ whose faulting library frame
-is inside WelsSampleSad8x8_c in codec/common/src/sad_common.cpp.
+Mechanism
+---------
+CVpFrameWork::Process (codec/processing/src/common/WelsFrameWork.cpp:169)
+dispatches the configured strategy as
+  pStrategy->Process(0, &sSrcPic, &sDstPic)
+where sSrcPic is the source pixmap and sDstPic the destination pixmap.
 
-The harness (harness/processing_fuzzer.cpp) parses the first 5 bytes as
-{method, width, height}, allocates I420 source/destination buffers,
-sets up SPixMaps, and drives the chosen processing method via the
-public path WelsCreateVpInterface -> Init -> Process. To reach the bug,
-the method byte must select METHOD_SCENE_CHANGE_DETECTION_VIDEO and the
-derived dimensions must drive the SAD scan past the destination buffer.
+CSceneChangeDetection<T>::Process
+(codec/processing/src/scenechangedetection/SceneChangeDetection.h:215)
+derives the block grid from the SOURCE dimensions:
+  m_sLocalParam.iBlock8x8Width  = iWidth  >> 3   (line 220)
+  m_sLocalParam.iBlock8x8Height = iHeight >> 3   (line 221)
+but takes the reference plane and stride from the DESTINATION pixmap:
+  m_sLocalParam.pRefY      = pRefPixMap->pPixel[0]  (line 222)
+  m_sLocalParam.iRefStride = pRefPixMap->iStride[0] (line 224)
+It then invokes the detector functor m_cDetector(m_sLocalParam) (line 238)
+with no check that the reference (destination) plane is large enough for a
+source-sized block scan.
+
+CSceneChangeDetectorVideo::operator()
+(SceneChangeDetection.h:109) loops j over iBlock8x8Height and i over
+iBlock8x8Width (lines 118/121) and calls
+  m_pfSad(pCurTmp, iCurStride, pRefTmp, iRefStride)   (line 122)
+advancing pRefTmp by 8 per block (line 124) and pRefY by iRefStride<<3
+per row (line 127). Because the grid and the reference row stride come
+from the larger source while pRefY points into the smaller destination
+buffer, pRefTmp runs off the end of the destination plane.
+
+The faulting read is in WelsSampleSad8x8_c
+(codec/common/src/sad_common.cpp:76). Its per-row loop dereferences both
+operand pointers at line 82:
+  iSadSum += WELS_ABS ((pSrc1[0] - pSrc2[0]));
+pSrc2 is the reference pointer pRefTmp into the destination buffer; ASan
+reports a READ of size 1, 0 bytes to the right of the destination plane
+(an 864-byte region), with line 82 (within the [60,100] reach range) as
+the faulting frame.
+
+Harness consumption
+-------------------
+harness/processing_fuzzer.cpp parses the first 5 bytes as
+{method=data[0], width=(data[1]<<8)|data[2], height=(data[3]<<8)|data[4]},
+maps method to METHOD_SCENE_CHANGE_DETECTION_VIDEO, 16-aligns/clamps the
+source dimensions, and sets the destination to half size
+(dstWidth=srcWidth/2, dstHeight=srcHeight/2, floored at 16). It allocates
+I420 src and dst buffers, fills SPixMaps (src sRect = full source size,
+dst smaller), and drives WelsCreateVpInterface -> Init -> Process. Selecting
+the scene-change method with a source whose half-size destination is too
+small for the source-derived 8x8 grid triggers the OOB read.
+
+Call chain
+----------
+  #0 WelsSampleSad8x8_c                       codec/common/src/sad_common.cpp:82
+  #1 CSceneChangeDetectorVideo::operator()    SceneChangeDetection.h:122
+  #2 CSceneChangeDetection<...>::Process      SceneChangeDetection.h:238
+  #3 CVpFrameWork::Process                    WelsFrameWork.cpp:169
+  #4 LLVMFuzzerTestOneInput                   harness/processing_fuzzer.cpp
 
 References
 ----------
 - Upstream issue: github.com/cisco/openh264/issues/3926
-- Faulting site: codec/common/src/sad_common.cpp, WelsSampleSad8x8_c
-- Reach path: CSceneChangeDetectorVideo::operator() (SceneChangeDetection.h)
-  -> CSceneChangeDetection::Process -> CVpFrameWork::Process
+- Faulting site: codec/common/src/sad_common.cpp:82 (WelsSampleSad8x8_c)

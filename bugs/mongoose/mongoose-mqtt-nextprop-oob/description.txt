@@ -1,7 +1,36 @@
 Heap-buffer-overflow (out-of-bounds read) in mongoose's MQTT5 property parser.
+================================================================================
 
-The harness parses an MQTT v5 packet via mg_mqtt_parse() and iterates its
-properties with mg_mqtt_next_prop(). For a User Property (STRING_PAIR), the
-parser reads a 2-byte key length, advances the cursor by 2 + key_len without
-bounds-checking against the property region, then reads the next length bytes
-— an out-of-bounds read when key_len points past the buffer.
+Project:     mongoose (MQTT v5 property iterator)
+Bug class:   heap-buffer-overflow (OOB read)
+Sanitizer:   asan
+
+The harness (harness/fuzzer.c) treats the raw input bytes as one MQTT packet:
+it calls mg_mqtt_parse(data, size, 5, &mm) and, on MQTT_OK, walks the property
+region with a mg_mqtt_next_prop(&mm, &prop, ofs) loop. The harness performs no
+bounds checking of its own; the parser is expected to stay inside the datagram.
+
+In mg_mqtt_next_prop (mongoose.c:4116-4168) a property cursor is set up as
+  i   = msg->dgram.buf + msg->props_start + ofs   (mongoose.c:4118)
+  end = msg->dgram.buf + msg->dgram.len           (mongoose.c:4119)
+For a User Property (MQTT_PROP_TYPE_STRING_PAIR, case at mongoose.c:4128) the
+code reads a 2-byte big-endian key length at mongoose.c:4129
+  prop->key.len = (i[0] << 8) | i[1];
+then advances the cursor by 2 + key.len with NO check that the result stays
+below `end`:
+  i += 2 + prop->key.len;                         (mongoose.c:4131)
+and immediately dereferences the advanced cursor to read the value length:
+  prop->val.len = (i[0] << 8) | i[1];             (mongoose.c:4132)  <-- FAULT
+When an attacker-supplied key.len (up to 0xffff) drives i past the end of the
+heap-allocated datagram buffer, the i[0]/i[1] read at mongoose.c:4132 is an
+out-of-bounds read that ASan reports as a heap-buffer-overflow. The function's
+only guard (mongoose.c:4123) validates the loop offset `ofs` against dgram.len
+and props_start+props_size; it never re-validates after the key.len advance,
+and the `end` computed at line 4119 is never consulted on this path.
+
+Call chain:
+  LLVMFuzzerTestOneInput            harness/fuzzer.c:10
+    mg_mqtt_parse                   harness/fuzzer.c:12   (sets props_start/props_size)
+    mg_mqtt_next_prop               harness/fuzzer.c:15   (iteration loop)
+      i += 2 + prop->key.len        mongoose.c:4131       (unchecked advance)
+      prop->val.len = i[0..1]       mongoose.c:4132       (OOB read - crash site)

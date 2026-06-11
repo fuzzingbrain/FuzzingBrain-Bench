@@ -3,27 +3,48 @@ OOM in Ghidra Bundled libiberty rust_demangle
 
 Project:     NationalSecurityAgency/ghidra (bundled GPL libiberty)
 Bug class:   oom (unbounded output-buffer growth)
-Sanitizer:   libFuzzer out-of-memory (built with -fsanitize=fuzzer,address)
+Sanitizer:   libfuzzer-oom (built with -fsanitize=fuzzer,address)
 
 Ghidra bundles a copy of GNU libiberty at
-`GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/`. The vendored
-`rust_demangle()` grows its output buffer with no maximum-size
-limit. `str_buf_reserve()` doubles the capacity in a loop until it
-covers the requested length and then calls `realloc()` with no cap.
+`GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/rust-demangle.c`. The
+vendored `rust_demangle()` accumulates demangled output into a
+`struct str_buf` (definition at lines 1503-1509) that grows with no
+maximum-size cap. `str_buf_reserve()` (defined at line 1511) computes
+`min_new_cap` from the requested `extra`, then doubles `new_cap` in
+the loop at lines 1540-1551 (`new_cap *= 2;` at line 1543) until it
+covers the request, and finally calls
+`new_ptr = (char *)realloc (buf->ptr, new_cap);` at line 1553 — the
+faulting allocation. The only guards are integer-overflow checks
+(lines 1529, 1547); there is no policy limit on output size, so a
+malformed symbol that drives huge output amplification makes a single
+`realloc` request reach ~2 GB and trips libFuzzer's malloc hook,
+ending stderr with `SUMMARY: libFuzzer: out-of-memory`.
 
-A small (~61-byte) malformed Rust v0 mangled symbol with nested
-generic / lifetime parameters drives ~35-million-times output
-amplification through
+A small (~61-byte) malformed Rust v0 (`_R...`) mangled symbol with
+nested generic / lifetime parameters produces ~35-million-times output
+amplification: each appended lifetime token reaches the buffer through
+`print_str()` (line 280) -> the registered callback
+`str_buf_demangle_callback()` (line 1582) -> `str_buf_append()`
+(line 1570) -> `str_buf_reserve()` (line 1511) -> `realloc()`
+(line 1553). The amplification originates in the lifetime/binder
+demangling path, e.g. `print_lifetime_from_index()` (line 605, which
+calls `print_str` at line 622) invoked from `demangle_binder()`
+(line 650, call at line 666) under `demangle_type()` (line 875,
+binder calls at lines 960 and 1029).
 
-    demangle_type -> demangle_binder -> print_lifetime_from_index
-    -> str_buf_append -> str_buf_reserve -> realloc
+The harness (`harness/fuzz_rust_demangle.c`) copies the fuzz input
+into a `malloc(size+1)` buffer, NUL-terminates it, and calls
+`rust_demangle(mangled, DMGL_VERBOSE)` in `LLVMFuzzerTestOneInput`.
 
-The single realloc request reaches 2 GB, libFuzzer's malloc hook
-trips, and stderr ends with
-`SUMMARY: libFuzzer: out-of-memory`.
-
-The harness drives `rust_demangle()` on a NUL-terminated copy of the
-fuzz input.
+Call chain:
+  demangle_type                rust-demangle.c:875
+  -> demangle_binder           rust-demangle.c:650 (called at 960/1029)
+  -> print_lifetime_from_index rust-demangle.c:605 (called at 666)
+  -> print_str                 rust-demangle.c:280 (called at 622)
+  -> str_buf_demangle_callback rust-demangle.c:1582
+  -> str_buf_append            rust-demangle.c:1570
+  -> str_buf_reserve           rust-demangle.c:1511
+  -> realloc                   rust-demangle.c:1553   <-- fault site
 
 References
 ----------

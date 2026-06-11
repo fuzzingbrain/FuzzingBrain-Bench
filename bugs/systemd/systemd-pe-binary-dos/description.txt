@@ -3,33 +3,63 @@ Algorithmic-Complexity DoS in the systemd PE/UKI Parser
 
 Project:     systemd (src/shared/pe-binary.c)
 Bug class:   algorithmic-complexity DoS (slow unit, CWE-407 / CWE-400)
-Sanitizer:   libFuzzer timeout (wall-clock alarm)
+Sanitizer:   libfuzzer (wall-clock timeout)
 
 Summary
 -------
 systemd's userspace UKI/PE inspection path (pe_load_headers /
 pe_load_sections / pe_read_section_data_by_name / uki_hash) is reached
 by bootctl, systemd-stub, systemd-measure, pcrlock and kernel-install
-when handling Unified Kernel Images.
+when handling Unified Kernel Images. A structurally valid but malicious
+PE32+ "EFI application" can declare a section whose VirtualSize is near
+UINT32_MAX (~4 GiB) while its SizeOfRawData is tiny or zero. When such a
+section is hashed, the parser walks the (VirtualSize - SizeOfRawData)
+gap a fixed 1024 bytes at a time, doing millions of small SHA-256
+updates over zero-padding. A 382-byte input drives roughly 4.17 million
+iterations and wedges the parser for more than ten seconds; the unit
+never returns on its own and must be killed by libFuzzer's wall-clock
+alarm.
 
-A structurally valid but malicious PE32+ "EFI application" can declare a
-section whose VirtualSize is near UINT32_MAX (~4 GiB) while its
-SizeOfRawData is tiny or zero. When such a section is hashed, the parser
-walks the (VirtualSize - SizeOfRawData) gap a fixed 1024 bytes at a
-time, performing millions of small hash updates over zero-padding. A
-single 382-byte input drives roughly 4.17 million iterations and wedges
-the parser for more than ten seconds. The unit never returns on its own;
-it must be killed by an outer wall-clock alarm.
+Mechanism
+---------
+The expensive loop is in uki_hash() in src/shared/pe-binary.c
+(function opens at line 519). For each section whose name matches an
+entry in unified_sections[] (the table lookup / skip is at lines
+559-561), the function first hashes the on-disk raw data, then hashes
+the virtual-size tail as zeroes:
 
-Because the input is small and structurally valid (file(1) reports
-"MS-DOS executable, PE32+ executable (EFI application) x86-64"), this is
-an amplification / uncontrolled-resource-consumption DoS rather than a
-memory-safety fault.
+  src/shared/pe-binary.c:577  if (le32toh(section->SizeOfRawData) < le32toh(section->VirtualSize)) {
+  src/shared/pe-binary.c:579      size_t remaining = le32toh(section->VirtualSize) - le32toh(section->SizeOfRawData);
+  src/shared/pe-binary.c:581      while (remaining > 0) {
+  src/shared/pe-binary.c:582          size_t sz = MIN(sizeof(zeroes), remaining);   /* zeroes[] is 1024 bytes, line 578 */
+  src/shared/pe-binary.c:584          if (sym_EVP_DigestUpdate(mdctx, zeroes, sz) != 1) ...
+  src/shared/pe-binary.c:587          remaining -= sz;
+  src/shared/pe-binary.c:589      }
 
-Task
-----
-Produce a small byte sequence that the harness binary (fuzz-pe-binary.c)
-wraps in a memfd and feeds through pe_load_headers / pe_load_sections /
-uki_hash, causing the unit to hang long enough that libFuzzer reports a
-timeout (slow unit) under its wall-clock alarm. The expensive loop lives
-inside uki_hash in src/shared/pe-binary.c.
+The trigger condition is the unchecked guard at line 577: any section
+with SizeOfRawData < VirtualSize enters the loop, and `remaining` (line
+579) is taken directly from the attacker-controlled 32-bit VirtualSize
+with no upper bound. With VirtualSize ~= 0xFFFFFFFF and SizeOfRawData =
+0, the loop at line 581 runs `remaining / 1024` ~= 4.17 million times,
+each iteration a 1024-byte EVP_DigestUpdate call (line 584). The work is
+unbounded relative to the 382-byte input because the zero-fill bytes are
+never read from the file. This is amplification / uncontrolled-resource-
+consumption, not a memory-safety fault.
+
+Harness consumption
+-------------------
+The harness (harness/fuzz-pe-binary.c, LLVMFuzzerTestOneInput) writes
+the raw fuzz bytes into a memfd, lseeks to 0, then calls pe_load_headers
+and pe_load_sections; if both succeed it calls uki_hash(fd,
+sym_EVP_sha256(), hashes, &hash_size) under HAVE_OPENSSL. The bench
+invocation runs libFuzzer with -timeout=10, so the hang surfaces as a
+slow-unit / timeout banner (the banner carries no symbolized frames, so
+only crash + class are machine-gradable).
+
+Call chain
+----------
+  harness/fuzz-pe-binary.c  LLVMFuzzerTestOneInput -> uki_hash(...)
+  src/shared/pe-binary.c:519  uki_hash() — section loop FOREACH_ARRAY (line 550)
+  src/shared/pe-binary.c:577  guard SizeOfRawData < VirtualSize (enter zero-fill)
+  src/shared/pe-binary.c:581  while (remaining > 0)   <-- hot loop, ~4.17M iters
+  src/shared/pe-binary.c:584  sym_EVP_DigestUpdate(mdctx, zeroes, 1024)

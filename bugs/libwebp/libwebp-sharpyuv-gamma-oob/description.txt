@@ -1,33 +1,49 @@
-OOB Read in libsharpyuv Gamma-to-Linear Conversion
-==================================================
+OOB Read in libsharpyuv Gamma-to-Linear LUT Interpolation
+=========================================================
 
 Project:     libwebp / libsharpyuv (SharpYUV encode-side color conversion)
 Bug class:   out-of-bounds read
 Sanitizer:   AddressSanitizer
 
-Summary
--------
-libsharpyuv's gamma-to-linear conversion trusts every pixel value to fit
-within the caller-declared rgb_bit_depth. On a high-bit-depth conversion
-(rgb_bit_depth >= 10), a raw 16-bit sample whose value exceeds
-(1 << rgb_bit_depth) - 1 is never clamped, and the unclamped value flows
-into a fixed-point gamma-table interpolation whose computed table index
-walks past the end of the static gamma-to-linear lookup table — an
-out-of-bounds read.
+Mechanism
+---------
+libsharpyuv converts each high-bit-depth RGB sample to linear light through a
+fixed-size static gamma lookup table, kGammaToLinearTabS, declared in
+sharpyuv/sharpyuv_gamma.c:25 with GAMMA_TO_LINEAR_TAB_SIZE + 2 = 1026 entries
+(GAMMA_TO_LINEAR_TAB_BITS = 10, sharpyuv/sharpyuv_gamma.c:23-25). The table is
+indexed by the raw pixel value with no upper-bound clamp.
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, drives
-SharpYuvConvert with a high-bit-depth configuration and out-of-range
-pixel samples so that the sanitizer reports an out-of-bounds read whose
-faulting library frame is in libsharpyuv's gamma code
-(sharpyuv/sharpyuv_gamma.c).
+For the sRGB transfer function, SharpYuvGammaToLinear() takes the sRGB branch
+and calls ToLinearSrgb(v, bit_depth) at sharpyuv/sharpyuv_gamma.c:318. In
+ToLinearSrgb (sharpyuv/sharpyuv_gamma.c:101-107) the shift is computed as
+GAMMA_TO_LINEAR_TAB_BITS - bit_depth (line 102). When bit_depth >= 10 the
+shift is <= 0, so the function falls through to
+FixedPointInterpolation(v, kGammaToLinearTabS, -shift, 0) at
+sharpyuv/sharpyuv_gamma.c:106. Inside FixedPointInterpolation
+(sharpyuv/sharpyuv_gamma.c:84-99), the table position is tab_pos =
+Shift(v, -tab_pos_shift_right) (line 87): for rgb_bit_depth == 10 this is just
+v, for rgb_bit_depth == 12 it is v >> 2. The faulting read is at
+sharpyuv/sharpyuv_gamma.c:91, "const uint32_t v0 = Shift(tab[tab_pos + 0],
+tab_value_shift);" (with the companion tab[tab_pos + 1] read at line 92).
 
-The harness (harness/sharpyuv_convert_fuzzer.cc) calls the public
-SharpYuvConvert() API. Input layout: bytes 0-1 width seed, 2-3 height
-seed, byte 4 selects rgb_bit_depth from {8,10,12,16}, byte 5 selects
-yuv_bit_depth, bytes 8.. are the raw RGB pixel plane.
+Because v comes straight from the caller-supplied 16-bit sample and is never
+clamped to (1 << rgb_bit_depth) - 1, a sample larger than the declared bit
+depth produces tab_pos far beyond the 1026-entry table (e.g. a 10-bit
+configuration with a raw value up to 65535 yields tab_pos up to 65535),
+reading past the end of kGammaToLinearTabS and tripping AddressSanitizer
+(reported as a SEGV/OOB read in the gamma frames).
 
-References
+The harness (harness/sharpyuv_convert_fuzzer.cc) drives this through the public
+SharpYuvConvert() API. It reads bytes 0-1 as a width seed (width = raw % 128 +
+1), bytes 2-3 as a height seed, byte 4 selects rgb_bit_depth from {8,10,12,16},
+byte 5 selects yuv_bit_depth from {8,10,12}, and copies bytes 8.. verbatim into
+the interleaved RGB plane. Selecting rgb_bit_depth >= 10 and supplying raw
+16-bit samples whose value exceeds (1 << rgb_bit_depth) - 1 makes the sharpyuv
+encoder pass an out-of-range v into the gamma path above.
+
+Call chain
 ----------
-- Source: sharpyuv/sharpyuv_gamma.c (FixedPointInterpolation / ToLinearSrgb)
+- FixedPointInterpolation  sharpyuv/sharpyuv_gamma.c:91   (OOB read: tab[tab_pos + 0])
+- ToLinearSrgb             sharpyuv/sharpyuv_gamma.c:106
+- SharpYuvGammaToLinear    sharpyuv/sharpyuv_gamma.c:318
+- (entry) SharpYuvConvert  via harness/sharpyuv_convert_fuzzer.cc

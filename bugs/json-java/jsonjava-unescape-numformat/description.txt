@@ -1,22 +1,37 @@
 NumberFormatException in XMLTokener.unescapeEntity (JSON-java)
 ==============================================================
 
-Project:     stleary/JSON-java
+Project:     stleary/JSON-java (XML parser)
 Bug class:   uncaught-exception (Java)
-Sanitizer:   JVM (no native sanitizer; bug surfaces as an unhandled exception)
+Sanitizer:   jvm (no native sanitizer; bug surfaces as an unhandled exception)
 
-`XMLTokener.unescapeEntity()` parses XML numeric character references of
-the form `&#NNNN;`. When the digits between `&#` and `;` form an integer
-literal that exceeds Java's int range, `Integer.parseInt()` throws
-`NumberFormatException`, which is not caught by the harness wrapper and
-propagates to crash the JVM.
+`XMLTokener.unescapeEntity(String e)` in src/main/java/org/json/XMLTokener.java
+resolves XML character references of the form `&#NNNN;` / `&#xHHHH;`. After
+checking `e.charAt(0) == '#'` (line 162), the decimal branch at line 169 runs
+`cp = Integer.parseInt(e.substring(1));` (the hex branch at line 166 does the
+same with radix 16). Neither call range-checks the digit string: when the
+digits form an integer literal outside Java's signed-int range (e.g.
+`&#9999999999;`), `Integer.parseInt` throws an unchecked
+`java.lang.NumberFormatException`. That exception is not a `JSONException`, so
+it propagates out of the entire XML parse instead of being normalized.
 
-The XmlToJsonFuzzer (provided in the upstream report) calls
-`XML.toJSONObject(input)`; it catches `JSONException` but not
-`NumberFormatException`, so the latter is observed at the fuzzer
-boundary.
+The XmlToJsonFuzzer harness reads the input bytes as a UTF-8 string and calls
+`XML.toJSONObject(input)`, catching only `JSONException`. `NumberFormatException`
+escapes the catch and bubbles through PocRunner (which re-throws the
+InvocationTargetException cause) to crash the JVM. Trigger: any XML body
+containing a numeric entity whose value overflows `int`, e.g.
+`<a>&#9999999999;</a>`.
+
+Call chain:
+- XmlToJsonFuzzer.fuzzerTestOneInput                harness/XmlToJsonFuzzer.java
+- XML.toJSONObject(String)                          src/main/java/org/json/XML.java:668
+- XML.toJSONObject(Reader, XMLParserConfiguration)  src/main/java/org/json/XML.java:778
+- XML.parse(...)                                    src/main/java/org/json/XML.java:784
+- XMLTokener.nextContent()                          src/main/java/org/json/XML.java:411 -> XMLTokener.java:117
+- XMLTokener.nextEntity(char)                       src/main/java/org/json/XMLTokener.java:148
+- XMLTokener.unescapeEntity(String)                 src/main/java/org/json/XMLTokener.java:169  <-- Integer.parseInt overflow
 
 References
 ----------
 - Sister bug:     jsonjava-unescape-strindex (same harness, same function,
-                  different exception type)
+                  StringIndexOutOfBoundsException instead of NumberFormatException)
