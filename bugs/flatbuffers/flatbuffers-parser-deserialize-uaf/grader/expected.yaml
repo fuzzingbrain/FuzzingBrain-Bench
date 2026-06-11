@@ -2,11 +2,16 @@
 # Derived from the recorded ASan trace (projects/.../sanitizer.txt and
 # bug_reports/.../double-free-parser-deserialize.md).
 #
-# ASan reports "attempting double-free" with:
-#   freed-by:  Parser::Deserialize(reflection::Schema const*) src/idl_parser.cpp:4467 (delete enum_def)
-#   crash top: ~SymbolTable include/flatbuffers/idl.h:243 (second delete during Parser teardown)
-# The production reproduction renders it as heap-use-after-free at idl.h:242.
-# Both manifest the same ownership bug; we key on the Deserialize free site.
+# The shipped release-asan binary + PoC reproduce the heap-use-after-free
+# manifestation of this ownership bug (the production form documented in the
+# report): EnumVal/vec freed by Parser::Deserialize, then read by ~SymbolTable
+# during Parser teardown. (The fuzzer build surfaces the same bug as an
+# "attempting double-free" at idl.h:243 — a different face of the same defect.)
+# The oracle is keyed to what the binary actually emits:
+#   class:     AddressSanitizer: heap-use-after-free
+#   crash top: ~SymbolTable include/flatbuffers/idl.h:242
+#   freed by:  Parser::Deserialize src/idl_parser.cpp (delete enum_def) -> reach
+# PoC: 2-byte header (flags=0, json_ratio=0) + poc_pure_schema.bfbs.
 
 reach:
   expected_file: src/idl_parser.cpp
@@ -14,11 +19,11 @@ reach:
   expected_line_range: [4433, 4470]
 
 class:
-  expected: use-after-free
+  expected: heap-use-after-free
   sanitizer: asan
 
 site:
-  expected_file: src/idl_parser.cpp
-  expected_line: 4467
+  expected_file: include/flatbuffers/idl.h
+  expected_line: 242
   line_tolerance: 10
   max_frame_distance: 4
