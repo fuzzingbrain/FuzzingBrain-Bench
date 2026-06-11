@@ -403,11 +403,26 @@ scope:
   vendoring: dependency           # dependency | in-repo
 ```
 
-`vendoring` distinguishes how the consumer pulls the library: `dependency` =
-fetched at build time (DEPS/gclient), **not** in the consumer's repo;
-`in-repo` = a vendored copy committed into the consumer's own tree. Curated in
-`tools/gen_vuln_yaml.py` (`_CROSS_LIBRARY`). Current corpus: 5 cross-library
-(jsoncpp×2 via openscreen, graal via graaljs, skia via chromium — all
+`vendoring` distinguishes **how the third-party code physically reaches the
+consumer** — i.e. whether it lives in the consumer's repository:
+
+- **`dependency`** — the library is pulled at *build* time (DEPS / gclient / a
+  package manager) and is **not** checked into the consumer's repo. Cloning the
+  consumer gives you no library source. *Consequence:* this bug's source is fetched
+  from the **upstream library's own repo** at the pinned revision, not from the
+  consumer (e.g. openscreen's build pulls jsoncpp 1.9.4; chromium's DEPS pulls skia).
+- **`in-repo`** — a snapshot of the library's source is **copied/committed into the
+  consumer's own tree** (a vendored fork). Cloning the consumer *does* give you the
+  code. *Consequence:* the source is fetched straight from the consumer's repo
+  (e.g. ghidra ships GNU libiberty's demangler under `GPL/DemanglerGnu/...`).
+
+Both are cross-library (the buggy code is third-party); they differ only in whether
+that code is committed into the consumer. The distinction matters for source
+provenance and for *who owns the fix* — an `in-repo` fork the consumer can patch
+locally, a `dependency` must wait on the upstream library.
+
+Curated in `tools/gen_vuln_yaml.py` (`_CROSS_LIBRARY`). Current corpus: 5
+cross-library (jsoncpp×2 via openscreen, graal via graaljs, skia via chromium — all
 `dependency`; libiberty via ghidra — `in-repo`), 63 single-library.
 
 When a runner starts an episode for this bug, it:
