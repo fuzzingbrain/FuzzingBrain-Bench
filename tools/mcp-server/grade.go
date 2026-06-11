@@ -21,6 +21,10 @@ type expectedYAML struct {
 		ExpectedFile      string `yaml:"expected_file"`
 		ExpectedFunction  string `yaml:"expected_function"`
 		ExpectedLineRange []int  `yaml:"expected_line_range"`
+		// Continuous marks a coverage binary built with -fprofile-continuous,
+		// whose counters are mmap'd live so an OOM/timeout-killed run still leaves
+		// a profile. Set only for such binaries — plain ones break under %c.
+		Continuous bool `yaml:"coverage_continuous"`
 	} `yaml:"reach"`
 	Class struct {
 		Expected  string `yaml:"expected"`
