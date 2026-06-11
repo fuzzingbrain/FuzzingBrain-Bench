@@ -31,7 +31,7 @@ issues a single `realloc(2147483648)`. libFuzzer reports:
 
 ## Notes
 
-Sibling of `ghidra-cplus-demangle-oom` and `binutils-rust-demangle-oom`
+Sibling of `binutils-rust-demangle-oom` (same libiberty rust_demangle)
 (same vendored libiberty `rust-demangle.c`). This bug is the OOM
 (CWE-400, uncontrolled resource consumption), graded as class `oom` at
 `str_buf_reserve` rust-demangle.c:1553.

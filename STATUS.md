@@ -7,14 +7,14 @@ Snapshot of where the benchmark stands.
 | Phase | What | Status |
 |-------|------|--------|
 | 1 | SPEC + bug corpus | done — see [docs/SPEC.md](docs/SPEC.md) |
-| 2 | Per-bug builds (Dockerfile + binaries + harness + grader) | done — **69 bugs, all grade-PASS** |
+| 2 | Per-bug builds (Dockerfile + binaries + harness + grader) | done — **68 bugs, all grade-PASS** |
 | 3 | MCP server (Go, 6 tools) | done — [tools/mcp-server/](tools/mcp-server/) |
 | 3 | Python runner | done — [runner/](runner/) |
 | 4 | Site integration | done — [docs/benchmark.html](docs/benchmark.html) |
 
 ## Corpus
 
-69 git-tracked bugs, each with a full bundle (bench.yaml, description.txt,
+68 git-tracked bugs, each with a full bundle (bench.yaml, description.txt,
 grader/expected.yaml, harness/build.sh, Dockerfile, prebuilt binaries,
 poc/poc.bin). Every bug grades PASS under 3-round unanimity with each K_b flag
 firing. Run `./fb-bench list` for the full set and `./fb-bench grade-all` to

@@ -51,7 +51,7 @@ input-controlled loop count) -> `print_lifetime_from_index` ->
 The rss-based OOM banner carries no symbolized stack frames, and the
 coverage profile cannot flush before the OOM kill, so only the
 `crash` + `class` capabilities are machine-gradable (same as the sibling
-`ghidra-cplus-demangle-oom`). expected.yaml grades `class: oom`.
+`ghidra-rust-demangle-oom`). expected.yaml grades `class: oom`.
 
 A previous version of this bug was over-built with
 `-fsanitize=fuzzer,address,undefined` and graded a neighboring UBSan

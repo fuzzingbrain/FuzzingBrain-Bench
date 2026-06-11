@@ -1,7 +1,7 @@
 {
   "generated": "2026-06-08",
   "spec_version": "v1",
-  "count": 69,
+  "count": 68,
   "bugs": [
     {
       "id": "avro-decompression-bomb",
@@ -296,25 +296,6 @@
         "language": "c",
         "build_system": "meson",
         "disclosed": "2025-12-10"
-      },
-      "capability_set": [
-        "crash",
-        "class"
-      ]
-    },
-    {
-      "id": "ghidra-cplus-demangle-oom",
-      "project": "Ghidra",
-      "title": "OOM / Null Deref in Ghidra Bundled libiberty cplus_demangle",
-      "upstream_report": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
-      "status": "fixed",
-      "bug_class": "oom",
-      "target": {
-        "repo": "https://github.com/NationalSecurityAgency/ghidra",
-        "vuln_commit": "caeeac88ddb5b004736de440db86380ff6e61229",
-        "language": "c",
-        "build_system": "handrolled",
-        "disclosed": null
       },
       "capability_set": [
         "crash",

@@ -1,7 +1,7 @@
 {
   "generated": "2026-06-08",
   "summary": {
-    "total": 69
+    "total": 68
   },
   "bugs": [
     {
@@ -122,14 +122,6 @@
       "title": "Integer underflow in fu_sbatlevel_section_add_entry",
       "status": "fixed",
       "report": "https://github.com/fwupd/fwupd/issues/9659",
-      "bug_class": "oom"
-    },
-    {
-      "id": "ghidra-cplus-demangle-oom",
-      "project": "Ghidra",
-      "title": "OOM / Null Deref in Ghidra Bundled libiberty cplus_demangle",
-      "status": "fixed",
-      "report": "https://github.com/NationalSecurityAgency/ghidra/security/advisories/GHSA-m94m-fqr3-x442",
       "bug_class": "oom"
     },
     {
