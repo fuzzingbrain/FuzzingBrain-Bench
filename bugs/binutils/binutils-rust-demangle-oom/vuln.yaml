@@ -19,7 +19,7 @@ supports:
 metadata:
   language: c
   arch: x86_64
-  sanitizer: libfuzzer-oom
+  sanitizer: libfuzzer
   vuln_version: 96c87c6dd55c38519ad168230d0893797b62fd52
   fix_commit: null
 active: true

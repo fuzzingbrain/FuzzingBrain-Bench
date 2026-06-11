@@ -13,7 +13,7 @@ reach:
 
 class:
   expected: oom
-  sanitizer: libfuzzer-oom
+  sanitizer: libfuzzer
 
 site:
   expected_file: src/hunspell/hashmgr.cxx

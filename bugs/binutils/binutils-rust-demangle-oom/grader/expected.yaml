@@ -17,7 +17,7 @@ reach:
 
 class:
   expected: oom
-  sanitizer: libfuzzer-oom
+  sanitizer: libfuzzer
 
 site:
   expected_file: libiberty/rust-demangle.c

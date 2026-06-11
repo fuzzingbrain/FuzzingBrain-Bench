@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: oom
-  sanitizer: libfuzzer-oom
+  sanitizer: libfuzzer
 
 site:
   expected_file: ghidra-demangler/rust-demangle.c
