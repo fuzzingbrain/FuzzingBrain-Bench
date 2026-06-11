@@ -55,16 +55,31 @@ func reachFired(covBin string, invocation []string, pocPath, runDir string, expe
 			return false
 		}
 	}
-	export := exec.Command("llvm-cov", "export", "--format=text", "-instr-profile", profdata, covBin)
+	// The buggy code may live in a sibling shared library next to the harness
+	// (e.g. systemd's libsystemd-shared-*.so holds pe-binary.c). llvm-cov only
+	// maps functions from the objects it is given, so pass every .so beside the
+	// coverage binary as an extra -object.
+	covArgs := []string{"export", "--format=text", "-instr-profile", profdata, covBin}
+	for _, so := range siblingSharedObjects(covBin) {
+		covArgs = append(covArgs, "-object", so)
+	}
+	export := exec.Command("llvm-cov", covArgs...)
 	out, err := export.Output()
 	if err != nil {
-		export = exec.Command("llvm-cov-14", "export", "--format=text", "-instr-profile", profdata, covBin)
+		export = exec.Command("llvm-cov-14", covArgs...)
 		out, err = export.Output()
 		if err != nil {
 			return false
 		}
 	}
 	return llvmCovHit(out, expected)
+}
+
+// siblingSharedObjects returns the .so files in the coverage binary's directory
+// (covered code in a shared lib must be passed to llvm-cov as extra -object).
+func siblingSharedObjects(covBin string) []string {
+	matches, _ := filepath.Glob(filepath.Join(filepath.Dir(covBin), "*.so*"))
+	return matches
 }
 
 // reachFromBacktrace is the fallback when the coverage build crashes
