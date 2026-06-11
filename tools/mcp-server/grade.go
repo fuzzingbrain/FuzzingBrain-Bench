@@ -286,7 +286,7 @@ func runHarness(bin string, invocation []string, pocPath, runDir string, timeout
 		asanLeak = "detect_leaks=1"
 	}
 	cmd.Env = append(os.Environ(),
-		"ASAN_OPTIONS=abort_on_error=0:exitcode=66:"+asanLeak,
+		"ASAN_OPTIONS=abort_on_error=0:exitcode=66:handle_abort=1:"+asanLeak,
 		"UBSAN_OPTIONS=abort_on_error=0:print_stacktrace=1",
 		"LSAN_OPTIONS=exitcode=66",
 		"TMPDIR="+runDir,
