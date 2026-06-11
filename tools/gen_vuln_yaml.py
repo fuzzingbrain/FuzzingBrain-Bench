@@ -160,6 +160,29 @@ _CONFIDENT_MAP = {
     "class-cast":              "type-confusion",
 }
 
+# Cross-library bugs: the buggy code lives in a THIRD-PARTY library that is reached
+# through a *consumer* project's harness (supply-chain scope). Everything not listed
+# here is single-library (bug code, harness and crash all in the project's own code).
+# Tuple = (upstream_lib, reached_via, vendoring); vendoring is how the consumer pulls
+# the library: 'dependency' = fetched at build time (DEPS/gclient), NOT in the consumer
+# repo; 'in-repo' = a vendored copy committed into the consumer's own tree.
+_CROSS_LIBRARY = {
+    "openscreen-jsoncpp-nonobject-oob":          ("jsoncpp", "openscreen", "dependency"),
+    "openscreen-jsoncpp-error-message-overflow": ("jsoncpp", "openscreen", "dependency"),
+    "graal-regexlexer-oob":                      ("graal", "graaljs", "dependency"),
+    "skia-raster8888-blur-oob":                  ("skia", "chromium", "dependency"),
+    "ghidra-rust-demangle-oom":                  ("libiberty", "ghidra", "in-repo"),
+}
+
+
+def _scope(bug: str) -> dict:
+    cl = _CROSS_LIBRARY.get(bug)
+    if cl is None:
+        return {"type": "single-library"}
+    lib, via, vendoring = cl
+    return {"type": "cross-library", "upstream_lib": lib,
+            "reached_via": via, "vendoring": vendoring}
+
 _HEADER = (
     "# vuln.yaml — HIDDEN ground-truth metadata. NOT in SANDBOX_ENTRIES, so it is\n"
     "# never staged into the agent's view. `category` is the T2 class answer — do\n"
@@ -170,10 +193,14 @@ _HEADER = (
 )
 
 
+# Projects the generator must never touch (untracked intern WIP, etc.).
+_SKIP_PROJECTS = {"krb5"}
+
+
 def _iter_bug_dirs(one: str | None):
     for proj in sorted(os.listdir(REPO / "bugs")):
         proj_dir = REPO / "bugs" / proj
-        if not proj_dir.is_dir():
+        if not proj_dir.is_dir() or proj in _SKIP_PROJECTS:
             continue
         for name in sorted(os.listdir(proj_dir)):
             d = proj_dir / name
@@ -213,15 +240,17 @@ def _compute(bug_dir: str) -> dict:
         modes.append("diff-scan")
     return {
         "category": category,
+        "scope": _scope(bug),
         "difficulty": "none",
         "supports": {"grades": grades, "modes": modes},
         "metadata": {
             "language": _LANG_CANON.get(tgt.get("language"), tgt.get("language") or None),
             "arch": "x86_64",   # whole corpus targets x86_64 Linux (the prebuilt
                                 # binaries); override per bug if that ever changes
-            # sanitizer the bug was DETECTED/reproduced under (the fuzzing build
-            # that found it), NOT the minimal one needed: a null-deref found under
-            # an ASan build is `asan`, a plain assert/abort build is `none`.
+            # sanitizer = the crash ORACLE that captures the bug at reproduction
+            # (read from the crash banner), never "none": something always catches
+            # a reproducible bug. asan/ubsan/lsan = compiler sanitizers; libfuzzer =
+            # the engine (OOM/timeout/deadly-signal); jazzer = the JVM engine.
             "sanitizer": cls.get("sanitizer") or _SANITIZER.get(bug) or None,
             "vuln_version": tgt.get("vuln_commit") or None,
             "fix_commit": _FIX_COMMIT.get(bug),   # null where not recorded

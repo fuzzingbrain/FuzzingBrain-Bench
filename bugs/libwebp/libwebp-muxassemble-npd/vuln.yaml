@@ -5,6 +5,8 @@
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: null-pointer-dereference
+scope:
+  type: single-library
 difficulty: none
 supports:
   grades:

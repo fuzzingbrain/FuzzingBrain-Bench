@@ -5,6 +5,11 @@
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: reachable-assertion
+scope:
+  type: cross-library
+  upstream_lib: jsoncpp
+  reached_via: openscreen
+  vendoring: dependency
 difficulty: none
 supports:
   grades:
