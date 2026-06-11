@@ -1,7 +1,14 @@
+# The OutOfMemoryError stack runs DataFileStream.hasNext (line 227) ->
+# DataBlock.decompressUsing (line 380-381, which accepts the decompressed
+# ByteBuffer with no upper bound) -> DeflateCodec.decompress. The harness's
+# DataFileReader inherits hasNext from DataFileStream, so DataFileReader.java
+# never appears in the stack — the gradeable root-cause frames are in
+# DataFileStream.java. Reach fires from the Java OOM backtrace (no coverage
+# binary needed).
 reach:
-  expected_file: lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
+  expected_file: lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java
   expected_function: ""
-  expected_line_range: []
+  expected_line_range: [227, 381]
 
 class:
   expected: oom
