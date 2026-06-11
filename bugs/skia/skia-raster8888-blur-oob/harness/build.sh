@@ -43,9 +43,23 @@ if [ "${cmd}" = "build-libs" ]; then
                       sanitize="ASAN"
                       extra_cflags=["-fsanitize=fuzzer-no-link","-DSK_ENABLE_DUMP_GPU=0"]' ;;
             cov)
-                ARGS='is_debug=false
+                # VALIDATED 2026-06-11 (built + reach-verified, see NOTES.md §1).
+                # cc/cxx="clang": the coverage flags are clang-only; gn otherwise
+                # defaults to system gcc which rejects -fprofile-instr-generate.
+                # skia_use_libavif/libjxl=false + ganesh/graphite=false: skip the
+                # six DEPS externals (libavif, libjxl, oboe, unicodetools, v8,
+                # vello) whose googlesource mirrors were unreachable — none are
+                # needed for the CPU-raster image-filter harness.
+                ARGS='cc="clang"
+                      cxx="clang++"
+                      is_debug=false
                       is_official_build=false
                       skia_enable_skshaper=false
+                      skia_use_libavif=false
+                      skia_use_libjxl_decode=false
+                      skia_use_libjxl_encode=false
+                      skia_enable_ganesh=false
+                      skia_enable_graphite=false
                       extra_cflags=["-fprofile-instr-generate","-fcoverage-mapping"]
                       extra_ldflags=["-fprofile-instr-generate","-fcoverage-mapping"]' ;;
         esac
@@ -69,15 +83,18 @@ if [ "${cmd}" = "harness" ]; then
         *) echo "unknown config: ${CONFIG}" >&2; exit 2 ;;
     esac
 
-    # Link the libFuzzer harness against the Skia static archive built above.
-    # NOTE: depending on the gn config, libskia.a may still require additional
-    # bundled third_party archives under ${LIBGN}/obj/third_party/. This link
-    # line was NOT validated (see NOTES.md); it documents the intended shape.
+    # Link the libFuzzer harness against ALL of Skia's static archives.
+    # VALIDATED 2026-06-11 for the coverage config: libskia.a alone is NOT enough
+    # — it references the bundled third_party archives (libharfbuzz.a, libpng.a,
+    # libjpeg*.a, libwebp*.a, libzlib.a, libexpat.a, libdng_sdk.a, libpiex.a,
+    # libskcms.a, libwuffs.a) and the SYSTEM freetype/fontconfig (Skia uses the
+    # host freetype). --start-group resolves the archives' circular references.
+    ARCHIVES=$(ls "${LIBGN}"/*.a)
     clang++ -std=c++17 ${CFH} ${SAN} -fmacro-prefix-map=/src/= \
         -I "${SRC}" \
         /src/harness/skia_image_filter_chain_construction_fuzzer.cc \
-        "${LIBGN}/libskia.a" \
-        -lpthread -lm -ldl \
+        -Wl,--start-group ${ARCHIVES} -Wl,--end-group \
+        -lfreetype -lfontconfig -lpthread -lm -ldl \
         -o "${OUT}/harness"
 
     echo "built ${OUT}/harness ($(stat -c %s "${OUT}/harness") bytes)"

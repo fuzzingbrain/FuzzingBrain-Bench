@@ -17,7 +17,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [crash]   # ASan does not surface a clean class (double-free aborts as deadly signal); only deterministic crash is gradable
+capability_set: [class, crash, reach, site]   # heap-use-after-free (idl.h:242), freed by Deserialize
 
 reproducibility:
   base_image_digest: ""
