@@ -357,14 +357,27 @@ exercised.
 
 ### `vuln.yaml` category — controlled vocabulary
 
-`vuln.yaml`'s `category` is the semantic vulnerability **type**, not the
-sanitizer crash class (`segv`/`abrt`/`oom` are symptoms that map to several of
-these — determine the real type by reading the root-cause code). It must be one
-of the locked terms below, or `unclassified` for a bug not yet classified:
+`vuln.yaml`'s `category` is the semantic vulnerability **type**, determined by
+reading the root-cause code — **not** the sanitizer crash class. The crash class
+(`segv`, `abrt`, `oom`, `heap-buffer-overflow`, …) is the *symptom* and lives in
+`grader/expected.yaml`'s `class.expected`; `category` is the *root cause*. These
+are kept as two non-overlapping vocabularies on purpose:
+
+- A raw `segv` may be a `null-pointer-dereference`, an `out-of-bounds-read`, … —
+  read the code to decide.
+- **Spatial violations are classified by OPERATION, not by region.** ASan's
+  region-named crash classes (`heap-buffer-overflow`, `stack-buffer-overflow`,
+  `stack-buffer-underflow`) are *symptoms* and are **not** category values; a
+  spatial bug is `out-of-bounds-read` if the offending access is a read or
+  `out-of-bounds-write` if it is a write (heap-vs-stack is a crash detail, not a
+  root-cause distinction). When in doubt, the ASan banner's `READ`/`WRITE` tag
+  settles it.
+
+`category` must be one of the locked terms below, or `unclassified`:
 
 | group | terms |
 |---|---|
-| memory-safety — spatial | `heap-buffer-overflow`, `stack-buffer-overflow`, `stack-buffer-underflow`, `out-of-bounds-read`, `out-of-bounds-write` |
+| memory-safety — spatial (by operation) | `out-of-bounds-read`, `out-of-bounds-write` |
 | memory-safety — temporal / pointer | `use-after-free`, `null-pointer-dereference` |
 | resource / DoS | `memory-leak`, `memory-exhaustion`, `excessive-computation`, `stack-exhaustion` |
 | logic / language | `reachable-assertion`, `type-confusion`, `uncaught-exception`, `undefined-behavior` |
