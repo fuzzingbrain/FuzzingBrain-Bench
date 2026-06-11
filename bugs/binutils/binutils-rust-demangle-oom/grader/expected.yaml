@@ -5,12 +5,11 @@
 # output buffer that str_buf_reserve() doubles without limit until the
 # allocation exhausts the rss_limit_mb (2048) and libFuzzer aborts.
 #
-# The rss-based OOM banner carries NO symbolized stack frames, so only
-# the crash + class capabilities are machine-gradable (same as the
-# sibling ghidra-rust-demangle-oom). The reach/site fields below record
-# the true source locations in the vuln_commit for documentation; they
-# are not in capability_set because the OOM report yields no frames and
-# the coverage profile cannot flush before the OOM kill.
+# The malloc-too-big OOM banner DOES carry the allocation backtrace (the
+# str_buf_reserve -> realloc frames), so reach and site are machine-gradable
+# alongside crash and class -- the same capability set as the sibling
+# ghidra-rust-demangle-oom. The reach/site fields below are the true source
+# locations matched against that allocation stack.
 reach:
   expected_file: libiberty/rust-demangle.c
   expected_function: demangle_binder

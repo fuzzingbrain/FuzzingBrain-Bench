@@ -9,6 +9,7 @@ difficulty: none
 supports:
   grades:
   - crash
+  - reach
   modes:
   - normal
   - full-scan

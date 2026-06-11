@@ -8,8 +8,10 @@ category: out-of-bounds-read
 difficulty: none
 supports:
   grades:
-  - crash
   - class
+  - crash
+  - reach
+  - site
   modes:
   - normal
   - full-scan

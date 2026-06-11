@@ -8,8 +8,9 @@ category: uncaught-exception
 difficulty: none
 supports:
   grades:
-  - crash
   - class
+  - crash
+  - reach
   modes:
   - normal
   - full-scan

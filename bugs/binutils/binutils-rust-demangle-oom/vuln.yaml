@@ -8,8 +8,10 @@ category: memory-exhaustion
 difficulty: none
 supports:
   grades:
-  - crash
   - class
+  - crash
+  - reach
+  - site
   modes:
   - normal
   - full-scan
