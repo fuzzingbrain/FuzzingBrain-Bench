@@ -65,12 +65,16 @@ def test_vuln_yaml_category_in_controlled_vocabulary():
 def test_vuln_yaml_scope_schema():
     """scope.type is single/cross-library; cross-library carries upstream_lib,
     reached_via and a valid vendoring."""
+    import yaml
+
     bad = []
     for bug, d in list_bugs(include_inactive=True):
         vp = d / "vuln.yaml"
         if not vp.is_file():
             continue
-        scope = read_bench(vp).get("scope") or {}
+        # scope is a nested object -> use a real YAML parser, not read_bench
+        # (which only handles flat top-level key: value pairs).
+        scope = (yaml.safe_load(vp.read_text()) or {}).get("scope") or {}
         t = scope.get("type")
         if t not in ("single-library", "cross-library"):
             bad.append((bug, f"type={t!r}"))
