@@ -90,7 +90,14 @@ _CURATED = {
     "flatbuffers-flexbuffers-tostring-overflow": "out-of-bounds-read",  # strlen on AsKey() past buffer -- read
     "flatbuffers-reflection-verifier-overflow":  "out-of-bounds-read",  # ReadScalar load past heap region -- read
     "fwupd-logitech-oob-read":        "out-of-bounds-read",      # g_byte_array_append source overread -- read
-    "graal-regexlexer-oob":           "out-of-bounds-read",      # pattern.charAt(position) no bounds check
+    # JVM bugs are memory-safe: an index/cast fault is a bounds-checked managed
+    # exception, NOT a real OOB read or memory type-confusion -> uncaught-exception
+    # (the specific exception class lives in expected.yaml class.expected).
+    "graal-regexlexer-oob":           "uncaught-exception",      # JVM StringIndexOutOfBoundsException from charAt
+    "jsonjava-jsonml-classcast":      "uncaught-exception",      # JVM ClassCastException (not memory type-confusion)
+    "jsonjava-unescape-strindex":     "uncaught-exception",      # JVM StringIndexOutOfBoundsException
+    "pdfbox-cmap-bfrange-aioob":      "uncaught-exception",      # JVM ArrayIndexOutOfBoundsException
+    "pdfbox-inlineimage-type-confusion": "uncaught-exception",   # JVM ClassCastException (not memory type-confusion)
     "graaljs-illformed-locale":       "uncaught-exception",      # IllformedLocaleException from Locale.Builder
     "icu-translit-rule-dtor-uaf":     "undefined-behavior",      # dtor deletes an UNINITIALIZED wild pointer (not a freed-then-reused UAF)
     "imagemagick-kernelinfo-alloc":   "memory-exhaustion",       # excessive AcquireKernelInfo allocation
