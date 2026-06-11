@@ -51,6 +51,15 @@ configure() {
     if [ -n "${SAN}" ]; then
         SAN_ARGS+=("-Db_sanitize=${SAN}")
     fi
+    # Coverage build: source-based llvm coverage on BOTH the harness and
+    # libsystemd-shared (uki_hash lives in the shared lib), so `reach` is
+    # gradeable. Without these flags the cov binary has zero instrumentation.
+    if [ "${BUILD}" = "/src/build-cov" ]; then
+        SAN_ARGS+=("-Dc_args=-fprofile-instr-generate -fcoverage-mapping"
+                   "-Dcpp_args=-fprofile-instr-generate -fcoverage-mapping"
+                   "-Dc_link_args=-fprofile-instr-generate -fcoverage-mapping"
+                   "-Dcpp_link_args=-fprofile-instr-generate -fcoverage-mapping")
+    fi
     env CC=clang CXX=clang++ \
         meson setup "${BUILD}" "${SRC}" \
             -Dllvm-fuzz=true \
