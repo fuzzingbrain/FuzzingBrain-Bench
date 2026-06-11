@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: abort
-  sanitizer: none
+  sanitizer: libfuzzer
 
 site:
   expected_file: coders/msl.c

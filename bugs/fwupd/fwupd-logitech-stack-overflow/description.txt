@@ -3,7 +3,7 @@ Stack Overflow in logitech-rdfu JSON Parsing (Missing Depth Limit)
 
 Project:     fwupd (plugins/logitech-rdfu, libfwupd JSON parser)
 Bug class:   stack-exhaustion (unbounded recursion)
-Sanitizer:   none (native SIGSEGV from stack exhaustion)
+Sanitizer:   UndefinedBehaviorSanitizer (reports the stack-overflow on stack exhaustion)
 
 The harness (logitech_rdfu_fuzzer.c) wraps the raw fuzzer bytes in a GBytes
 and calls fu_firmware_parse_bytes() on a FU_TYPE_LOGITECH_RDFU_FIRMWARE
@@ -29,8 +29,10 @@ zero-initialized and the RDFU plugin never calls
 fwupd_json_parser_set_max_depth(). Per the API docs at
 fwupd-json-parser.c:39, "By default there is no limit." So a deeply nested
 input such as "[[[[[..." drives load_array to recurse once per opening
-bracket until the call stack is exhausted, producing a native SIGSEGV with
-no sanitizer report. The crash manifests inside the load_array loop around
+bracket until the call stack is exhausted; UndefinedBehaviorSanitizer's
+signal handler catches the overflow and reports
+"UndefinedBehaviorSanitizer: stack-overflow". The crash manifests inside the
+load_array loop around
 fwupd-json-parser.c:308 (the per-frame token dispatch); the exact faulting
 frame is non-deterministic since the stack is exhausted before any one line.
 

@@ -3,7 +3,7 @@ Reachable Assertion in libaom AV1 Config Parser (aom_rb_read_literal)
 
 Project:     libaom (AOMedia AV1 codec — AV1CodecConfigurationBox parser)
 Bug class:   assertion-failure (reachable assertion / SIGABRT)
-Sanitizer:   none (plain C assert -> abort)
+Sanitizer:   libFuzzer (C assert -> SIGABRT, caught as "libFuzzer: deadly signal")
 
 Summary
 -------

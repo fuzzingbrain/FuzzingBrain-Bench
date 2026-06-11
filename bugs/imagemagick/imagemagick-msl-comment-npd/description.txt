@@ -3,7 +3,7 @@ NULL Image Assertion Abort Parsing MSL <comment>
 
 Project:     ImageMagick (Magick++ + MagickCore + coders/msl.c)
 Bug class:   NULL-pointer dereference (assertion abort)
-Sanitizer:   none
+Sanitizer:   libFuzzer (assert -> SIGABRT, caught as "libFuzzer: deadly signal")
 
 When an MSL ("Magick Scripting Language") document contains an
 `<image>` element whose image pointer is still NULL — the `<image>`
