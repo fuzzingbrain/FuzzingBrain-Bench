@@ -19,7 +19,7 @@ supports:
 metadata:
   language: jvm
   arch: x86_64
-  sanitizer: jvm
+  sanitizer: jazzer
   vuln_version: c83691fd49a05b854918381dac08df7ec6db57ec
   fix_commit: null
 active: true

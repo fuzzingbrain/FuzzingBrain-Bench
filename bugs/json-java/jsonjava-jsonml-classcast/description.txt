@@ -3,7 +3,7 @@ ClassCastException in JSONML.toJSONArray (JSON-java)
 
 Project:     stleary/JSON-java
 Bug class:   class-cast (Java uncaught-exception)
-Sanitizer:   JVM (no native sanitizer)
+Sanitizer:   Jazzer (JVM fuzzing engine; bug surfaces as an uncaught exception)
 
 The public `JSONML.toJSONArray(String)` method casts the result of the
 internal `parse()` helper to `JSONArray` (JSONML.java:279,

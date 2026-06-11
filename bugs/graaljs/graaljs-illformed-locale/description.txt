@@ -3,7 +3,7 @@ IllformedLocaleException treated as Internal Error in Intl API
 
 Project:     graaljs (Intl implementation; runtime/util/IntlUtil.java)
 Bug class:   uncaught-exception (IllformedLocaleException)
-Sanitizer:   jvm (uncaught exception / "Internal Error")
+Sanitizer:   Jazzer (uncaught exception / "Internal Error")
 
 The harness (IntlFuzzer.fuzzerTestOneInput, IntlFuzzer.java) decodes the
 fuzz bytes as a UTF-8 string, single-quote-escapes it, and evaluates

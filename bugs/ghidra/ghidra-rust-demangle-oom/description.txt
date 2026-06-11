@@ -3,7 +3,7 @@ OOM in Ghidra Bundled libiberty rust_demangle
 
 Project:     NationalSecurityAgency/ghidra (bundled GPL libiberty)
 Bug class:   oom (unbounded output-buffer growth)
-Sanitizer:   libfuzzer-oom (built with -fsanitize=fuzzer,address)
+Sanitizer:   libFuzzer (out-of-memory oracle; built -fsanitize=fuzzer,address)
 
 Ghidra bundles a copy of GNU libiberty at
 `GPL/DemanglerGnu/src/demangler_gnu_v2_41/c/rust-demangle.c`. The

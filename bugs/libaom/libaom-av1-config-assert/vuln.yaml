@@ -18,7 +18,7 @@ supports:
 metadata:
   language: cpp
   arch: x86_64
-  sanitizer: none
+  sanitizer: libfuzzer
   vuln_version: f23c9437a
   fix_commit: null
 active: true
