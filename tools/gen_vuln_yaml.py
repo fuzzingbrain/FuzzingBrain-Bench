@@ -83,27 +83,44 @@ _FIX_COMMIT = {
 # Each is grounded in the reach/site source (see commit / PR notes).
 _CURATED = {
     "avro-neg-string-len":            "memory-exhaustion",       # neg length -> huge realloc, ASan allocation-size-too-big (verified by running)
+    "cups-utf8-charset-overflow":     "out-of-bounds-read",      # *src++ past NUL then read -- OOB read (not write)
+    "flatbuffers-flexbuffers-tostring-overflow": "out-of-bounds-read",  # strlen on AsKey() past buffer -- read
+    "flatbuffers-reflection-verifier-overflow":  "out-of-bounds-read",  # ReadScalar load past heap region -- read
+    "fwupd-logitech-oob-read":        "out-of-bounds-read",      # g_byte_array_append source overread -- read
     "graal-regexlexer-oob":           "out-of-bounds-read",      # pattern.charAt(position) no bounds check
     "graaljs-illformed-locale":       "uncaught-exception",      # IllformedLocaleException from Locale.Builder
-    "icu-translit-rule-dtor-uaf":     "use-after-free",          # dtor frees pointers of a partial rule
+    "icu-translit-rule-dtor-uaf":     "undefined-behavior",      # dtor deletes an UNINITIALIZED wild pointer (not a freed-then-reused UAF)
     "imagemagick-kernelinfo-alloc":   "memory-exhaustion",       # excessive AcquireKernelInfo allocation
-    "imagemagick-msl-comment-npd":    "null-pointer-dereference",  # msl_info->image[n] NULL deref
+    "imagemagick-msl-comment-npd":    "reachable-assertion",     # assert(image!=NULL) fires (SIGABRT) before any NULL deref
     "jq-dump-op-npd":                 "null-pointer-dereference",  # getlevel()->subfunctions[idx] NULL
     "jsonjava-unescape-numformat":    "uncaught-exception",      # NumberFormatException
     "libaom-av1-config-assert":       "reachable-assertion",     # assert in aom_rb_read_literal
+    "libaom-svc-encoder-hang":        "undefined-behavior",      # interpolate_core out_length==0 integer divide-by-zero (SIGFPE)
+    "libavif-jni-signext":            "out-of-bounds-read",      # avifROStreamRead memcpy source overread -- read
+    "libheif-image-crop-overflow":    "out-of-bounds-read",      # memcpy source-plane overread (right-left+1 underflow) -- read
     "libvpx-vp9-encoder-caq-assert":  "reachable-assertion",     # VP9 CAQ assertion
     "libwebp-muxassemble-npd":        "null-pointer-dereference",  # data->bytes NULL deref
     "libwebp-sharpyuv-convert-stride-oob": "out-of-bounds-read",  # missing stride validation -> OOB read
     "libwebp-sharpyuv-gamma-oob":     "out-of-bounds-read",      # unclamped LUT index -> OOB read
+    "libwebsockets-lhp-class-oob":    "out-of-bounds-read",      # strlen past 47-byte heap alloc -- read
+    "mongoose-mg-match-overflow":     "out-of-bounds-read",      # s.buf[s.len] backtrack read -- read
+    "mongoose-mqtt-nextprop-oob":     "out-of-bounds-read",      # next_prop i[0]/i[1] read past end -- read
     "ndpi-hex-decode-sscanf":         "out-of-bounds-read",      # sscanf reads past borrowed src buffer
     "netsnmp-vacm-parse-npd":         "null-pointer-dereference",  # skip_token_const()->NULL then deref
     "opcua-pubsub-json-assert":       "reachable-assertion",     # lookAheadForKey assertion
+    "opencv-yaml-parsekey":           "out-of-bounds-read",      # *--endptr reads before line buffer -- read
+    "openh264-scenechange-overflow":  "out-of-bounds-read",      # SAD kernel pSrc reads past plane -- read (no store)
+    "openldap-parse-whsp":            "out-of-bounds-read",      # get_token (*sp)++ past NUL then **sp read -- read
+    "openscreen-jsoncpp-error-message-overflow": "out-of-bounds-read",  # json_reader CR-LF look-ahead deref past end -- read
     "openscreen-jsoncpp-nonobject-oob": "reachable-assertion",   # jsoncpp find() JSON_ASSERT abort
+    "openssl-des-ofb-cfb-overread":   "out-of-bounds-read",      # d[n] indexes past 8-byte stack DES_cblock -- read
     "ots-processgeneric-npd":         "null-pointer-dereference",  # maxp NULL deref
     "pdfbox-pfb-negative-array":      "uncaught-exception",      # NegativeArraySizeException
     "skia-raster8888-blur-oob":       "out-of-bounds-read",      # eval_blur_passes OOB pixel pointer (read)
     "spirv-orderblocks-segv":         "null-pointer-dereference",  # blocks[0] on empty CFG -> null data deref
+    "spirv-tools-friendlynamemapper-overflow": "out-of-bounds-read",  # inst.words[3] read past word buffer -- read
     "systemd-hwdb-trie-oob-read":     "out-of-bounds-read",      # trie offset deref before bounds check
+    "upx-elf64-generate-overflow":    "out-of-bounds-read",      # fo->write source overread of file_image -- read
 }
 
 _CONFIDENT_MAP = {
