@@ -25,26 +25,23 @@ FULL = ["reach", "crash", "class", "site"]
 LINE = re.compile(r"[●○]\s+T\d\s+(reach|crash|class|site)\s+(fired|not fired)")
 
 
+CS_LINE = re.compile(r"^(\s*capability_set\s*:).*$", re.M)
+ROUNDS = os.environ.get("PROBE_ROUNDS", "1")
+
+
 def declared(bench_path):
     return yaml.safe_load(open(bench_path)).get("capability_set", [])
 
 
-def set_caps(bench_path, caps):
-    b = yaml.safe_load(open(bench_path))
-    b["capability_set"] = caps
-    yaml.safe_dump(b, open(bench_path, "w"), sort_keys=False)
-
-
-def restore(bench_path):
-    subprocess.run(["git", "checkout", "--quiet", "--", bench_path], check=False)
-
-
-ROUNDS = os.environ.get("PROBE_ROUNDS", "1")
-
-
 def probe(bug, bench_path):
-    set_caps(bench_path, FULL)
+    # Save the EXACT original text and restore it verbatim afterwards. Do a
+    # line-level rewrite of just the capability_set line (never a yaml round-trip,
+    # which would reformat the file and drop comments) and never `git checkout`
+    # (which would clobber unrelated uncommitted edits in this same file).
+    original = open(bench_path).read()
+    forced = CS_LINE.sub(lambda m: f'{m.group(1)} [{", ".join(FULL)}]', original, count=1)
     try:
+        open(bench_path, "w").write(forced)
         r = subprocess.run(["./fb-bench", "grade", bug, "-v", "--rounds", ROUNDS],
                            capture_output=True, text=True, timeout=600)
         fired = {m.group(1) for m in LINE.finditer(r.stdout + r.stderr)
@@ -52,7 +49,7 @@ def probe(bug, bench_path):
     except subprocess.TimeoutExpired:
         fired = None
     finally:
-        restore(bench_path)
+        open(bench_path, "w").write(original)
     return fired
 
 
