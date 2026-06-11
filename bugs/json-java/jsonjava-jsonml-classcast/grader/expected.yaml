@@ -5,7 +5,7 @@ reach:
 
 class:
   expected: class-cast
-  sanitizer: jvm
+  sanitizer: jazzer
 
 site:
   expected_file: JSONML.java

@@ -3,7 +3,7 @@ StringIndexOutOfBoundsException in XMLTokener.unescapeEntity (JSON-java)
 
 Project:     stleary/JSON-java (org.json XML parser)
 Bug class:   uncaught-exception / out-of-bounds string index (Java)
-Sanitizer:   JVM (no native sanitizer; bug surfaces as an unhandled exception)
+Sanitizer:   Jazzer (JVM fuzzing engine; bug surfaces as an uncaught exception)
 
 `XMLTokener.unescapeEntity(String e)` (src/main/java/org/json/XMLTokener.java:156)
 handles numeric character references `&#NNNN;`. After confirming the entity

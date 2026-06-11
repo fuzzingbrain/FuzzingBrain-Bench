@@ -3,7 +3,7 @@ NumberFormatException in XMLTokener.unescapeEntity (JSON-java)
 
 Project:     stleary/JSON-java (XML parser)
 Bug class:   uncaught-exception (Java)
-Sanitizer:   jvm (no native sanitizer; bug surfaces as an unhandled exception)
+Sanitizer:   Jazzer (JVM fuzzing engine; bug surfaces as an uncaught exception)
 
 `XMLTokener.unescapeEntity(String e)` in src/main/java/org/json/XMLTokener.java
 resolves XML character references of the form `&#NNNN;` / `&#xHHHH;`. After

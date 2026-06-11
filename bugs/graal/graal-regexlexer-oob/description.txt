@@ -3,7 +3,7 @@ StringIndexOutOfBoundsException in RegexLexer.consumeChar
 
 Project:     oracle/graal (Truffle regex engine), reached via GraalJS
 Bug class:   out-of-bounds-read (surfaced as StringIndexOutOfBoundsException)
-Sanitizer:   jvm (uncaught exception / "Internal Error")
+Sanitizer:   Jazzer (uncaught exception / "Internal Error")
 
 The harness (RegExpFuzzer.fuzzerTestOneInput) decodes the fuzzer bytes as a
 UTF-8 string, escapes them, and evaluates `new RegExp('<pattern>', 'v')`,

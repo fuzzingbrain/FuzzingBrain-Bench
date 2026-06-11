@@ -3,7 +3,7 @@ Type Confusion DoS in PDInlineImage.getDecode
 
 Project:     pdfbox (pdmodel inline image)
 Bug class:   type-confusion (ClassCastException)
-Sanitizer:   JVM (uncaught exception)
+Sanitizer:   Jazzer (uncaught exception)
 
 PDInlineImage.getDecode() (declared at PDInlineImage.java:279) returns the
 inline image's /D (Decode) entry via the single statement at

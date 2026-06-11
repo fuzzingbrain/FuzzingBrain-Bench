@@ -3,7 +3,7 @@ ArrayIndexOutOfBoundsException in fontbox CMapParser.increment via Malformed bfr
 
 Project:     pdfbox (fontbox CMap parser)
 Bug class:   out-of-bounds-read (ArrayIndexOutOfBoundsException)
-Sanitizer:   jvm (uncaught exception)
+Sanitizer:   Jazzer (uncaught exception)
 
 The harness CMapFuzzer.fuzzerTestOneInput(byte[]) wraps the raw input in a
 RandomAccessReadBuffer and calls CMapParser.parse(...), so the entire byte[]

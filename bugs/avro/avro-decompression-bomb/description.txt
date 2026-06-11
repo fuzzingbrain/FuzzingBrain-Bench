@@ -3,7 +3,7 @@ Decompression bomb in Avro Java DataFileReader
 
 Project:     apache/avro (lang/java)
 Bug class:   oom (Java OutOfMemoryError)
-Sanitizer:   jvm (heap exhaustion at -Xmx256m)
+Sanitizer:   Jazzer (heap exhaustion at -Xmx256m)
 
 Avro container files declare a compression codec (e.g. "deflate") and,
 per data block, a *compressed* block size. When iterating records, the
