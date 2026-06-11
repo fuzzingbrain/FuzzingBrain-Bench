@@ -34,11 +34,14 @@ DEACTIVATED: set[str] = set()
 
 # Controlled vocabulary for `category` — the ONLY allowed values (plus the
 # "unclassified" placeholder). The semantic vulnerability TYPE, NOT the sanitizer
-# crash class: `segv`/`abrt` are symptoms that map to several of these. Locked;
-# document in docs/SPEC.md. Add a term here (and to SPEC) before using it.
+# crash class: `segv`/`abrt`/`heap-buffer-overflow` are symptoms that live in
+# expected.yaml class.expected. In particular the ASan spatial crash classes
+# (heap-buffer-overflow, stack-buffer-overflow, stack-buffer-underflow) are NOT
+# category values — a spatial violation is classified by its OPERATION:
+# out-of-bounds-read or out-of-bounds-write (region heap/stack is a crash detail).
+# Locked; document in docs/SPEC.md. Add a term here (and to SPEC) before using it.
 CANONICAL_CATEGORIES = {
-    # memory-safety — spatial
-    "heap-buffer-overflow", "stack-buffer-overflow", "stack-buffer-underflow",
+    # memory-safety — spatial (by operation, not by region)
     "out-of-bounds-read", "out-of-bounds-write",
     # memory-safety — temporal / pointer
     "use-after-free", "null-pointer-dereference",
@@ -83,35 +86,69 @@ _FIX_COMMIT = {
 # Each is grounded in the reach/site source (see commit / PR notes).
 _CURATED = {
     "avro-neg-string-len":            "memory-exhaustion",       # neg length -> huge realloc, ASan allocation-size-too-big (verified by running)
-    "graal-regexlexer-oob":           "out-of-bounds-read",      # pattern.charAt(position) no bounds check
+    "cups-utf8-charset-overflow":     "out-of-bounds-read",      # *src++ past NUL then read -- OOB read (not write)
+    "flatbuffers-flexbuffers-tostring-overflow": "out-of-bounds-read",  # strlen on AsKey() past buffer -- read
+    "flatbuffers-reflection-verifier-overflow":  "out-of-bounds-read",  # ReadScalar load past heap region -- read
+    "fwupd-logitech-oob-read":        "out-of-bounds-read",      # g_byte_array_append source overread -- read
+    # JVM bugs are memory-safe: an index/cast fault is a bounds-checked managed
+    # exception, NOT a real OOB read or memory type-confusion -> uncaught-exception
+    # (the specific exception class lives in expected.yaml class.expected).
+    "graal-regexlexer-oob":           "uncaught-exception",      # JVM StringIndexOutOfBoundsException from charAt
+    "jsonjava-jsonml-classcast":      "uncaught-exception",      # JVM ClassCastException (not memory type-confusion)
+    "jsonjava-unescape-strindex":     "uncaught-exception",      # JVM StringIndexOutOfBoundsException
+    "pdfbox-cmap-bfrange-aioob":      "uncaught-exception",      # JVM ArrayIndexOutOfBoundsException
+    "pdfbox-inlineimage-type-confusion": "uncaught-exception",   # JVM ClassCastException (not memory type-confusion)
     "graaljs-illformed-locale":       "uncaught-exception",      # IllformedLocaleException from Locale.Builder
-    "icu-translit-rule-dtor-uaf":     "use-after-free",          # dtor frees pointers of a partial rule
+    "icu-translit-rule-dtor-uaf":     "undefined-behavior",      # dtor deletes an UNINITIALIZED wild pointer (not a freed-then-reused UAF)
     "imagemagick-kernelinfo-alloc":   "memory-exhaustion",       # excessive AcquireKernelInfo allocation
-    "imagemagick-msl-comment-npd":    "null-pointer-dereference",  # msl_info->image[n] NULL deref
+    "imagemagick-msl-comment-npd":    "reachable-assertion",     # assert(image!=NULL) fires (SIGABRT) before any NULL deref
     "jq-dump-op-npd":                 "null-pointer-dereference",  # getlevel()->subfunctions[idx] NULL
     "jsonjava-unescape-numformat":    "uncaught-exception",      # NumberFormatException
     "libaom-av1-config-assert":       "reachable-assertion",     # assert in aom_rb_read_literal
+    "libaom-svc-encoder-hang":        "undefined-behavior",      # interpolate_core out_length==0 integer divide-by-zero (SIGFPE)
+    "libavif-jni-signext":            "out-of-bounds-read",      # avifROStreamRead memcpy source overread -- read
+    "libheif-image-crop-overflow":    "out-of-bounds-read",      # memcpy source-plane overread (right-left+1 underflow) -- read
     "libvpx-vp9-encoder-caq-assert":  "reachable-assertion",     # VP9 CAQ assertion
     "libwebp-muxassemble-npd":        "null-pointer-dereference",  # data->bytes NULL deref
     "libwebp-sharpyuv-convert-stride-oob": "out-of-bounds-read",  # missing stride validation -> OOB read
     "libwebp-sharpyuv-gamma-oob":     "out-of-bounds-read",      # unclamped LUT index -> OOB read
+    "libwebsockets-lhp-class-oob":    "out-of-bounds-read",      # strlen past 47-byte heap alloc -- read
+    "mongoose-mg-match-overflow":     "out-of-bounds-read",      # s.buf[s.len] backtrack read -- read
+    "mongoose-mqtt-nextprop-oob":     "out-of-bounds-read",      # next_prop i[0]/i[1] read past end -- read
     "ndpi-hex-decode-sscanf":         "out-of-bounds-read",      # sscanf reads past borrowed src buffer
     "netsnmp-vacm-parse-npd":         "null-pointer-dereference",  # skip_token_const()->NULL then deref
     "opcua-pubsub-json-assert":       "reachable-assertion",     # lookAheadForKey assertion
+    "opencv-yaml-parsekey":           "out-of-bounds-read",      # *--endptr reads before line buffer -- read
+    "openh264-scenechange-overflow":  "out-of-bounds-read",      # SAD kernel pSrc reads past plane -- read (no store)
+    "openldap-parse-whsp":            "out-of-bounds-read",      # get_token (*sp)++ past NUL then **sp read -- read
+    "openscreen-jsoncpp-error-message-overflow": "out-of-bounds-read",  # json_reader CR-LF look-ahead deref past end -- read
     "openscreen-jsoncpp-nonobject-oob": "reachable-assertion",   # jsoncpp find() JSON_ASSERT abort
+    "openssl-des-ofb-cfb-overread":   "out-of-bounds-read",      # d[n] indexes past 8-byte stack DES_cblock -- read
     "ots-processgeneric-npd":         "null-pointer-dereference",  # maxp NULL deref
     "pdfbox-pfb-negative-array":      "uncaught-exception",      # NegativeArraySizeException
     "skia-raster8888-blur-oob":       "out-of-bounds-read",      # eval_blur_passes OOB pixel pointer (read)
     "spirv-orderblocks-segv":         "null-pointer-dereference",  # blocks[0] on empty CFG -> null data deref
+    "spirv-tools-friendlynamemapper-overflow": "out-of-bounds-read",  # inst.words[3] read past word buffer -- read
     "systemd-hwdb-trie-oob-read":     "out-of-bounds-read",      # trie offset deref before bounds check
+    "upx-elf64-generate-overflow":    "out-of-bounds-read",      # fo->write source overread of file_image -- read
+    # Former ASan-crash-class spatial labels (heap/stack-buffer-overflow/underflow)
+    # re-expressed as the SEMANTIC operation. ASan banner confirms read vs write.
+    "harfbuzz-fontations-oob-write":  "out-of-bounds-write",     # copy_from_slice into 1-byte stack buf -- WRITE
+    "libaom-restore-layer-overflow":  "out-of-bounds-write",     # lrc->avg_frame_bandwidth = ... on OOB layer ctx -- ASan WRITE
+    "libvpx-vp9-reconfig-overflow":   "out-of-bounds-write",     # memset past entropy-context arrays -- WRITE
+    "openldap-ldif-stack-underflow":  "out-of-bounds-read",      # last_ch = line[-1] read before stack buf -- READ
+    "simdutf-utf16-utf8-overflow":    "out-of-bounds-write",     # convert_utf16_to_utf8 write-before-check -- WRITE
 }
 
+# Crash class -> canonical category, ONLY where the crash class itself pins the
+# semantic type. The ASan spatial crash classes (heap-buffer-overflow,
+# stack-buffer-overflow/underflow) are deliberately ABSENT: they are read/write-
+# ambiguous symptoms, so every spatial bug must be curated above to out-of-bounds-
+# read or out-of-bounds-write (the semantic operation). Those crash-class names
+# live only in expected.yaml class.expected, never in category.
 _CONFIDENT_MAP = {
-    "heap-buffer-overflow":    "heap-buffer-overflow",
     "heap-use-after-free":     "use-after-free",
     "use-after-free":          "use-after-free",
-    "stack-buffer-overflow":   "stack-buffer-overflow",
-    "stack-buffer-underflow":  "stack-buffer-underflow",
     "stack-overflow":          "stack-exhaustion",
     "oob-read":                "out-of-bounds-read",
     "memory-leak":             "memory-leak",

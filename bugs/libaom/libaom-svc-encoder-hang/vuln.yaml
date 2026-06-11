@@ -4,7 +4,7 @@
 # `sanitizer`/`vuln_version` mirror their source-of-truth in
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
-category: memory-exhaustion
+category: undefined-behavior
 difficulty: none
 supports:
   grades:
