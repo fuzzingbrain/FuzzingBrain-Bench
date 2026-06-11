@@ -5,9 +5,35 @@ Project:     fwupd (libfwupdplugin)
 Bug class:   integer-underflow -> out-of-memory
 Sanitizer:   libFuzzer (OOM, -rss_limit_mb)
 
-The harness loads the input as firmware via fwupd's firmware parser.
-fu_sbatlevel_section_add_entry() in libfwupdplugin/fu-sbatlevel-section.c
-computes a length from attacker-controlled header fields and subtracts
-without checking for underflow. A crafted SBAT-level section makes the
-length wrap to a huge unsigned value, which is then used as an
-allocation/copy size and exhausts memory (OOM).
+The libFuzzer harness (harness/fu-fuzzer-firmware.c.in) wraps the raw input
+bytes in a static GBytes and calls fu_fuzzer_test_input() on a freshly
+constructed FuSbatlevelSection object, which drives the firmware parser
+fu_sbatlevel_section_parse() (libfwupdplugin/fu-sbatlevel-section.c:71).
+
+The section header is parsed at line 80 from the SBAT-level struct
+(fu-sbatlevel-section.rs: version:u32le, previous:u32le, latest:u32le). The
+attacker-controlled "previous" and "latest" u32 fields are used directly to
+form a stream offset: line 86 computes offset = sizeof(guint32) +
+get_previous(st), and line 95 computes offset = sizeof(guint32) +
+get_latest(st). These offsets are passed to fu_sbatlevel_section_add_entry()
+with no bound against the actual stream size.
+
+Inside fu_sbatlevel_section_add_entry() the faulting expression is the
+unsigned gsize subtraction at libfwupdplugin/fu-sbatlevel-section.c:55:
+
+    partial_stream = fu_partial_input_stream_new(stream, offset, streamsz - offset, error);
+
+When the header's "previous"/"latest" value makes offset exceed streamsz
+(the real stream length, from fu_input_stream_size at line 34), streamsz -
+offset wraps to a near-2^64 gsize. That huge value becomes the length of the
+partial input stream, which is then consumed by fu_firmware_parse_stream()
+(line 60); the oversized read/allocation exhausts memory and libFuzzer aborts
+on the rss_limit_mb cap (OOM). A secondary unchecked subtraction exists at
+line 41 (streamsz = i - 1) when the first scanned byte is NUL.
+
+Call chain:
+  LLVMFuzzerTestOneInput                          harness/fu-fuzzer-firmware.c.in:14
+  fu_sbatlevel_section_parse                      libfwupdplugin/fu-sbatlevel-section.c:71
+    header parse / get_previous|get_latest        libfwupdplugin/fu-sbatlevel-section.c:80,86,95
+  fu_sbatlevel_section_add_entry                  libfwupdplugin/fu-sbatlevel-section.c:21
+    streamsz - offset  (underflow -> huge size)   libfwupdplugin/fu-sbatlevel-section.c:55

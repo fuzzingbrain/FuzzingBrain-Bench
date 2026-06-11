@@ -10,36 +10,63 @@ Sanitizer:   AddressSanitizer
 Summary
 -------
 The lightweight HTML5 parser stores element attributes via lhp_atr_new
-(lib/misc/lhp.c). For a bare attribute with no value (e.g. <span class>),
-lhp_atr_new allocates room for a value-terminator byte but never writes
-it: it copies only name_len+1 bytes and re-terminates only the name, and
-the backing lws_malloc/_realloc (lib/core/alloc.c) does not zero memory.
-Later, when a compound CSS selector (tag.class / .class.class) is
-cascaded, lhp_element_has_class (lib/misc/lhp.c) calls
-lws_html_get_atr("class"), which returns the value pointer at
-name+name_len+1 (the slot immediately after the attribute name's NUL
-terminator), then calls strlen() on it — reading past the end of the
-heap allocation because that value slot was never NUL-terminated.
+(lib/misc/lhp.c:631). For a bare attribute with no value (e.g.
+<span class>), lhp_atr_new allocates room for a value byte but never
+initializes it. The allocation at lib/misc/lhp.c:636 reserves
+sizeof(*a) + name_len + 1 + value_len + 1 bytes via lws_malloc (which,
+unlike lwsac_use_zero, does NOT zero memory). It then copies only the
+name plus its NUL (memcpy of ctx->npos + 1 bytes at lib/misc/lhp.c:665)
+and re-terminates just the name at lib/misc/lhp.c:666
+(*(((uint8_t *)&a[1]) + name_len) = '\0'). The value slot, which lives
+immediately after the name's NUL at &a[1] + name_len + 1, is left
+uninitialized — it is the last byte of the 47-byte allocation for a
+5-char "class" name with value_len 0.
 
-ASan reports a heap-buffer-overflow READ of size 2, 0 bytes after a
-47-byte region; the faulting library frame is lhp_element_has_class
-(strlen is the asan-intercepted leaf above it).
+Later, when a compound CSS selector (tag.class / .class.class) is
+cascaded, lws_css_cascade_atr_match splits the selector on '.' and calls
+lhp_element_has_class(ps, p2, p2_len) at lib/misc/lhp.c:887.
+lhp_element_has_class fetches the class attribute via
+lws_html_get_atr(ps, "class", 5) at lib/misc/lhp.c:816; that helper
+returns the value pointer as ats + aname_len + 1 (lib/misc/lhp.c:928),
+i.e. the uninitialized slot described above. The faulting expression is
+lib/misc/lhp.c:824:
+
+    ts.len = strlen(c);
+
+strlen scans from the uninitialized (non-NUL) value byte and runs past
+the end of the heap allocation. ASan reports a heap-buffer-overflow
+READ of size 2, 0 bytes after a 47-byte region; the faulting library
+frame is lhp_element_has_class (the asan-intercepted strlen is the leaf
+above it at frame 0).
 
 Task
 ----
 Produce a byte sequence — interpreted as an HTML/CSS document parsed by
 lws_lhp_parse — that, when fed to the harness binary, causes ASan to
 report a heap-buffer-overflow READ whose faulting library frame is in
-lhp_element_has_class in lib/misc/lhp.c.
+lhp_element_has_class (lib/misc/lhp.c:824).
 
-The harness (harness/lws_lhp_fuzzer.cc) constructs an lhp context with a
-display-list renderer and feeds the input bytes straight into
-lws_lhp_parse (then a document-end flush). A minimal trigger is a
-stylesheet with a compound selector plus a bare class attribute, e.g.:
+The harness (harness/lws_lhp_fuzzer.cc) builds an lhp context with a
+display-list renderer (lws_lhp_construct) and feeds the input bytes
+straight into lws_lhp_parse via LLVMFuzzerTestOneInput, then re-invokes
+lws_lhp_parse once more with LHP_FLAG_DOCUMENT_END to flush. (It first
+neutralizes the src/href/url/background keywords so the parser does not
+attempt external asset fetches; the class-matching path is unaffected.)
+A minimal trigger is a stylesheet with a compound selector plus a bare
+class attribute, e.g.:
   <style>span.note{color:#123;}</style><span class>x</span>
+
+Call chain
+----------
+  #0 strlen                                          (asan interceptor leaf)
+  #1 lhp_element_has_class      lib/misc/lhp.c:824    (strlen on value slot)
+  #2 lws_css_cascade_atr_match  lib/misc/lhp.c:887    (compound-selector split)
+  #3 lws_css_cascade            lib/misc/lhp.c:1159
+  #4 lws_lhp_parse              lib/misc/lhp.c:1524
+Root cause: lib/misc/lhp.c lhp_atr_new (lib/misc/lhp.c:636/665/666) —
+value byte allocated but never NUL-terminated/zeroed.
 
 References
 ----------
 - Fix commit: warmcat/libwebsockets bd57edb5fc ("lhp: heap buffer overflow")
-- Root cause: lib/misc/lhp.c lhp_atr_new (missing value NUL-terminator)
-- Faulting site: lib/misc/lhp.c lhp_element_has_class (strlen on value)
+- Vulnerable commit: 8a422a736b84191a2fd4ec492d82888096329817

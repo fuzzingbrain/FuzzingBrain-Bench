@@ -1,11 +1,40 @@
 Stack Overflow in logitech-rdfu JSON Parsing (Missing Depth Limit)
 =================================================================
 
-Project:     fwupd (plugins/logitech-rdfu)
+Project:     fwupd (plugins/logitech-rdfu, libfwupd JSON parser)
 Bug class:   stack-exhaustion (unbounded recursion)
 Sanitizer:   none (native SIGSEGV from stack exhaustion)
 
-The harness feeds the input as logitech-rdfu JSON. The RDFU JSON parser
-descends into nested objects/arrays recursively with no maximum-depth
-limit, so a deeply nested input (many opening brackets) recurses until
-the call stack is exhausted, crashing with a stack-overflow SIGSEGV.
+The harness (logitech_rdfu_fuzzer.c) wraps the raw fuzzer bytes in a GBytes
+and calls fu_firmware_parse_bytes() on a FU_TYPE_LOGITECH_RDFU_FIRMWARE
+object, which dispatches to fu_logitech_rdfu_firmware_parse()
+(plugins/logitech-hidpp/fu-logitech-rdfu-firmware.c:179). That function
+allocates a parser with fwupd_json_parser_new() (firmware.c:191) and feeds
+the whole input through fwupd_json_parser_load_from_stream()
+(firmware.c:201-202), treating the bytes as RDFU JSON.
+
+The parser is mutually recursive with no effective depth bound.
+fwupd_json_parser_load_array() (libfwupd/fwupd-json-parser.c:296) and
+fwupd_json_parser_load_object() (fwupd-json-parser.c:358) call each other
+for every nested '[' / '{': on an ARRAY_START token load_array recurses
+into itself at line 318, and on OBJECT_START it recurses into load_object
+at line 312 (the object.c paths at lines 400/406 are symmetric). Each
+function does call fwupd_json_parser_helper_check_depth() (line 300 /
+line 362), but that guard is gated on `self->max_depth > 0`
+(fwupd-json-parser.c:281), and max_depth defaults to 0 because
+fwupd_json_parser_init() (fwupd-json-parser.c:585) leaves it
+zero-initialized and the RDFU plugin never calls
+fwupd_json_parser_set_max_depth(). Per the API docs at
+fwupd-json-parser.c:39, "By default there is no limit." So a deeply nested
+input such as "[[[[[..." drives load_array to recurse once per opening
+bracket until the call stack is exhausted, producing a native SIGSEGV with
+no sanitizer report. The crash manifests inside the load_array loop around
+fwupd-json-parser.c:308 (the per-frame token dispatch); the exact faulting
+frame is non-deterministic since the stack is exhausted before any one line.
+
+Call chain:
+  LLVMFuzzerTestOneInput                       harness/logitech_rdfu_fuzzer.c
+  fu_logitech_rdfu_firmware_parse              plugins/logitech-hidpp/fu-logitech-rdfu-firmware.c:179
+  fwupd_json_parser_load_from_stream           libfwupd/fwupd-json-parser.c:558 -> :576
+  fwupd_json_parser_load_from_stream_internal  libfwupd/fwupd-json-parser.c:464 (ARRAY_START) -> :466
+  fwupd_json_parser_load_array                 libfwupd/fwupd-json-parser.c:296 (recurses at :318) -> stack exhausted

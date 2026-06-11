@@ -1,41 +1,63 @@
 Unbounded heap allocation (~1.6 GB) in HashMgr::load_tables via unvalidated tablesize
 =====================================================================================
 
-Project:     hunspell/hunspell
+Project:     hunspell/hunspell (src/hunspell — HashMgr dictionary loader)
 Bug class:   out-of-memory (CWE-789 Memory Allocation with Excessive Size Value;
              also CWE-1284 Improper Validation of Specified Quantity in Input)
-Sanitizer:   libFuzzer out-of-memory (rss_limit_mb)
+Sanitizer:   libfuzzer-oom (libFuzzer rss_limit_mb out-of-memory)
 
-`HashMgr::load_tables()` (`src/hunspell/hashmgr.cxx:602`) reads the first line of a
-`.dic` file, parses it as a signed `int` via `atoi()`, and uses the result to
-pre-size the internal hash table via `std::vector<hentry*>::resize(tablesize,
-nullptr)` at line 642 -- before a single dictionary entry is parsed.
+`HashMgr::load_tables()` (`src/hunspell/hashmgr.cxx:602`) reads the first line of
+the `.dic` file via `FileMgr::getline` (`hashmgr.cxx:610`), strips a UTF-8 BOM,
+and parses that line into a signed `int tablesize` with `atoi()`
+(`hashmgr.cxx:622`). It then pre-sizes the internal hash table to that value via
+`tableptr.resize(tablesize, nullptr)` at `hashmgr.cxx:642` — before a single
+dictionary entry is parsed.
 
-The only pre-resize bound check (`hashmgr.cxx:631`) rejects `tablesize <= 0` or
-`tablesize >= INT_MAX / sizeof(hentry*)` (~268,435,455 entries on 64-bit). Any
-value in (0, 268M) is accepted, so a 16-byte `.dic` whose first line is
-`200000000` drives a deterministic ~1.6 GB allocation (200,000,000 entries x
-8 bytes). A second sanity check at `hashmgr.cxx:742` (`tablesize > nLineCount *
-10`) exists but fires *after* the resize, so it cannot prevent the allocation.
+The only pre-resize bound check is at `hashmgr.cxx:631`
+(`if (tablesize <= 0 || tablesize >= max_allowed)`). Because the harness is built
+WITHOUT `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION`, `max_allowed` is computed at
+`hashmgr.cxx:626` as `(INT_MAX - 1 - nExtra) / sizeof(struct hentry*)`
+(~268,435,455 entries on a 64-bit build with `nExtra = 5 + USERWORD`). Any value
+in (0, ~268M) is accepted; `tablesize` is then bumped by `nExtra` and rounded to
+odd at `hashmgr.cxx:637-639`, and the `resize` at line 642 allocates
+`tablesize * sizeof(hentry*)` bytes. A 16-byte `.dic` whose first line is
+`200000000` therefore drives a deterministic ~1.6 GB allocation
+(200,000,000 entries x 8 bytes). The later sanity check at `hashmgr.cxx:742`
+(`tablesize > 8192 + nExtra && tablesize > nLineCount * 10 + nExtra`) only sets a
+return code AFTER the word loop, so it runs far too late to prevent the
+allocation.
 
-The requested 1.6 GB block is below AddressSanitizer's default
+The requested ~1.6 GB block is below AddressSanitizer's default
 allocation-size-too-big ceiling (~3 GB), so ASan does NOT trip on the allocation
-itself. The fault surfaces as a libFuzzer out-of-memory once the resident set is
-capped: running with `-rss_limit_mb=256` makes libFuzzer abort as soon as the
-vector materializes the table.
+itself. The fault is surfaced as a libFuzzer out-of-memory once the resident set
+is capped: bench.yaml invokes the harness with `-rss_limit_mb=256`, so libFuzzer
+aborts as soon as the vector materializes the table.
 
-Reached via:
+How the harness reaches it: the libFuzzer entrypoint `LLVMFuzzerTestOneInput`
+(harness/hunspell_hashmgr_dic_loader_fuzzer.cc) carves the fuzz input with a
+`FuzzedDataProvider` into an AF/AM alias block, a primary `.dic` body, an optional
+custom `.dic` body, and trailing word bytes, writes the primary slice into a temp
+`.dic` file, and constructs `Hunspell(aff_path, dic_path)`. The fuzz-controlled
+first line of that `.dic` becomes `tablesize`. The harness wraps the ctor in
+`try { ... } catch (...)` to swallow `std::bad_alloc`, but the rss-based OOM fires
+before any allocation failure is thrown.
 
-    Hunspell::Hunspell(aff_path, dic_path)        hunspell.cxx:2142
-    └─ HunspellImpl::HunspellImpl                 hunspell.cxx:189
-       └─ HashMgr::HashMgr(tpath, apath, key)     hashmgr.cxx:88
-          └─ HashMgr::load_tables(tpath, key)     hashmgr.cxx:602
-             └─ tableptr.resize(tablesize, ...)   hashmgr.cxx:642  <- OOM alloc
+Call chain (verified against vuln_commit f23fcd33052c7c8a307eaa3e1b1a4c0cdcf45651):
 
-Note: the `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION` guard in `load_tables` caps
-`max_allowed` to ~1248 entries when that macro is defined, which is precisely why
-OSS-Fuzz never surfaced this. The harness in this benchmark is therefore built
-WITHOUT that macro, matching production builds that get the full INT_MAX ceiling.
+    LLVMFuzzerTestOneInput                          harness fuzzer .cc
+    └─ Hunspell::Hunspell(aff, dic)                 hunspell.cxx:2142 (new HunspellImpl)
+       └─ HunspellImpl::HunspellImpl               hunspell.cxx:189  (new HashMgr)
+          └─ HashMgr::HashMgr(tpath, apath, key)   hashmgr.cxx:99    (load_tables call)
+             └─ HashMgr::load_tables(tpath, key)   hashmgr.cxx:602
+                ├─ atoi(ts) -> tablesize           hashmgr.cxx:622
+                ├─ bound check (too weak)          hashmgr.cxx:631
+                └─ tableptr.resize(tablesize, ...) hashmgr.cxx:642   <- OOM alloc
+
+Note: when `FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION` is defined, `max_allowed` at
+`hashmgr.cxx:628` is capped to `(10000 - 1 - nExtra) / sizeof(hentry*)` (~1248
+entries), and the loop is also bounded at `hashmgr.cxx:654`, which is precisely why
+OSS-Fuzz never surfaced this. The benchmark harness is built without that macro,
+matching production builds that get the full INT_MAX-derived ceiling at line 626.
 
 References
 ----------

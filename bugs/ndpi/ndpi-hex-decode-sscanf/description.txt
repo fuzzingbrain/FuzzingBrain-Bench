@@ -7,21 +7,40 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-ndpi_hex_decode() in src/lib/ndpi_utils.c uses per-byte
-`sscanf("%02hhX", ...)` to parse hex characters from a caller-
-supplied byte buffer. The buffer is not required (by the public API)
-to be NUL-terminated. glibc's sscanf internally calls
-`memchr(s, 0, SIZE_MAX)` to compute the string length, walking past
-the end of the caller's buffer. Under ASan the read lands in the
-heap redzone.
+ndpi_hex_decode() at src/lib/ndpi_utils.c:1134 hex-decodes a caller-
+supplied byte buffer two characters at a time. The decode loop runs
+for(i=0; i<*out_len; i++) where *out_len = len/2 (line 1138), and on
+each iteration executes:
 
-Reachable from the public NDPI_EXPORT API `ndpi_decode_tls_blocks`.
-In-tree callers pass NUL-terminated strings; out-of-tree consumers
-that feed raw bytes hit the bug.
+    src/lib/ndpi_utils.c:1144
+      sscanf((const char*)&src[ret_idx], "%02hhX", &ret[i]);
 
-Task
-----
-Produce a byte sequence that the harness binary
-(fuzz_ndpi_decode_tls_blocks.c) feeds into ndpi_decode_tls_blocks
-without a trailing NUL, causing ASan to report a heap-buffer-overflow
-read inside ndpi_hex_decode at src/lib/ndpi_utils.c.
+with ret_idx advancing by 2 per byte (line 1145). The `src` buffer is
+NOT required to be NUL-terminated, but `sscanf` treats its input as a
+C string: glibc's vfscanf wraps the buffer in a memory FILE and, to
+bound the read, calls memchr(s, 0, SIZE_MAX) to locate the string
+length before applying the "%02hhX" conversion. With no NUL inside
+`src`, that length probe walks past the end of the heap allocation.
+Even though the %02 width caps the *conversion* at two characters, the
+strlen-style scan happens first and reads beyond the buffer. Under
+ASan this is a heap-buffer-overflow read; with the harness replaying
+the single input many times in-process the bad read crosses a page
+boundary and surfaces as SEGV (both are the same root cause — see
+grader notes).
+
+Harness
+-------
+fuzz_ndpi_decode_tls_blocks.c passes the raw fuzz bytes straight to the
+public API: ndpi_decode_tls_blocks((const u_char*)data, (u_int)size,
+&num_blocks) (harness line 24). The bytes are NOT NUL-terminated by the
+harness, so any input of length >= 2 with no embedded 0x00 reaches the
+over-read. ndpi_decode_tls_blocks() at src/lib/ndpi_utils.c:5341
+forwards `data` unchanged into ndpi_hex_decode() (call at line 5345),
+so the borrowed, unterminated buffer is exactly what sscanf scans.
+
+Call chain
+----------
+  LLVMFuzzerTestOneInput        harness/fuzz_ndpi_decode_tls_blocks.c:24
+  ndpi_decode_tls_blocks        src/lib/ndpi_utils.c:5345 (calls hex_decode)
+  ndpi_hex_decode               src/lib/ndpi_utils.c:1144 (sscanf over src)
+  sscanf -> glibc memchr(s,0,SIZE_MAX)  (OOB read past end of src)

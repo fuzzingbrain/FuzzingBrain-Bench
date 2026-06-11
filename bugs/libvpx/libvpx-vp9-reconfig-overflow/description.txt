@@ -8,29 +8,63 @@ Sanitizer:   AddressSanitizer
 Summary
 -------
 The VP9 encoder sizes its per-frame entropy-context buffers
-(cm->above_context / cm->above_seg_context) by the configured frame
-width (mi_cols). vpx_codec_enc_config_set() -> vp9_change_config only
-reallocates the context buffers when the new total mi size exceeds the
-old allocation (cm->mi_alloc_size < new_mi_size); it does not re-check
-mi_cols on its own. So a mid-stream reconfig that increases the width
-(more mi_cols) while keeping the total mi size within the prior
-allocation leaves above_context under-sized. The next encode's
-init_encode_frame_mb_context() memsets above_context using the new,
-larger aligned_mi_cols, overflowing the heap buffer.
+(xd->above_context / xd->above_seg_context) by the aligned frame width in
+mode-info columns. On a mid-stream resolution change those buffers are only
+reallocated when the *total* mi allocation grows, not when the width alone
+grows, so an encode after such a reconfig memsets past the end of the
+under-sized heap buffer.
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, drives the
-encoder through a reconfiguration that increases the width followed by an
-encode, so the sanitizer reports a heap-buffer-overflow whose faulting
-library frame is in libvpx's VP9 encoder (vp9/encoder/vp9_encodeframe.c).
+Root cause
+----------
+vp9_change_config() in vp9/encoder/vp9_encoder.c:2083 re-runs the dimension
+math: vp9_set_mb_mi() at line 2157 recomputes cm->mi_cols/mi_rows from the new
+width/height, then new_mi_size is computed at line 2158. The reallocation guard
+at vp9_encoder.c:2159 only frees and re-allocates the context buffers when
+"cm->mi_alloc_size < new_mi_size". When the new width yields the *same* total
+mi size (the else-if branch at lines 2167-2173, taken when
+cm->mi_alloc_size == new_mi_size and width/height increased) only the loop
+filter is reallocated; the above_context / above_seg_context buffers keep their
+old, smaller size. Because the harness's dimension ladder lets the width grow
+while total mi size stays within the prior allocation (e.g. 128x256 -> 256x128:
+same mi product, larger mi_cols), above_context is left under-sized for the new
+aligned_mi_cols.
 
-The harness (harness/vp9_encoder_midstream_reconfig_fuzzer.cc) initializes
-a VP9 encoder, then across reconfig epochs mutates only (width, height,
-rc_target_bitrate) from a pre-validated dimension ladder, applying
-vpx_codec_enc_config_set() before each vpx_codec_encode(); the timebase is
-set once at init and lag is fixed at 0.
+Crash site
+----------
+On the next encode, init_encode_frame_mb_context() in
+vp9/encoder/vp9_encodeframe.c:4280 computes
+  aligned_mi_cols = mi_cols_aligned_to_sb(cm->mi_cols)   (line 4284)
+using the new, larger mi_cols, then at vp9/encoder/vp9_encodeframe.c:4293-4294
+executes:
+  memset(xd->above_context[0], 0,
+         sizeof(*xd->above_context[0]) * 2 * aligned_mi_cols * MAX_MB_PLANE);
+This memset writes 2 * aligned_mi_cols * MAX_MB_PLANE entries into a buffer that
+was allocated for the old (smaller) aligned width, so ASan reports a
+heap-buffer-overflow WRITE at vp9_encodeframe.c:4293. (The following
+above_seg_context memset at line 4295 overflows analogously.)
+
+Call chain
+----------
+- vp9/encoder/vp9_encodeframe.c:4293  init_encode_frame_mb_context  <- memset overflow
+- vp9/encoder/vp9_encodeframe.c:5656  encode_frame_internal         (calls init_encode_frame_mb_context)
+- vp9/encoder/vp9_encodeframe.c:5882  vp9_encode_frame              (calls encode_frame_internal)
+- under-allocation set up earlier by vp9/encoder/vp9_encoder.c:2159 vp9_change_config
+
+Harness
+-------
+harness/vp9_encoder_midstream_reconfig_fuzzer.cc initializes a VP9 encoder via
+vpx_codec_enc_init, then loops over up to 6 epochs. Input byte 0 selects the
+initial (width,height) and bitrate, byte 1 selects the timebase, and each
+subsequent payload byte (offset 2 onward) seeds one epoch. Per epoch it encodes
+2 frames, then mutate_cfg() picks a new (width,height,bitrate) from a
+pre-validated ladder (kDimLadder / kBitrateLadder) and pushes it via
+vpx_codec_enc_config_set() (which dispatches to vp9_change_config) before the
+next encode. Timebase is set once at init and g_lag_in_frames is fixed at 0. A
+byte sequence whose epoch seeds drive a width-increasing reconfig that keeps the
+total mi size within the prior allocation, followed by an encode, triggers the
+overflow.
 
 References
 ----------
-- Source: vp9/encoder/vp9_encodeframe.c (init_encode_frame_mb_context), vp9_change_config
+- vp9/encoder/vp9_encodeframe.c:4293 (init_encode_frame_mb_context, faulting memset)
+- vp9/encoder/vp9_encoder.c:2159 (vp9_change_config, under-allocation guard)

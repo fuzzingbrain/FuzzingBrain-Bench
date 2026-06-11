@@ -7,26 +7,65 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-AcquireKernelInfo() parses a morphology kernel specification string.
-For a built-in kernel whose radius is taken directly from the input
-string, the kernel allocation is sized from the attacker-controlled
-radius without an upper bound. A crafted kernel string with a huge
-radius makes the allocation request reach AcquireAlignedMemory with a
-multi-gigabyte size, which AddressSanitizer reports as
-allocation-size-too-big and aborts.
+AcquireKernelInfo() (MagickCore/morphology.c:485) parses a morphology
+kernel specification string. For a named built-in convolution kernel
+(Gaussian / DoG / LoG), the kernel dimensions are derived directly from
+the attacker-controlled radius argument with no upper bound, so a large
+radius makes the values-array allocation request reach
+AcquireAlignedMemory with a multi-gigabyte size, which AddressSanitizer
+reports as "requested allocation size ... exceeds maximum" and aborts.
 
-Task
-----
-Produce a byte sequence that, when fed to the harness binary, drives
-AcquireKernelInfo to request an oversized allocation, causing the
-sanitizer to abort with the faulting library frame in MagickCore's
-memory allocator on the kernel-parsing path.
+Mechanism
+---------
+AcquireKernelInfo() tokenizes the kernel string and, when a token begins
+with an alpha character, dispatches to ParseKernelName() at
+MagickCore/morphology.c:519. ParseKernelName() (defined at
+morphology.c:369) fills a GeometryInfo whose first argument becomes
+args->rho (the kernel radius) and calls AcquireKernelBuiltIn() at
+morphology.c:469.
 
-The harness (harness/profile_fuzzer.cc) builds a morphology kernel
-specification string from the input bytes (several encodings: named
-kernel list, old-style kernel, user kernel list, raw string) and
-passes it to MagickCore::AcquireKernelInfo().
+In AcquireKernelBuiltIn() (defined at morphology.c:951), the
+GaussianKernel/DoGKernel/LoGKernel case (morphology.c:1046-1064) sizes
+the kernel from the radius with no clamp: when args->rho >= 1.0,
+
+    morphology.c:1055   kernel->width = CastDoubleToSizeT(args->rho)*2+1;
+    morphology.c:1060   kernel->height = kernel->width;
+
+The kernel value buffer is then requested at
+
+    morphology.c:1062-1064
+      kernel->values=(MagickRealType *) MagickAssumeAligned(
+        AcquireAlignedMemory(kernel->width,kernel->height*
+        sizeof(*kernel->values)));
+
+Because width and height both scale linearly with the unbounded radius,
+the count*size product passed to AcquireAlignedMemory becomes enormous.
+The allocation reaches AcquireAlignedMemory_POSIX, which calls
+posix_memalign at MagickCore/memory.c:277 with the oversized size; ASan
+intercepts the request and aborts before any heap write.
+
+How the harness drives it
+-------------------------
+harness/profile_fuzzer.cc consumes the input via a ByteReader: the first
+byte selects one of five build modes (reader.GetByte() % 5). Mode 3
+(MakeNamedKernelList) emits a "<Name>:a x b + x + y" string drawn from a
+fixed name table including "Gaussian", "DoG" and "LoG"; mode 4
+(MakeSanitizedRawString) maps input bytes onto a kernel-grammar alphabet
+("...:;,xX+-.@><'%") and can likewise spell a named kernel with a
+numeric radius. The resulting kernel specification string is passed
+directly to MagickCore::AcquireKernelInfo() in LLVMFuzzerTestOneInput.
+
+Call chain
+----------
+- MagickCore/memory.c:277        posix_memalign (faulting alloc site, AcquireAlignedMemory_POSIX)
+- MagickCore/morphology.c:1062   AcquireKernelBuiltIn -> AcquireAlignedMemory(width, height*sizeof)
+- MagickCore/morphology.c:1055   width = CastDoubleToSizeT(args->rho)*2+1  (unbounded radius)
+- MagickCore/morphology.c:469    ParseKernelName -> AcquireKernelBuiltIn(type, &args, exception)
+- MagickCore/morphology.c:519    AcquireKernelInfo -> ParseKernelName(p, exception)
 
 References
 ----------
-- Source: MagickCore/morphology.c, function AcquireKernelInfo
+- Source: MagickCore/morphology.c, AcquireKernelInfo (line 485),
+  ParseKernelName (line 369), AcquireKernelBuiltIn (line 951),
+  Gaussian/DoG/LoG sizing+allocation (lines 1046-1064)
+- Allocation site: MagickCore/memory.c:277

@@ -3,21 +3,44 @@ Decompression bomb in Avro Java DataFileReader
 
 Project:     apache/avro (lang/java)
 Bug class:   oom (Java OutOfMemoryError)
-Sanitizer:   JVM (heap exhaustion at -Xmx256m)
+Sanitizer:   jvm (heap exhaustion at -Xmx256m)
 
-Avro container files can declare a compression codec ("snappy",
-"deflate", "bzip2", "xz", "zstandard") on a per-block basis. The Java
-implementation calls the codec's decompress() routine and accepts the
-returned ByteBuffer without checking the declared block size against
-any sane upper bound. A maliciously-crafted block can declare a small
-compressed payload that expands into a multi-gigabyte buffer, exhausting
-the heap and crashing the JVM with OutOfMemoryError.
+Avro container files declare a compression codec (e.g. "deflate") and,
+per data block, a *compressed* block size. When iterating records, the
+inherited DataFileStream.hasNext() reads the next raw block and calls
+block.decompressUsing(codec) at
+lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java:227.
+DataBlock.decompressUsing() (same file, line 380) invokes
+c.decompress(getAsByteBuffer()) at line 381 and accepts the returned
+ByteBuffer with no upper bound on its size. For the deflate codec,
+DeflateCodec.decompress()
+(lang/java/avro/src/main/java/org/apache/avro/file/DeflateCodec.java:80)
+inflates the whole block into an unbounded
+NonCopyingByteArrayOutputStream: outputStream.write(...) at line 83 grows
+the backing array to the full inflated length and the result is returned
+at line 85. The only size check, in hasNextBlock() at
+DataFileStream.java:305, validates the *compressed* blockSize against
+Integer.MAX_VALUE and never bounds the decompressed output, so a tiny
+compressed payload that inflates to ~1 GiB passes through and exhausts
+the heap, raising OutOfMemoryError.
 
-The harness exercises the Avro Java DataFileReader against
-fuzzer-controlled bytes; with -Xmx256m, decompression-bomb inputs
-deterministically trigger OOM.
+The harness (DecompressionBombFuzzer.fuzzerTestOneInput) wraps the raw
+fuzzer bytes in a SeekableByteArrayInput, opens a
+DataFileReader<GenericRecord>, and loops over fileReader.hasNext() /
+fileReader.next() (hasNext/next are inherited from DataFileStream),
+driving the decompression path above. The PoC (poc/generate_poc.py)
+builds a valid Avro header declaring avro.codec="deflate" plus one raw
+deflate stream of ~1 GiB of zeros, so with -Xmx256m the JVM
+deterministically dies with OutOfMemoryError.
 
-References
+Call chain
 ----------
-- Upstream PR (vuln_commit picked from its first parent):
-- Fix (AVRO-4247) merged via #3745:
+- DataFileReader.next()/hasNext() (inherited)
+- DataFileStream.hasNext()                  DataFileStream.java:215
+    -> block.decompressUsing(codec)         DataFileStream.java:227
+- DataBlock.decompressUsing(Codec)          DataFileStream.java:380
+    -> c.decompress(getAsByteBuffer())      DataFileStream.java:381
+- DeflateCodec.decompress(ByteBuffer)       DeflateCodec.java:80
+    -> outputStream.write(...) inflates unbounded into baos
+                                            DeflateCodec.java:83
+    -> return baos.asByteBuffer()           DeflateCodec.java:85  (OOM)

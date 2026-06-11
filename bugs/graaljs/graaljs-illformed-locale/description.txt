@@ -3,16 +3,44 @@ IllformedLocaleException treated as Internal Error in Intl API
 
 Project:     graaljs (Intl implementation; runtime/util/IntlUtil.java)
 Bug class:   uncaught-exception (IllformedLocaleException)
-Sanitizer:   JVM (uncaught exception / "Internal Error")
+Sanitizer:   jvm (uncaught exception / "Internal Error")
 
-The harness reads the input as a UTF-8 string and passes it as a locale
-to the Intl API (`new Intl.Locale(tag)`). IntlUtil.canonicalizeLanguageTag()
-canonicalizes the tag via ICU's `new ULocale.Builder().setLocale(...)`,
-which throws ICU's `IllformedLocaleException` for a tag that passes the
-BCP-47 well-formedness gate (UTS35Validator) but is rejected by ICU's
-stricter variant rules. The surrounding `catch (IllformedLocaleException e)`
-catches `java.util.IllformedLocaleException`, a *different* class from
-ICU's shadowed `com.ibm.icu.util.IllformedLocaleException`, so the thrown
-exception is never matched and converted to a JavaScript RangeError — it
-escapes as an Internal Error. The trigger is a tag in that gap (well-formed
-BCP-47 but ICU-invalid, e.g. an ill-formed variant subtag).
+The harness (IntlFuzzer.fuzzerTestOneInput, IntlFuzzer.java) decodes the
+fuzz bytes as a UTF-8 string, single-quote-escapes it, and evaluates
+`new Intl.Locale('<tag>')` in a polyglot js Context; if the resulting
+PolyglotException reports isInternalError() it rethrows as a RuntimeException
+("Internal error from user input"), which crashes the JVM. The expected
+behavior is a JavaScript RangeError (a normal, non-internal exception).
+
+Root cause is in IntlUtil.canonicalizeLanguageTag()
+(graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java:532).
+Its caller validateAndCanonicalizeLanguageTag() first gates the tag through
+the BCP-47 well-formedness check at line 523
+(UTS35Validator.isWellFormedUnicodeBCP47LocaleIdentifier), then calls
+canonicalizeLanguageTag(). Inside, the tag is fed to the SHADOWED ICU
+locale builder `org.graalvm.shadowed.com.ibm.icu.util.ULocale.Builder`
+(import at line 65): `new ULocale.Builder().setLocale(locale)` at line 535,
+followed by `builder.setVariant(...)` (line 549), `builder.setUnicodeLocaleKeyword(...)`
+(line 579), `builder.setExtension('t', ...)` (line 591) and `builder.build()`
+(line 594). For a tag that passes the BCP-47 gate but violates ICU's stricter
+rules (e.g. an ill-formed variant subtag), one of these ICU builder calls
+throws `org.graalvm.shadowed.com.ibm.icu.util.IllformedLocaleException`.
+
+The surrounding `catch (IllformedLocaleException e)` at line 596 (which would
+convert the exception to a RangeError at line 597) is bound to the WRONG class:
+`java.util.IllformedLocaleException`, imported at line 48. That is a different
+type from the shadowed ICU exception actually thrown by the ULocale.Builder, so
+the catch never matches. The ICU IllformedLocaleException propagates out
+uncaught, Truffle classifies it as an internal error, PolyglotException.isInternalError()
+returns true, and the harness rethrows it as a fatal "Internal error from user input".
+
+(Note: `new Locale.Builder().setLanguageTag(...)` at line 568 uses java.util.Locale
+(import line 50) and does throw java.util.IllformedLocaleException, so that one
+would be caught; only the shadowed-ICU ULocale.Builder operations leak.)
+
+Call chain:
+  IntlFuzzer.fuzzerTestOneInput              harness/IntlFuzzer.java  (eval `new Intl.Locale(...)`)
+  IntlUtil.validateAndCanonicalizeLanguageTag  IntlUtil.java:519 -> BCP-47 gate :523 -> :527
+  IntlUtil.canonicalizeLanguageTag           IntlUtil.java:532
+  ULocale.Builder.setLocale/setVariant/build IntlUtil.java:535 / :549 / :591 / :594  (throws ICU IllformedLocaleException)
+  catch (java.util.IllformedLocaleException) IntlUtil.java:596  (class mismatch — does not catch the ICU exception)

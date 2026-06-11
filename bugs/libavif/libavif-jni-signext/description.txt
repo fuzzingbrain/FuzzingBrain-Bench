@@ -7,10 +7,33 @@ Sanitizer:   AddressSanitizer
 
 The Android JNI wrapper passes the AVIF byte buffer's length as a Java
 `int`. When that length is widened to `size_t` for
-avifDecoderSetIOMemory(), a value with the sign bit set is sign-extended
-to a huge 64-bit size. The decoder then trusts that size and reads past
-the end of the actual buffer in avifDecoderParse(), a heap buffer
-overflow. The harness reproduces this by handing avifDecoderSetIOMemory
-a hardcoded size of `(size_t) -1` (SIZE_MAX) over a small valid buffer
-— exactly the value the JNI shim produces when Java passes
-`int length = -1`.
+avifDecoderSetIOMemory() (src/read.c:5120), a value with the sign bit set
+is sign-extended to a huge 64-bit size. That size is stored verbatim as
+`reader->rodata.size` in avifIOCreateMemoryReader() (src/io.c:148-149).
+The decoder then trusts that size while parsing and reads past the end of
+the actual buffer. The harness reproduces this natively by calling
+avifDecoderSetIOMemory(decoder, buffer, (size_t)-1) over a small malloc'd
+copy of the libFuzzer input — exactly the value SIZE_MAX that the JNI
+shim produces when Java passes `int length = -1`.
+
+Mechanism: with rodata.size == SIZE_MAX, the memory reader's clamp in
+avifIOMemoryReaderRead() (src/io.c:115, `availableSize = rodata.size -
+offset`) never shrinks a request, so the decoder builds an avifROStream
+whose `raw->size` is SIZE_MAX. The bounds guard
+avifROStreamHasBytesLeft() (src/stream.c:33) returns
+`byteCount <= (raw->size - offset)`, which is always true against a
+SIZE_MAX size. avifROStreamRead() (src/stream.c:66) then performs
+`memcpy(data, stream->raw->data + stream->offset, size)` at
+src/stream.c:74, copying from beyond the small heap allocation. On the
+avifDecoderParse() path the first over-read is the 32-bit box-size field
+read by avifROStreamReadU32() at src/stream.c:128. Because the claimed
+size walks off into unmapped pages, ASan reports this as a heap buffer
+overflow (or SEGV on unknown address, depending on layout).
+
+Call chain:
+  LLVMFuzzerTestOneInput -> avifDecoderSetIOMemory          src/read.c:5120
+    -> avifIOCreateMemoryReader (rodata.size = SIZE_MAX)     src/io.c:148
+  avifDecoderParse -> avifIOMemoryReaderRead (no clamp)      src/io.c:115
+    -> avifROStreamHasBytesLeft (guard always true)          src/stream.c:33
+    -> avifROStreamReadU32 (box size read)                   src/stream.c:128
+    -> avifROStreamRead -> memcpy past buffer (fault)        src/stream.c:74

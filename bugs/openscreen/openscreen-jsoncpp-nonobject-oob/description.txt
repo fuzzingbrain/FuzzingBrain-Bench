@@ -13,16 +13,36 @@ its siblings VideoConstraints / Constraints / DisplayDescription) take a
 `const Json::Value& root` and immediately index it with string keys
 (e.g. root[kMaxSampleRate]) without first calling root.isObject(). When
 the attacker-supplied JSON document parses to a non-object Value — a bare
-array `[]`, a number, a string, or a bool — jsoncpp's
-operator[](key) const routes into Json::Value::find(), whose precondition
-JSON_ASSERT_MESSAGE(type() == nullValue || type() == objectValue, ...)
-fails. Under openscreen's production configuration
-(JSON_USE_EXCEPTION=0, -DNDEBUG, -fno-exceptions) the JSON_FAIL_MESSAGE
-macro expands to `{ ...; assert(false && ...); abort(); }`: NDEBUG elides
-the assert(), but the trailing unconditional abort() still runs. The
-result is a network-reachable, pre-auth abort of any Cast sender whose
-OnMessage path validates an ANSWER from an attacker-controlled LAN Cast
-receiver.
+array `[]`, a number, a string, or a bool — the const string-keyed
+operator[] routes into Json::Value::find().
+
+In the DEPS-pinned jsoncpp (1.9.4, rev 9af09c4a, the rev openscreen built
+its binary from), the relevant frames in src/lib_json/json_value.cpp are:
+
+  - const Value& Value::operator[](const String& key) const
+    is defined at json_value.cpp:1193; its body calls `find(key)` at
+    json_value.cpp:1194.
+  - Value const* Value::find(const String& key) const at
+    json_value.cpp:1129 forwards to the two-pointer overload at
+    json_value.cpp:1130.
+  - Value const* Value::find(char const* begin, char const* end) const
+    begins at json_value.cpp:1116, and its FIRST statement is the
+    precondition guard
+      JSON_ASSERT_MESSAGE(type() == nullValue || type() == objectValue,
+                          "in Json::Value::find(begin, end): requires "
+                          "objectValue or nullValue");
+    at json_value.cpp:1117. For an arrayValue/number/string/bool root the
+    condition is false.
+
+JSON_ASSERT_MESSAGE (include/json/assertions.h:54) expands its failing
+branch to JSON_FAIL_MESSAGE. Under openscreen's production configuration
+(JSON_USE_EXCEPTION=0, -DNDEBUG, -fno-exceptions) JSON_FAIL_MESSAGE takes
+the non-exception definition at include/json/assertions.h:44, whose body
+is `{ OStringStream oss; oss << message; assert(false && ...); abort(); }`
+— NDEBUG elides the assert() at assertions.h:48, but the trailing
+unconditional abort() at assertions.h:49 still runs. The result is a
+network-reachable, pre-auth abort of any Cast sender whose OnMessage path
+validates an ANSWER from an attacker-controlled LAN Cast receiver.
 
 The same jsoncpp non-object find() abort is reachable from the sibling
 RECEIVER- and SENDER-message parsers (receiver_message.cc /
@@ -32,13 +52,24 @@ root cause and fix (an isObject() guard before any value[key]) are the
 same. The primary harness/crash here is the ANSWER (answer_messages)
 path.
 
+Call chain
+----------
+  AudioConstraints::TryParse (cast/streaming/public/answer_messages.cc)
+    -> root[key]  i.e. Value::operator[](const String&) const
+                  src/lib_json/json_value.cpp:1193 (calls find at :1194)
+    -> Value::find(const String&) const   json_value.cpp:1129 (calls :1130)
+    -> Value::find(char const*, char const*) const  json_value.cpp:1116
+       -> JSON_ASSERT_MESSAGE precondition fails    json_value.cpp:1117
+         -> JSON_FAIL_MESSAGE  include/json/assertions.h:44
+           -> abort()          include/json/assertions.h:49   <-- faults
+
 Task
 ----
 Produce a JSON document that, when parsed and handed to one of the
 openscreen ANSWER sub-struct TryParse entries, drives a `root[key]`
 lookup on a non-object Json::Value and makes the sanitizer report a
 deadly signal (ABRT) whose faulting library frame is in jsoncpp's
-Json::Value::find (src/lib_json/json_value.cpp).
+Json::Value::find (src/lib_json/json_value.cpp:1117).
 
 The harness (harness/openscreen_answer_messages_deep_substructs_fuzzer.cc)
 reads byte 0 as a selector (mod 5, picking one of the five sub-struct
@@ -50,4 +81,5 @@ References
 - Tracker: https://issues.chromium.org/issues/505902443 (siblings
   505902444 / 505947418); fix CL
   https://chromium-review.googlesource.com/c/openscreen/+/7801091
-- Bundled library: jsoncpp 1.9.4, Json::Value::find / operator[].
+- Bundled library: jsoncpp 1.9.4 (rev 9af09c4a), Json::Value::find /
+  operator[].

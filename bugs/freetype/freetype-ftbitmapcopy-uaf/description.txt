@@ -8,32 +8,62 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-FreeType's bitmap-glyph initializer performs a "lazy copy" when the
-glyph slot owns its rendered bitmap: ft_bitmap_glyph_init (ftglyph.c)
-moves the slot's FT_Bitmap pointer into the new FT_Glyph and clears the
-FT_GLYPH_OWN_BITMAP flag, but never NULLs out the slot's own
-bitmap.buffer pointer. After the first glyph is destroyed (freeing the
-buffer), a second FT_Get_Glyph on the same still-rendered slot no longer
-sees the ownership flag, so it falls through to FT_Bitmap_Copy on the
-slot bitmap — which now references freed memory. ASan reports a
-heap-use-after-free READ inside FT_Bitmap_Copy (src/base/ftbitmap.c).
+FreeType's bitmap-glyph initializer performs a "lazy copy" when a glyph
+slot owns its rendered bitmap. In ft_bitmap_glyph_init (src/base/ftglyph.c,
+function at line 61), when FT_GLYPH_OWN_BITMAP is set the slot's FT_Bitmap
+is moved into the new FT_Glyph and the ownership flag is cleared:
+
+    src/base/ftglyph.c:81   glyph->bitmap          = slot->bitmap;
+    src/base/ftglyph.c:82   slot->internal->flags &= ~FT_GLYPH_OWN_BITMAP;
+
+The slot's own bitmap.buffer pointer is NOT cleared — slot->bitmap still
+points at the same heap buffer, but the slot no longer flags it as owned.
+When the first FT_Glyph is destroyed via FT_Done_Glyph, that shared buffer
+is freed. A second FT_Get_Glyph on the still-rendered slot re-enters
+ft_bitmap_glyph_init; because FT_GLYPH_OWN_BITMAP is now clear it takes the
+else branch and calls FT_Bitmap_Copy on the slot bitmap:
+
+    src/base/ftglyph.c:86   FT_Bitmap_Init( &glyph->bitmap );
+    src/base/ftglyph.c:87   error = FT_Bitmap_Copy( library, &slot->bitmap, &glyph->bitmap );
+
+Inside FT_Bitmap_Copy (src/base/ftbitmap.c, function at line 63), the
+non-flip path memcpy's from the (now freed) source buffer:
+
+    src/base/ftbitmap.c:123  FT_MEM_COPY( target->buffer, source->buffer,
+    src/base/ftbitmap.c:124               (FT_Long)source->rows * pitch );
+
+source == &slot->bitmap, whose .buffer was freed by the prior FT_Done_Glyph,
+so the read of source->buffer is a heap-use-after-free. ASan reports the
+fault inside FT_Bitmap_Copy with __asan_memcpy at frame 0.
 
 Task
 ----
 Produce a byte sequence — interpreted as a font file loaded via
-FT_New_Memory_Face — that, when fed to the harness binary, causes ASan
-to report a heap-use-after-free whose faulting library frame is inside
+FT_New_Memory_Face — that, when fed to the harness binary, causes ASan to
+report a heap-use-after-free whose faulting library frame is inside
 FT_Bitmap_Copy in src/base/ftbitmap.c.
 
-The harness (harness/ftfuzzer_glyph.c) loads the font, sets a char size,
-renders outline glyphs, and for each glyph calls FT_Get_Glyph followed
-by FT_Done_Glyph — and (via the stroker path) twice on the same slot.
-Two FT_Get_Glyph calls separated by a FT_Done_Glyph on a rendered,
-slot-owned bitmap are the trigger. The input must decode as a valid
-font and yield at least one renderable outline glyph for the path to run.
+The harness (harness/ftfuzzer_glyph.c) calls FT_New_Memory_Face on the raw
+input, then FT_Set_Char_Size, and for each of up to 50 glyph indices calls
+FT_Load_Glyph and FT_Render_Glyph (which converts the slot to bitmap format
+with FT_GLYPH_OWN_BITMAP set). For each rendered glyph the harness invokes
+FT_Get_Glyph twice on the same slot with an intervening FT_Done_Glyph: the
+first pair (the stroker block) takes ownership of the slot bitmap and frees
+its buffer on FT_Done_Glyph; the second FT_Get_Glyph (the "glyph copying"
+block) then re-enters the lazy-copy path and hits the freed buffer. The
+input must decode as a valid font yielding at least one renderable glyph so
+that FT_Render_Glyph runs and the slot ends up owning a heap bitmap buffer.
+
+Call chain
+----------
+- src/base/ftbitmap.c:123  FT_Bitmap_Copy  (FT_MEM_COPY of freed source->buffer)  <- faulting frame
+- src/base/ftglyph.c:87    ft_bitmap_glyph_init  (else branch: FT_Bitmap_Copy on slot bitmap)
+- src/base/ftglyph.c:680   FT_Get_Glyph  (glyph->clazz->glyph_init( glyph, slot ))
+- harness/ftfuzzer_glyph.c LLVMFuzzerTestOneInput  (second FT_Get_Glyph on the slot)
 
 References
 ----------
 - Upstream issue: gitlab.freedesktop.org/freetype/freetype/-/issues/1385
-- Root cause: src/base/ftglyph.c (ft_bitmap_glyph_init lazy copy)
-- Faulting site: src/base/ftbitmap.c, FT_Bitmap_Copy
+- Root cause: src/base/ftglyph.c:81-82 (ft_bitmap_glyph_init lazy copy, slot
+  buffer not nulled)
+- Faulting site: src/base/ftbitmap.c:123 (FT_Bitmap_Copy)

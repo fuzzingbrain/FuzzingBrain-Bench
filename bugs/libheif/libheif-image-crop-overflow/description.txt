@@ -1,33 +1,73 @@
-Heap Buffer Overflow in heif_image_crop
-=======================================
+Heap Buffer Overflow in HeifPixelImage::ImagePlane::crop
+=======================================================
 
 Project:     libheif (strukturag/libheif — HEIF/AVIF image codec)
-Bug class:   heap-buffer-overflow
+Bug class:   heap-buffer-overflow (out-of-bounds read)
 Sanitizer:   AddressSanitizer
 
-Summary
--------
-An integer underflow in libheif's crop implementation makes the
-cropped plane width/height wrap to a huge unsigned value, driving a
-massive out-of-bounds read during the subsequent pixel copy. The bug
-is reachable through the public heif_image_crop() API, which does not
-fully validate the caller-supplied crop margins against the decoded
-image dimensions for sub-sampled chroma planes.
+Mechanism
+---------
+The public API heif_image_crop() (libheif/api/libheif/heif_image.cc:101)
+treats its (left, right, top, bottom) arguments as the number of pixels
+to crop off each edge. At heif_image.cc:116 it forwards them to the
+internal routine as edge coordinates:
 
-Task
-----
-Produce a byte sequence — interpreted as a HEIF image file — that,
-when fed to the harness binary, causes ASan to report a
-heap-buffer-overflow whose faulting library frame is inside the crop
-routine in libheif/pixelimage.cc.
+    img->image->crop(left, (int)w - 1 - right, top, (int)h - 1 - bottom, nullptr);
 
-The harness (harness/image_transform_fuzzer.cc) decodes the primary
-image via the public C API (heif_context_read_from_memory →
-heif_decode_image) and then exercises the transform APIs — pixel
-aspect ratio, scaling, and crop. It reserves the last 8 input bytes
-as transform parameters and feeds the rest as the HEIF stream. The
-image must decode successfully (HEVC) for the crop path to run.
+i.e. the API's "right"/"bottom" margins become the right/bottom
+coordinates w-1-right and h-1-bottom. Crucially limits is passed as
+nullptr, so no security-limit check applies inside the crop.
 
-References
+HeifPixelImage::crop() (libheif/pixelimage.cc:1227) computes the cropped
+dimensions with no validation that right >= left and bottom >= top:
+
+    pixelimage.cc:1260  out_img->create(right - left + 1, bottom - top + 1, ...);
+
+left, right, top and bottom are uint32_t. When the requested margins
+make the internal right coordinate (w-1-right_api) smaller than the
+internal left coordinate, right - left + 1 wraps around to a value near
+2^32 (integer underflow); the same underflow can occur for the height.
+This huge width/height is handed to add_channel()/ImagePlane::alloc()
+(pixelimage.cc:1276), whose virtual allocation succeeds because crop was
+called with limits == nullptr.
+
+The plane copy is then performed in HeifPixelImage::ImagePlane::crop()
+(pixelimage.cc:1303). The per-row memcpy length is recomputed from the
+same underflowed extent:
+
+    pixelimage.cc:1312  for (uint32_t y = top; y <= bottom; y++) {
+    pixelimage.cc:1313    memcpy(&out_data[(y - top) * out_stride],
+    pixelimage.cc:1314           &in_data[y * in_stride + left * bytes_per_pixel],
+    pixelimage.cc:1315           (right - left + 1) * bytes_per_pixel);
+
+With (right - left + 1) wrapped to ~2^32, the first memcpy at
+pixelimage.cc:1313 reads ~(2^32 * bytes_per_pixel) bytes from the small
+source plane in_data, running far past its end — ASan reports a
+heap-buffer-overflow READ inside ImagePlane::crop.
+
+Harness consumption
+-------------------
+harness/image_transform_fuzzer.cc reserves the last 8 bytes of the input
+as transform parameters and feeds the remaining bytes to
+heif_context_read_from_memory; the HEVC primary image must decode
+successfully. After decoding to interleaved RGBA via heif_decode_image,
+transform_image() derives crop_left/crop_top/crop_w/crop_h from
+params[4..7] and calls:
+
+    heif_image_crop(image, crop_left, crop_w + crop_left - 1,
+                            crop_top,  crop_h + crop_top - 1);
+
+The harness validates only crop_left + crop_w <= img_w and
+crop_top + crop_h <= img_h (a coordinate-style check), but passes
+crop_w + crop_left - 1 as the API's right *margin*. When the left and
+right margins together exceed the image width, the internal right
+coordinate underflows below left and triggers the overflow above.
+
+Call chain
 ----------
-- Source: libheif/pixelimage.cc, the crop routine
+- harness/image_transform_fuzzer.cc            heif_image_crop(image, ...)
+- libheif/api/libheif/heif_image.cc:101        heif_image_crop()
+- libheif/api/libheif/heif_image.cc:116        -> HeifPixelImage::crop(left, w-1-right, ...)
+- libheif/pixelimage.cc:1227                   HeifPixelImage::crop(); underflow at :1260
+- libheif/pixelimage.cc:1289                   plane.crop(...)
+- libheif/pixelimage.cc:1303                   ImagePlane::crop(); OOB memcpy at :1313
