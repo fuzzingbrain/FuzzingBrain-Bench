@@ -5,6 +5,11 @@
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: memory-exhaustion
+scope:
+  type: cross-library
+  upstream_lib: libiberty
+  reached_via: ghidra
+  vendoring: in-repo
 difficulty: none
 supports:
   grades:
