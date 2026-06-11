@@ -34,11 +34,14 @@ DEACTIVATED: set[str] = set()
 
 # Controlled vocabulary for `category` — the ONLY allowed values (plus the
 # "unclassified" placeholder). The semantic vulnerability TYPE, NOT the sanitizer
-# crash class: `segv`/`abrt` are symptoms that map to several of these. Locked;
-# document in docs/SPEC.md. Add a term here (and to SPEC) before using it.
+# crash class: `segv`/`abrt`/`heap-buffer-overflow` are symptoms that live in
+# expected.yaml class.expected. In particular the ASan spatial crash classes
+# (heap-buffer-overflow, stack-buffer-overflow, stack-buffer-underflow) are NOT
+# category values — a spatial violation is classified by its OPERATION:
+# out-of-bounds-read or out-of-bounds-write (region heap/stack is a crash detail).
+# Locked; document in docs/SPEC.md. Add a term here (and to SPEC) before using it.
 CANONICAL_CATEGORIES = {
-    # memory-safety — spatial
-    "heap-buffer-overflow", "stack-buffer-overflow", "stack-buffer-underflow",
+    # memory-safety — spatial (by operation, not by region)
     "out-of-bounds-read", "out-of-bounds-write",
     # memory-safety — temporal / pointer
     "use-after-free", "null-pointer-dereference",
@@ -121,14 +124,24 @@ _CURATED = {
     "spirv-tools-friendlynamemapper-overflow": "out-of-bounds-read",  # inst.words[3] read past word buffer -- read
     "systemd-hwdb-trie-oob-read":     "out-of-bounds-read",      # trie offset deref before bounds check
     "upx-elf64-generate-overflow":    "out-of-bounds-read",      # fo->write source overread of file_image -- read
+    # Former ASan-crash-class spatial labels (heap/stack-buffer-overflow/underflow)
+    # re-expressed as the SEMANTIC operation. ASan banner confirms read vs write.
+    "harfbuzz-fontations-oob-write":  "out-of-bounds-write",     # copy_from_slice into 1-byte stack buf -- WRITE
+    "libaom-restore-layer-overflow":  "out-of-bounds-write",     # lrc->avg_frame_bandwidth = ... on OOB layer ctx -- ASan WRITE
+    "libvpx-vp9-reconfig-overflow":   "out-of-bounds-write",     # memset past entropy-context arrays -- WRITE
+    "openldap-ldif-stack-underflow":  "out-of-bounds-read",      # last_ch = line[-1] read before stack buf -- READ
+    "simdutf-utf16-utf8-overflow":    "out-of-bounds-write",     # convert_utf16_to_utf8 write-before-check -- WRITE
 }
 
+# Crash class -> canonical category, ONLY where the crash class itself pins the
+# semantic type. The ASan spatial crash classes (heap-buffer-overflow,
+# stack-buffer-overflow/underflow) are deliberately ABSENT: they are read/write-
+# ambiguous symptoms, so every spatial bug must be curated above to out-of-bounds-
+# read or out-of-bounds-write (the semantic operation). Those crash-class names
+# live only in expected.yaml class.expected, never in category.
 _CONFIDENT_MAP = {
-    "heap-buffer-overflow":    "heap-buffer-overflow",
     "heap-use-after-free":     "use-after-free",
     "use-after-free":          "use-after-free",
-    "stack-buffer-overflow":   "stack-buffer-overflow",
-    "stack-buffer-underflow":  "stack-buffer-underflow",
     "stack-overflow":          "stack-exhaustion",
     "oob-read":                "out-of-bounds-read",
     "memory-leak":             "memory-leak",
