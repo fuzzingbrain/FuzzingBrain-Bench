@@ -7,7 +7,7 @@ Sanitizer:   AddressSanitizer
 
 Summary
 -------
-AcquireKernelInfo() (MagickCore/morphology.c:485) parses a morphology
+AcquireKernelInfo() (MagickCore/morphology.c:486) parses a morphology
 kernel specification string. For a named built-in convolution kernel
 (Gaussian / DoG / LoG), the kernel dimensions are derived directly from
 the attacker-controlled radius argument with no upper bound, so a large
@@ -65,7 +65,7 @@ Call chain
 
 References
 ----------
-- Source: MagickCore/morphology.c, AcquireKernelInfo (line 485),
+- Source: MagickCore/morphology.c, AcquireKernelInfo (line 486),
   ParseKernelName (line 369), AcquireKernelBuiltIn (line 951),
   Gaussian/DoG/LoG sizing+allocation (lines 1046-1064)
 - Allocation site: MagickCore/memory.c:277

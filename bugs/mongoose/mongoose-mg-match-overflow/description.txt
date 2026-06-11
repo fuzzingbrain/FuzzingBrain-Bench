@@ -22,10 +22,11 @@ The fault is the backtracking branch at mongoose.c:11175:
     } else if (nj > 0 && nj <= s.len && (p.buf[ni] == '#' || s.buf[j] != '/')) {
 
 The guard bounds `nj` (the restart index) with `nj <= s.len`, but it never
-bounds the CURRENT cursor `j`. When the `*` has already consumed the whole
-candidate, j == s.len, and once the first `*`/`#` branch (mongoose.c:11172-11174)
-has set `nj = j + 1 = s.len`, the guard `nj <= s.len` is still satisfied.
-Control reaches the `||` right-hand side `s.buf[j] != '/'`, which evaluates
+bounds the CURRENT cursor `j`. The `*`/`#` branch (mongoose.c:11172-11174)
+records a restart index `nj <= s.len`; a subsequent literal match then
+advances the cursor to `j == s.len`. On the next iteration this branch is
+re-entered with `nj <= s.len` still satisfied, so control reaches the `||`
+right-hand side `s.buf[j] != '/'`, which evaluates
 `s.buf[s.len]` — a 1-byte out-of-bounds read on the heap-allocated candidate
 buffer. ASan reports the heap-buffer-overflow READ with the top library frame
 at mongoose.c:11175, column 62 (the `s.buf[j]` subexpression).
@@ -47,11 +48,15 @@ mg_str_n, no NUL terminator):
     struct mg_str caps[10] = {0};
     mg_match(str, pattern, caps);
 
-Trigger: the first-half pattern must end in a non-`/` literal after a `*`
-(e.g. "*x") while the second-half candidate is a string the `*` consumes
-entirely. Then j advances to s.len, `i < p.len` keeps the loop alive, the
-backtracking branch is taken, and `s.buf[j]` reads one byte past the
-candidate buffer.
+Trigger: the first-half pattern must contain a `*` followed by at least two
+non-`/` literal bytes, where the first trailing literal matches the final
+candidate byte — e.g. pattern `*ab` with candidate `a`. The `*` records
+`nj <= s.len`; the literal match then drives the cursor to `j == s.len` while
+a further literal remains in the pattern, so on the next iteration the
+trailing-literal test at mongoose.c:11175 evaluates `s.buf[s.len]`, one byte
+past the candidate buffer. (A `*` followed by only one literal, e.g. `*x`,
+does NOT trigger: the `*` branch re-runs once `j` reaches `s.len` and bumps
+`nj` to `s.len+1`, failing the `nj <= s.len` guard.)
 
 Task
 ----
