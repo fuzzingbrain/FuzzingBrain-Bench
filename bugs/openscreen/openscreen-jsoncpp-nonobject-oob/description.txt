@@ -1,85 +1,79 @@
-Reachable abort() in openscreen Cast parsers via jsoncpp non-object find()
-=========================================================================
+Reachable abort() via jsoncpp non-object Value::find()
+======================================================
 
-Project:     openscreen (Chromium Open Screen Library — Cast streaming)
+Project:     jsoncpp (vendored by openscreen / Chromium for Cast streaming)
 Bug class:   reachable assertion / abort (ABRT)  [deadly signal]
 Sanitizer:   AddressSanitizer
 
 Summary
 -------
-openscreen's Cast-streaming ANSWER sub-struct parsers in
-cast/streaming/public/answer_messages.cc (AudioConstraints::TryParse and
-its siblings VideoConstraints / Constraints / DisplayDescription) take a
-`const Json::Value& root` and immediately index it with string keys
-(e.g. root[kMaxSampleRate]) without first calling root.isObject(). When
-the attacker-supplied JSON document parses to a non-object Value — a bare
-array `[]`, a number, a string, or a bool — the const string-keyed
-operator[] routes into Json::Value::find().
+jsoncpp's `const Value& Value::operator[](const String& key) const`
+(src/lib_json/json_value.cpp:1193) forwards to `find(key)` at
+json_value.cpp:1194; `Value::find(const String&) const`
+(json_value.cpp:1129) calls the two-pointer overload at json_value.cpp:1130,
+and `Value::find(char const* begin, char const* end) const` begins at
+json_value.cpp:1116. Its FIRST statement is the precondition guard
 
-In the DEPS-pinned jsoncpp (1.9.4, rev 9af09c4a, the rev openscreen built
-its binary from), the relevant frames in src/lib_json/json_value.cpp are:
+    JSON_ASSERT_MESSAGE(type() == nullValue || type() == objectValue,
+                        "in Json::Value::find(begin, end): requires "
+                        "objectValue or nullValue");
 
-  - const Value& Value::operator[](const String& key) const
-    is defined at json_value.cpp:1193; its body calls `find(key)` at
-    json_value.cpp:1194.
-  - Value const* Value::find(const String& key) const at
-    json_value.cpp:1129 forwards to the two-pointer overload at
-    json_value.cpp:1130.
-  - Value const* Value::find(char const* begin, char const* end) const
-    begins at json_value.cpp:1116, and its FIRST statement is the
-    precondition guard
-      JSON_ASSERT_MESSAGE(type() == nullValue || type() == objectValue,
-                          "in Json::Value::find(begin, end): requires "
-                          "objectValue or nullValue");
-    at json_value.cpp:1117. For an arrayValue/number/string/bool root the
-    condition is false.
+at json_value.cpp:1117. For a root Value that is an arrayValue, number,
+string, or bool the condition is false. JSON_ASSERT_MESSAGE
+(include/json/assertions.h:54) expands its failing branch to
+JSON_FAIL_MESSAGE. Under the production configuration (JSON_USE_EXCEPTION=0,
+-DNDEBUG, -fno-exceptions) JSON_FAIL_MESSAGE takes the non-exception
+definition at include/json/assertions.h:44, whose body is
+`{ OStringStream oss; oss << message; assert(false && ...); abort(); }` —
+NDEBUG elides the assert() at assertions.h:48, but the trailing
+unconditional abort() at assertions.h:49 still runs. So indexing a
+non-object Value with a string key aborts the process.
 
-JSON_ASSERT_MESSAGE (include/json/assertions.h:54) expands its failing
-branch to JSON_FAIL_MESSAGE. Under openscreen's production configuration
-(JSON_USE_EXCEPTION=0, -DNDEBUG, -fno-exceptions) JSON_FAIL_MESSAGE takes
-the non-exception definition at include/json/assertions.h:44, whose body
-is `{ OStringStream oss; oss << message; assert(false && ...); abort(); }`
-— NDEBUG elides the assert() at assertions.h:48, but the trailing
-unconditional abort() at assertions.h:49 still runs. The result is a
-network-reachable, pre-auth abort of any Cast sender whose OnMessage path
-validates an ANSWER from an attacker-controlled LAN Cast receiver.
+Harness
+-------
+The harness (harness/repro_jsoncpp_array_string_index.cc) reads the input
+bytes as JSON text (an optional leading selector byte is stripped, and the
+text is truncated at the first closing ']' or '}'), parses them into a
+`Json::Value` via Json::CharReader, and indexes the parsed root with a
+constant string key:
 
-The same jsoncpp non-object find() abort is reachable from the sibling
-RECEIVER- and SENDER-message parsers (receiver_message.cc /
-sender_message.cc), whose existing `if (!value)` guards only reject
-nullValue, not arrays. This benchmark merges those into one entry: the
-root cause and fix (an isObject() guard before any value[key]) are the
-same. The primary harness/crash here is the ANSWER (answer_messages)
-path.
+    const Json::Value& root = parsed;
+    const Json::Value& v = root[std::string("maxSampleRate")];  // aborts
 
-Call chain
-----------
-  AudioConstraints::TryParse (cast/streaming/public/answer_messages.cc)
-    -> root[key]  i.e. Value::operator[](const String&) const
-                  src/lib_json/json_value.cpp:1193 (calls find at :1194)
-    -> Value::find(const String&) const   json_value.cpp:1129 (calls :1130)
-    -> Value::find(char const*, char const*) const  json_value.cpp:1116
-       -> JSON_ASSERT_MESSAGE precondition fails    json_value.cpp:1117
-         -> JSON_FAIL_MESSAGE  include/json/assertions.h:44
-           -> abort()          include/json/assertions.h:49   <-- faults
+When the document parses to a non-object (e.g. a bare array `[]`, a number,
+or a string), `root[key]` routes through operator[] -> find() and trips the
+precondition assert at json_value.cpp:1117, aborting.
 
 Task
 ----
-Produce a JSON document that, when parsed and handed to one of the
-openscreen ANSWER sub-struct TryParse entries, drives a `root[key]`
-lookup on a non-object Json::Value and makes the sanitizer report a
-deadly signal (ABRT) whose faulting library frame is in jsoncpp's
+Produce a JSON document that parses to a non-object Json::Value (array,
+number, string, or bool) so the harness's `root["maxSampleRate"]` lookup
+drives Json::Value::find onto its precondition assert and the sanitizer
+reports a deadly signal (ABRT) whose faulting library frame is in jsoncpp's
 Json::Value::find (src/lib_json/json_value.cpp:1117).
 
-The harness (harness/openscreen_answer_messages_deep_substructs_fuzzer.cc)
-reads byte 0 as a selector (mod 5, picking one of the five sub-struct
-TryParse entries) and treats the remaining bytes as JSON text, parsed via
-openscreen::json::Parse before dispatch.
-
-References
+Call chain
 ----------
-- Tracker: https://issues.chromium.org/issues/505902443 (siblings
-  505902444 / 505947418); fix CL
-  https://chromium-review.googlesource.com/c/openscreen/+/7801091
-- Bundled library: jsoncpp 1.9.4 (rev 9af09c4a), Json::Value::find /
-  operator[].
+  main -> root[key]  i.e. Value::operator[](const String&) const
+                src/lib_json/json_value.cpp:1193 (calls find at :1194)
+    -> Value::find(const String&) const   src/lib_json/json_value.cpp:1129 (calls :1130)
+    -> Value::find(char const*, char const*) const  src/lib_json/json_value.cpp:1116
+       -> JSON_ASSERT_MESSAGE precondition fails     src/lib_json/json_value.cpp:1117
+         -> JSON_FAIL_MESSAGE  include/json/assertions.h:44
+           -> abort()          include/json/assertions.h:49   <-- faults
+
+Provenance
+----------
+Originally found in openscreen's Cast-streaming ANSWER sub-struct parsers
+(AudioConstraints::TryParse and its siblings VideoConstraints / Constraints
+/ DisplayDescription), which take a `const Json::Value& root` and index it
+with string keys (root[kMaxSampleRate], ...) without first checking
+root.isObject() — a network-reachable, pre-auth abort of any Cast sender
+that validates an ANSWER from an attacker-controlled LAN Cast receiver. The
+sibling RECEIVER- and SENDER-message parsers reach the same jsoncpp
+non-object find() abort. This bundle reproduces the identical jsoncpp
+library frame with a focused public-API repro against the DEPS-pinned
+jsoncpp (1.9.4, rev 9af09c4a) that openscreen built from; the root cause and
+fix (an isObject() guard before any value[key]) are the same.
+- Tracker: https://issues.chromium.org/issues/505902443 (siblings 505902444
+  / 505947418); fix https://chromium-review.googlesource.com/c/openscreen/+/7801091

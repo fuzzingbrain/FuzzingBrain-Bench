@@ -9,10 +9,10 @@ The harness drives the server-side `AcceptSecurityContext()` with a
 fuzz-controlled inbound token; the dispatch byte `data[0] % 3` selects
 the negotiate/challenge/authenticate branch, and the canonical PoC
 takes the NEGOTIATE branch. A malformed NEGOTIATE token makes
-`ntlm_read_NegotiateMessage()` fail (ntlm.c:564), so the server step
-returns an error early at ntlm.c:566 — after it has already allocated
-the NTLM context at `ntlm.c:244` in `ntlm_ContextNew()` (via
-ntlm.c:523). Because the harness only frees the context
+`ntlm_read_NegotiateMessage()` fail (winpr/libwinpr/sspi/NTLM/ntlm.c:564),
+so the server step returns an error early at ntlm.c:566 — after it has
+already allocated the NTLM context at `ntlm.c:244` in `ntlm_ContextNew()`
+(via ntlm.c:523). Because the harness only frees the context
 (`DeleteSecurityContext`) when the prior step succeeded, the error
 early-return leaves `haveContext` FALSE and leaks the ~1064-byte
 NTLM_CONTEXT allocation.
