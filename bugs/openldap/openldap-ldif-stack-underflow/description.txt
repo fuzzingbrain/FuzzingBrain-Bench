@@ -19,7 +19,7 @@ the last character of the line just processed (ldif.c:811):
 
   811      for ( stop = 0;  !stop;  last_ch = line[len-1] ) {
 
-len is a ber_len_t, i.e. unsigned (include/lber_types.h:55,
+len is a ber_len_t, i.e. unsigned (include/lber_types.hin:55,
 `typedef unsigned LBER_LEN_T ber_len_t`). Inside the loop, len is set
 from the freshly read line at ldif.c:836 (`len = strlen( line )`).
 Because ldif_open_mem() backs the LDIFFP with an in-memory buffer,

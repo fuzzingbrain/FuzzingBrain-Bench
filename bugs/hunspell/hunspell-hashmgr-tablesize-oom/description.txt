@@ -45,10 +45,10 @@ before any allocation failure is thrown.
 Call chain (verified against vuln_commit f23fcd33052c7c8a307eaa3e1b1a4c0cdcf45651):
 
     LLVMFuzzerTestOneInput                          harness fuzzer .cc
-    └─ Hunspell::Hunspell(aff, dic)                 hunspell.cxx:2142 (new HunspellImpl)
-       └─ HunspellImpl::HunspellImpl               hunspell.cxx:189  (new HashMgr)
-          └─ HashMgr::HashMgr(tpath, apath, key)   hashmgr.cxx:99    (load_tables call)
-             └─ HashMgr::load_tables(tpath, key)   hashmgr.cxx:602
+    └─ Hunspell::Hunspell(aff, dic)                 src/hunspell/hunspell.cxx:2142 (new HunspellImpl)
+       └─ HunspellImpl::HunspellImpl               src/hunspell/hunspell.cxx:189  (new HashMgr)
+          └─ HashMgr::HashMgr(tpath, apath, key)   src/hunspell/hashmgr.cxx:99    (load_tables call)
+             └─ HashMgr::load_tables(tpath, key)   src/hunspell/hashmgr.cxx:602
                 ├─ atoi(ts) -> tablesize           hashmgr.cxx:622
                 ├─ bound check (too weak)          hashmgr.cxx:631
                 └─ tableptr.resize(tablesize, ...) hashmgr.cxx:642   <- OOM alloc
