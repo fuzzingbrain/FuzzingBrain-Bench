@@ -62,6 +62,27 @@ def test_vuln_yaml_category_in_controlled_vocabulary():
     assert not bad, f"categories outside the controlled vocabulary: {bad}"
 
 
+def test_vuln_yaml_scope_schema():
+    """scope.type is single/cross-library; cross-library carries upstream_lib,
+    reached_via and a valid vendoring."""
+    bad = []
+    for bug, d in list_bugs(include_inactive=True):
+        vp = d / "vuln.yaml"
+        if not vp.is_file():
+            continue
+        scope = read_bench(vp).get("scope") or {}
+        t = scope.get("type")
+        if t not in ("single-library", "cross-library"):
+            bad.append((bug, f"type={t!r}"))
+            continue
+        if t == "cross-library":
+            if not (scope.get("upstream_lib") and scope.get("reached_via")):
+                bad.append((bug, "cross-library missing upstream_lib/reached_via"))
+            if scope.get("vendoring") not in ("dependency", "in-repo"):
+                bad.append((bug, f"vendoring={scope.get('vendoring')!r}"))
+    assert not bad, f"scope schema violations: {bad}"
+
+
 def test_vuln_yaml_never_staged_to_agent():
     """vuln.yaml holds the hidden class answer; it must never reach the agent.
 

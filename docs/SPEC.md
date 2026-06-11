@@ -386,6 +386,30 @@ The list is the single source of truth in `tools/gen_vuln_yaml.py`
 (`CANONICAL_CATEGORIES`); add a term there and here before using it. No CWE: it
 was never recorded upstream and one bug often maps to several.
 
+### `vuln.yaml` scope — single-library vs cross-library
+
+`scope` records the supply-chain topology: whether the buggy code lives in the
+fuzzed project's own source or in a third-party library reached through that
+project's harness.
+
+```yaml
+scope:
+  type: single-library            # bug code, harness and crash all in the project's own code
+# — or —
+scope:
+  type: cross-library             # bug code is in a third-party library
+  upstream_lib: jsoncpp           # where the buggy code actually lives
+  reached_via: openscreen         # the consumer project whose harness reaches it
+  vendoring: dependency           # dependency | in-repo
+```
+
+`vendoring` distinguishes how the consumer pulls the library: `dependency` =
+fetched at build time (DEPS/gclient), **not** in the consumer's repo;
+`in-repo` = a vendored copy committed into the consumer's own tree. Curated in
+`tools/gen_vuln_yaml.py` (`_CROSS_LIBRARY`). Current corpus: 5 cross-library
+(jsoncpp×2 via openscreen, graal via graaljs, skia via chromium — all
+`dependency`; libiberty via ghidra — `in-repo`), 63 single-library.
+
 When a runner starts an episode for this bug, it:
 
 1. Creates a fresh **workspace tmpdir**:

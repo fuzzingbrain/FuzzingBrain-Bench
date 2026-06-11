@@ -5,6 +5,11 @@
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
 category: uncaught-exception
+scope:
+  type: cross-library
+  upstream_lib: graal
+  reached_via: graaljs
+  vendoring: dependency
 difficulty: none
 supports:
   grades:
