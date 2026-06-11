@@ -1,8 +1,18 @@
 # NOTES — gaps and caveats (skia-raster8888-blur-oob)
 
-Binaries were NOT built or validated in this benchmark copy (NO docker / NO
-compile per task brief). The following gaps are material and a benchmark
-operator should weigh them before relying on this entry's build:
+UPDATE 2026-06-11 — the **coverage** binary HAS now been built and validated
+standalone (`binaries/coverage/harness`), so `reach` is gradeable and is in the
+capability_set (K_b = [crash, reach]). The standalone Skia build works with three
+fixes now encoded in `harness/build.sh`'s `cov` config: (1) force `cc/cxx="clang"`
+(the coverage flags are clang-only; gn defaults to gcc, which rejects them);
+(2) `skia_use_libavif/libjxl=false` + `ganesh/graphite=false` to skip six DEPS
+externals (libavif, libjxl, oboe, unicodetools, v8, vello) whose googlesource
+mirrors were unreachable — none needed for this CPU-raster harness; (3) link ALL
+of `out/cov/*.a` (libskia.a alone is insufficient) plus the SYSTEM
+freetype/fontconfig. The coverage run on the PoC executes `eval_blur_passes`
+(SkBlurEngine.cpp 200–245) → reach fires. `class`/`site` stay ungraded
+(chromium-GN frames unreliable). The original gaps below still stand for the
+**release-asan** binary:
 
 1. **BUILD-SIZE RISK — skia is a very large build (primary caveat).**
    A free-standing `clang++ ... -lskia` link is unworkable: `libskia.a`
