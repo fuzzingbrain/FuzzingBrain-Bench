@@ -48,4 +48,5 @@ Call chain:
 
 References
 ----------
-- Sibling bugs:    ghidra-cplus-demangle-oom, binutils-rust-demangle-oom
+- Sibling bug:     binutils-rust-demangle-oom (same libiberty rust_demangle,
+  binutils' own copy)

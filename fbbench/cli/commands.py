@@ -25,7 +25,6 @@ from fbbench.paths import REPO, SERVER
 SLOW_BUGS = {
     "openssl-des-ofb-cfb-overread",
     "imagemagick-msl-comment-npd",
-    "ghidra-cplus-demangle-oom",
     "jq-dump-op-npd",
     "icu-translit-rule-uaf",
 }

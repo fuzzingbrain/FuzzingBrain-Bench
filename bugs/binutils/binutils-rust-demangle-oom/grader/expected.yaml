@@ -7,7 +7,7 @@
 #
 # The rss-based OOM banner carries NO symbolized stack frames, so only
 # the crash + class capabilities are machine-gradable (same as the
-# sibling ghidra-cplus-demangle-oom). The reach/site fields below record
+# sibling ghidra-rust-demangle-oom). The reach/site fields below record
 # the true source locations in the vuln_commit for documentation; they
 # are not in capability_set because the OOM report yields no frames and
 # the coverage profile cannot flush before the OOM kill.

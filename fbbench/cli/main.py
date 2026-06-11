@@ -64,7 +64,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="grade rounds (default 1; the corpus is deterministic). "
                              "Use --rounds 3 as the opt-in determinism gate.")
     sp_all.add_argument("--include-slow", action="store_true",
-                        help="also run the 5 slow bugs (openssl/imagemagick/icu/jq/ghidra-cplus)")
+                        help="also run the 4 slow bugs (openssl/imagemagick/icu/jq)")
     sp_all.set_defaults(fn=commands.cmd_grade_all)
 
     return ap
