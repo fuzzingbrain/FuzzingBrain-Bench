@@ -60,6 +60,19 @@ def test_fullscan_system_prompt_is_as_sent():
         "full-scan system prompt (as sent) is not shown verbatim in PROMPTS.md"
 
 
+def test_blind_mode_workspace_not_named_after_bug():
+    # Regression: setup() exposes workspace_path, and the descriptive bug id names
+    # the fault (e.g. "...-nonobject-oob"). In full-scan / diff-scan the workspace
+    # tempdir must use a NEUTRAL prefix, else it leaks the bug past the bug_id alias.
+    main = (REPO / "fbbench" / "runner" / "__main__.py").read_text()
+    assert '"fbbench-fullscan-"' in main, \
+        "full-scan workspace prefix is not neutralized in runner/__main__.py"
+    diff = (REPO / "tools" / "diffscan_experiment.py").read_text()
+    assert 'f"fbbench-{args.bug}-"' not in diff, \
+        "diff-scan workspace is still named after the bug (leaks via workspace_path)"
+    assert '"fbbench-diffscan-"' in diff
+
+
 def test_diffscan_prompt_centralized():
     # The diff-scan first-turn prompt must come from prompts.build_diffscan_message,
     # not be re-hardcoded in the diff-scan tooling.
