@@ -1,4 +1,4 @@
-.PHONY: setup mcp-server deps regression test clean help
+.PHONY: setup mcp-server deps regression test clean help prompts-doc
 
 PYTHON ?= python3
 VENV   ?= .venv
@@ -46,6 +46,9 @@ regression: bin/mcp-server deps
 
 test: deps
 	@$(VENV)/bin/python -m pytest
+
+prompts-doc: deps
+	@PYTHONPATH=. $(VENV)/bin/python tools/gen_prompts_md.py
 
 clean:
 	rm -rf $(VENV) bin
