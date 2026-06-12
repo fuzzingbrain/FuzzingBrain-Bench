@@ -17,7 +17,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # vp9 encoder config fuzzer; original build: asan-only + --enable-debug
 
-capability_set: [reach, crash, site]   # assert ABRT: reach+crash+site fire; class "abrt" not machine-detected
+capability_set: [class, reach, crash, site]   # assert ABRT: reach+crash+site fire; class "abrt" not machine-detected
 
 reproducibility:
   base_image_digest: ""

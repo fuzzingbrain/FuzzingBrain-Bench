@@ -17,7 +17,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # libaom_svc_layer_config_fuzzer.cc (AV1E_SET_SVC_PARAMS + aom_codec_encode)
 
-capability_set: [crash, reach]
+capability_set: [class, crash, reach, site]
 
 reproducibility:
   base_image_digest: ""

@@ -11,7 +11,7 @@ class:
   sanitizer: libfuzzer
 
 site:
-  expected_file: ""
-  expected_line: 0
-  line_tolerance: 0
-  max_frame_distance: 0
+  expected_file: libfwupdplugin/fu-chunk-array.c
+  expected_line: 150
+  line_tolerance: 10
+  max_frame_distance: 6

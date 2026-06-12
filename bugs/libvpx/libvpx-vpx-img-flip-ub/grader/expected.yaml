@@ -13,7 +13,7 @@ reach:
   expected_line_range: [245, 270]
 
 class:
-  expected: undefined-behavior
+  expected: null-deref
   sanitizer: ubsan
 
 site:

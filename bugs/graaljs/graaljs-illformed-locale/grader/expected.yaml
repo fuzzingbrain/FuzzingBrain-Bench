@@ -11,7 +11,7 @@ class:
   sanitizer: jazzer
 
 site:
-  expected_file: ""
-  expected_line: 0
-  line_tolerance: 0
-  max_frame_distance: 0
+  expected_file: graal-js/src/com.oracle.truffle.js/src/com/oracle/truffle/js/runtime/util/IntlUtil.java
+  expected_line: 535
+  line_tolerance: 15
+  max_frame_distance: 3

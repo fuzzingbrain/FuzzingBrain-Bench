@@ -18,7 +18,7 @@ reach:
   expected_line_range: [80, 95]
 
 class:
-  expected: undefined-behavior
+  expected: float-cast-overflow
   sanitizer: ubsan
 
 site:

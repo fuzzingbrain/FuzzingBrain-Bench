@@ -17,7 +17,7 @@ harness:
   timeout_s: 60
   provenance: oss-fuzz
 
-capability_set: [class, crash, reach]
+capability_set: [class, crash, reach, site]
 
 reproducibility:
   base_image_digest: ""
