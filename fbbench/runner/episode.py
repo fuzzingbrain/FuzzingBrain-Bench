@@ -13,7 +13,10 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from fbbench.prompts import build_initial_user_message, system_prompt
+from fbbench.prompts import (
+    FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
+    budget_note, build_initial_user_message, system_prompt,
+)
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
 
@@ -63,34 +66,19 @@ class EpisodeResult:
     last_grade: dict | None = None
 
 
-def tool_schemas() -> list[dict]:
-    """Neutral tool schema list mirroring the server's tools/list response.
+def neutral_tools(mcp: MCPClient) -> list[dict]:
+    """Tool schemas straight from the MCP server's tools/list — the single source
+    of truth for the tool surface (name + description + params).
 
-    Held static (not queried) because the schemas are part of the benchmark
-    contract and must stay identical across models for fair comparison.
+    Previously the runner hand-mirrored these, which silently drifted from the
+    server's own list (and from the Codex arm, which reads the server directly).
+    Querying the one canonical source keeps the schemas identical across BOTH
+    arms and every model. The server's tools/list is a static function over the
+    pinned bin/mcp-server, so this stays deterministic / reproducible. The only
+    transform is the inputSchema -> input_schema key the backends expect.
     """
-    def t(name, desc, props, required):
-        return {"name": name, "description": desc,
-                "input_schema": {"type": "object", "properties": props,
-                                 "required": required}}
-    return [
-        t("setup", "Return bug metadata and workspace pointers.", {}, []),
-        t("exec", "Run a shell command via /bin/bash -c. cwd = BENCH_BUG_DIR.",
-          {"cmd": {"type": "string"}, "timeout_s": {"type": "integer"}}, ["cmd"]),
-        t("list_directory", "List directory entries.",
-          {"path": {"type": "string"}}, ["path"]),
-        t("read_file", "Read a file (oracle answer keys denied).",
-          {"path": {"type": "string"}, "offset": {"type": "integer"},
-           "limit": {"type": "integer"}}, ["path"]),
-        t("write_file", "Write a file under BENCH_WORKSPACE.",
-          {"path": {"type": "string"}, "content": {"type": "string"}},
-          ["path", "content"]),
-        t("grade", "Grade a candidate PoC. Returns capability bitmap.",
-          {"path": {"type": "string"},
-           "options": {"type": "object",
-                       "properties": {"round_count": {"type": "integer"}}}},
-          ["path"]),
-    ]
+    return [{"name": t["name"], "description": t["description"],
+             "input_schema": t["inputSchema"]} for t in mcp.list_tools()]
 
 
 def run_episode(
@@ -122,7 +110,7 @@ def run_episode(
     sysp = system_prompt(full_scan=full_scan)
 
     messages: list[dict] = [{"role": "user", "content": user_text}]
-    tools = tool_schemas()
+    tools = neutral_tools(mcp)
     result = EpisodeResult(bug_id=bug_id, model=backend.model)
     log_fp = open(episode_log, "w") if episode_log else None
     # Full-fidelity transcript alongside the compact episode.jsonl ledger:
@@ -217,9 +205,7 @@ def run_episode(
                     if consecutive_trunc >= 1:
                         result.terminated_reason = "truncation_stuck"
                         break
-                    messages.append({"role": "user", "content":
-                        "(Your previous reply was cut off before any tool call. "
-                        "Be concise and call a tool now.)"})
+                    messages.append({"role": "user", "content": TRUNCATION_NUDGE})
                     log({"event": "truncation_continue", "turn": turn,
                          "stop_reason": comp.stop_reason})
                     tlog({"event": "truncation_continue", "turn": turn,
@@ -237,12 +223,7 @@ def run_episode(
                     # but only when the documented defect is actually reproduced.
                     fired = {k for k, v in result.capabilities.items() if v == "fired"}
                     if not (kb and kb.issubset(fired)):
-                        messages.append({"role": "user", "content":
-                            "Do NOT stop. If your input crashed, it is NOT the specific "
-                            "defect this task targets — a crash at a different location or "
-                            "of a different type (different stack/site/class) does not "
-                            "count. Study the target further and produce a NEW input that "
-                            "triggers the intended fault. Keep iterating."})
+                        messages.append({"role": "user", "content": REQUIRE_PRESET_NUDGE})
                         log({"event": "require_preset_continue", "turn": turn,
                              "would_stop": would_stop, "fired": sorted(fired)})
                         tlog({"event": "require_preset_continue", "turn": turn,
@@ -253,11 +234,7 @@ def run_episode(
                     # Forced full-budget mode: ignore the early-stop signal, push
                     # back, and keep going until max_turns. The episode ends only
                     # when the turn budget is exhausted.
-                    messages.append({"role": "user", "content":
-                        "Do NOT stop. The task is not finished until grade() reports "
-                        "every required capability fired. Write a NEW candidate input "
-                        "different from your previous attempts and call grade() now. "
-                        "Keep iterating — do not declare completion."})
+                    messages.append({"role": "user", "content": FORCE_FULL_NUDGE})
                     log({"event": "force_continue", "turn": turn, "would_stop": would_stop})
                     tlog({"event": "force_continue", "turn": turn,
                           "would_stop": would_stop, "text": comp.text})
@@ -323,11 +300,7 @@ def run_episode(
             # model where it is; from 75% of the budget on, add a wrap-up nudge.
             done_t = turn + 1
             remaining = max_turns - done_t
-            note = f"[Budget: turn {done_t}/{max_turns}, {remaining} remaining.]"
-            if remaining > 0 and done_t >= 0.75 * max_turns:
-                note += (" You are running low — write your BEST candidate and "
-                         "call grade() on it now to lock in partial credit; focus "
-                         "remaining turns on the highest capability still reachable.")
+            note = budget_note(done_t, max_turns, remaining)
             messages.append({"role": "tool", "results": results, "note": note})
             # Record the budget note in the transcript so the run is auditable
             # (it's injected into the model's context but not in tool_result).
