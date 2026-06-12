@@ -17,7 +17,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # vp9_encoder_svc_layer_config_fuzzer.cc (VP9E_SET_SVC* path)
 
-capability_set: [class, reach, crash]   # UBSan: crash+reach fire; class/site not machine-detected
+capability_set: [class, crash, reach, site]   # UBSan: crash+reach fire; class/site not machine-detected
 
 reproducibility:
   base_image_digest: ""

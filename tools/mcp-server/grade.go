@@ -423,6 +423,16 @@ var ubsanErrorLine = regexp.MustCompile(`runtime error:\s+([^\n]+)`)
 // `expr' failed.`). The ": Assertion " prefix avoids false-matching a binary
 // path or message that merely contains the word.
 var assertFailLine = regexp.MustCompile(`: Assertion .+ failed`)
+
+// ubsanSiteLine matches the source location UBSan prints on its diagnostic line
+// ("/path/file.c:LINE:COL: runtime error: ..."). UBSan crashes carry the site
+// here, not in the (often offset-only) #N backtrace frames.
+var ubsanSiteLine = regexp.MustCompile(`([^\s:]+):(\d+):\d+: runtime error`)
+
+// chromiumFatalLine matches a chromium/skia DCHECK/CHECK abort header
+// ("[mmdd/hhmmss.us:FATAL:path/file.cc:LINE] ..."). The #N frames are usually
+// unsymbolized (<unknown>), so this header carries the site.
+var chromiumFatalLine = regexp.MustCompile(`:FATAL:([^\s:\]]+):(\d+)\]`)
 var lsanLeakLine = regexp.MustCompile(`(Direct|Indirect) leak of`)
 
 // stackOverflowLine matches a stack-overflow only on a sanitizer report line,
@@ -634,6 +644,23 @@ func siteMatches(r harnessRun, expected *expectedYAML) bool {
 		}
 		if abs(line-expected.Site.ExpectedLine) <= tol {
 			return true
+		}
+	}
+	// UBSan / chromium-FATAL site lines: the crash location lives on the
+	// diagnostic header, not the #N frames (UBSan frames are offset-only; chromium
+	// DCHECK frames are <unknown>). Match the file:line there too.
+	for _, re := range []*regexp.Regexp{ubsanSiteLine, chromiumFatalLine} {
+		for _, m := range re.FindAllStringSubmatch(r.stderr, -1) {
+			if !suffixMatch(m[1], expected.Site.ExpectedFile) {
+				continue
+			}
+			line, err := strconv.Atoi(m[2])
+			if err != nil {
+				continue
+			}
+			if abs(line-expected.Site.ExpectedLine) <= tol {
+				return true
+			}
 		}
 	}
 	return false

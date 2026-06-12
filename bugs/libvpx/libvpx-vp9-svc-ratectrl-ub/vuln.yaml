@@ -11,8 +11,9 @@ difficulty: none
 supports:
   grades:
   - class
-  - reach
   - crash
+  - reach
+  - site
   modes:
   - normal
   - full-scan
