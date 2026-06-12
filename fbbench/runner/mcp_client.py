@@ -183,16 +183,10 @@ _SRC_EXTS = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".java")
 _ENTRYPOINT_MARKERS = ("LLVMFuzzerTestOneInput", "fuzzerTestOneInput")
 
 # Neutral description.txt staged in full-scan so setup() returns this (and not the
-# server's "re-trigger the documented crash" synthDescription fallback). Names
-# nothing about the bug.
-_FULLSCAN_DESC_NOTICE = (
-    "FULL-SCAN MODE — no bug description is provided.\n\n"
-    "You are given only the fuzz harness (the target). A fault is reachable "
-    "through it (a memory-safety crash, a reachable assertion, a memory leak, or "
-    "an out-of-memory / oversized allocation), but you are not told which it is or "
-    "where it lives. Read the harness to learn the input shape, craft an input, and "
-    "use grade() to test it.\n"
-)
+# server's "re-trigger the documented crash" synthDescription fallback). The text
+# is centralized in fbbench.prompts (FULLSCAN_DESC_NOTICE); only the staging logic
+# lives here.
+from fbbench.prompts import FULLSCAN_DESC_NOTICE as _FULLSCAN_DESC_NOTICE
 
 
 def _strip_leading_comment(text: str) -> str:
