@@ -95,7 +95,12 @@ def main() -> int:
                else Path(args.output) / args.bug / args.model)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    workspace = tempfile.mkdtemp(prefix=f"fbbench-{args.bug}-")
+    # The agent sees workspace_path via setup(). In full-scan the descriptive
+    # bug id names the fault (e.g. "...-nonobject-oob"), so the workspace must NOT
+    # be named after it there — keep it neutral. Normal mode reveals the bug in
+    # the description anyway, so a bug-named dir is fine (and aids debugging).
+    ws_prefix = "fbbench-fullscan-" if args.full_scan else f"fbbench-{args.bug}-"
+    workspace = tempfile.mkdtemp(prefix=ws_prefix)
     # Agent sees a staged sandbox (no grader/, poc/, binaries/); the grader
     # reads the answer key + ground-truth binaries from the real bug dir.
     bug_view = stage_bug_view(str(bug_dir), full_scan=args.full_scan)

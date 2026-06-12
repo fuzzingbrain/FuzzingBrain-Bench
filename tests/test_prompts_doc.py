@@ -45,3 +45,41 @@ def test_no_inline_nudges_in_runner():
                    "[Budget: turn "):
         assert marker not in epi, \
             f"inline prompt text {marker!r} leaked back into episode.py"
+
+
+def test_fullscan_system_prompt_is_as_sent():
+    # The catalog must show the EXACT full-scan system prompt the model receives,
+    # not just the un-rewritten fragments. derived_prompts() computes it from the
+    # builder; assert it equals what episode.run_episode sends (system_prompt(True)).
+    derived = {p.id: p.text for p in prompts.derived_prompts()}
+    assert "system_prompt_fullscan_assembled" in derived
+    assert derived["system_prompt_fullscan_assembled"] == prompts.system_prompt(full_scan=True)
+    # and it must actually be in the rendered catalog
+    md = (REPO / "docs" / "PROMPTS.md").read_text()
+    assert prompts.system_prompt(full_scan=True) in md, \
+        "full-scan system prompt (as sent) is not shown verbatim in PROMPTS.md"
+
+
+def test_blind_mode_workspace_not_named_after_bug():
+    # Regression: setup() exposes workspace_path, and the descriptive bug id names
+    # the fault (e.g. "...-nonobject-oob"). In full-scan / diff-scan the workspace
+    # tempdir must use a NEUTRAL prefix, else it leaks the bug past the bug_id alias.
+    main = (REPO / "fbbench" / "runner" / "__main__.py").read_text()
+    assert '"fbbench-fullscan-"' in main, \
+        "full-scan workspace prefix is not neutralized in runner/__main__.py"
+    diff = (REPO / "tools" / "diffscan_experiment.py").read_text()
+    assert 'f"fbbench-{args.bug}-"' not in diff, \
+        "diff-scan workspace is still named after the bug (leaks via workspace_path)"
+    assert '"fbbench-diffscan-"' in diff
+
+
+def test_diffscan_prompt_centralized():
+    # The diff-scan first-turn prompt must come from prompts.build_diffscan_message,
+    # not be re-hardcoded in the diff-scan tooling.
+    lib = (REPO / "tools" / "diffscan_lib.py").read_text()
+    for marker in ("DIFF-SCAN MODE", "A recent pull request modified",
+                   "memory-safety crash (overflow"):
+        assert marker not in lib, \
+            f"diff-scan prompt text {marker!r} leaked back into diffscan_lib.py"
+    assert "build_diffscan_message" in lib, \
+        "diffscan_lib.py should delegate to prompts.build_diffscan_message"
