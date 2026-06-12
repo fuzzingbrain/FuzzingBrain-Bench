@@ -289,37 +289,14 @@ def budget_note(done: int, max_turns: int, remaining: int) -> str:
     return note
 
 
-# ---------------------------------------------------------------------------
-# MCP tool descriptions — the one-line description the model reads per tool
-# (params/schema stay structural in runner/episode.py; only the prose is here)
-# ---------------------------------------------------------------------------
-
-TOOL_DESCRIPTIONS = {
-    "setup": _reg("tool_desc.setup",
-        when="Shown in the `setup` tool schema (every turn).",
-        why="Tells the model what setup() returns.",
-        text="Return bug metadata and workspace pointers."),
-    "exec": _reg("tool_desc.exec",
-        when="Shown in the `exec` tool schema.",
-        why="Tells the model how to run a shell command and the cwd.",
-        text="Run a shell command via /bin/bash -c. cwd = BENCH_BUG_DIR."),
-    "list_directory": _reg("tool_desc.list_directory",
-        when="Shown in the `list_directory` tool schema.",
-        why="Tells the model it can list directory entries.",
-        text="List directory entries."),
-    "read_file": _reg("tool_desc.read_file",
-        when="Shown in the `read_file` tool schema.",
-        why="Tells the model it can read files; flags that oracle keys are denied.",
-        text="Read a file (oracle answer keys denied)."),
-    "write_file": _reg("tool_desc.write_file",
-        when="Shown in the `write_file` tool schema.",
-        why="Tells the model where it may write its candidate input.",
-        text="Write a file under BENCH_WORKSPACE."),
-    "grade": _reg("tool_desc.grade",
-        when="Shown in the `grade` tool schema.",
-        why="Tells the model grade() runs its input through the harness.",
-        text="Grade a candidate PoC. Returns capability bitmap."),
-}
+# NOTE — the MCP TOOL surface (the six tool names/descriptions/params, the tool
+# error messages, and the full-scan synthDescription fallback) is owned by the Go
+# MCP server (tools/mcp-server/): `main.go` declares the tools via `tools/list`,
+# `setup.go` builds the no-description fallback, `files.go`/`exec.go`/`grade.go`
+# return the tool errors. The Python runner fetches that list from the server
+# (episode.neutral_tools) rather than keeping a copy, so the API arm and the Codex
+# arm present byte-identical tools to the model. Those strings live with the server
+# (a separate binary) and are therefore NOT duplicated here.
 
 
 # ---------------------------------------------------------------------------

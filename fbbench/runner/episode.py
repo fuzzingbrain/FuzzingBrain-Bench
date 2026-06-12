@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fbbench.prompts import (
-    FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TOOL_DESCRIPTIONS, TRUNCATION_NUDGE,
+    FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
     budget_note, build_initial_user_message, system_prompt,
 )
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
@@ -66,37 +66,19 @@ class EpisodeResult:
     last_grade: dict | None = None
 
 
-def tool_schemas() -> list[dict]:
-    """Neutral tool schema list mirroring the server's tools/list response.
+def neutral_tools(mcp: MCPClient) -> list[dict]:
+    """Tool schemas straight from the MCP server's tools/list — the single source
+    of truth for the tool surface (name + description + params).
 
-    Held static (not queried) because the schemas are part of the benchmark
-    contract and must stay identical across models for fair comparison.
+    Previously the runner hand-mirrored these, which silently drifted from the
+    server's own list (and from the Codex arm, which reads the server directly).
+    Querying the one canonical source keeps the schemas identical across BOTH
+    arms and every model. The server's tools/list is a static function over the
+    pinned bin/mcp-server, so this stays deterministic / reproducible. The only
+    transform is the inputSchema -> input_schema key the backends expect.
     """
-    def t(name, desc, props, required):
-        return {"name": name, "description": desc,
-                "input_schema": {"type": "object", "properties": props,
-                                 "required": required}}
-    # Tool descriptions are centralized in fbbench.prompts (TOOL_DESCRIPTIONS);
-    # only the JSON params/required stay here as the structural schema.
-    d = TOOL_DESCRIPTIONS
-    return [
-        t("setup", d["setup"], {}, []),
-        t("exec", d["exec"],
-          {"cmd": {"type": "string"}, "timeout_s": {"type": "integer"}}, ["cmd"]),
-        t("list_directory", d["list_directory"],
-          {"path": {"type": "string"}}, ["path"]),
-        t("read_file", d["read_file"],
-          {"path": {"type": "string"}, "offset": {"type": "integer"},
-           "limit": {"type": "integer"}}, ["path"]),
-        t("write_file", d["write_file"],
-          {"path": {"type": "string"}, "content": {"type": "string"}},
-          ["path", "content"]),
-        t("grade", d["grade"],
-          {"path": {"type": "string"},
-           "options": {"type": "object",
-                       "properties": {"round_count": {"type": "integer"}}}},
-          ["path"]),
-    ]
+    return [{"name": t["name"], "description": t["description"],
+             "input_schema": t["inputSchema"]} for t in mcp.list_tools()]
 
 
 def run_episode(
@@ -128,7 +110,7 @@ def run_episode(
     sysp = system_prompt(full_scan=full_scan)
 
     messages: list[dict] = [{"role": "user", "content": user_text}]
-    tools = tool_schemas()
+    tools = neutral_tools(mcp)
     result = EpisodeResult(bug_id=bug_id, model=backend.model)
     log_fp = open(episode_log, "w") if episode_log else None
     # Full-fidelity transcript alongside the compact episode.jsonl ledger:
