@@ -235,7 +235,7 @@ func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYA
 			// when the crash aborts before the profile is written — which made
 			// reach spuriously fail on bugs whose site already matched.)
 			caps["reach"] = "fired"
-		} else if reachFired(covBin, bench.Harness.Invocation, pocPath, runDir, expected) {
+		} else if reachFired(covBin, bench.Harness.Invocation, pocPath, runDir, bench.Harness.TimeoutS, expected) {
 			caps["reach"] = "fired"
 		} else if reachFromBacktrace(out.stderr, expected) {
 			// Fallback: a sanitizer backtrace frame inside the buggy region

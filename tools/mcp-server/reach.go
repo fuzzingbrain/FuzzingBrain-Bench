@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strconv"
+	"syscall"
+	"time"
 )
 
 // reachFired runs the PoC against the coverage build and uses `llvm-cov
@@ -14,10 +16,9 @@ import (
 //
 // Fallback chain when llvm-cov isn't available: try `gdb` to set a
 // breakpoint at <file>:<line_range_mid> and check whether the PoC hits it.
-// Per the user's hint ("如果llvm-cov不行，可以试试gdb"). Implementation of
-// gdb fallback is deferred to a future revision; for now we surface the
-// llvm-cov result and fall back to "not_fired" if it fails.
-func reachFired(covBin string, invocation []string, pocPath, runDir string, expected *expectedYAML) bool {
+// (gdb fallback is deferred to a future revision; for now we surface the
+// llvm-cov result and fall back to "not_fired" if it fails.)
+func reachFired(covBin string, invocation []string, pocPath, runDir string, timeoutS int, expected *expectedYAML) bool {
 	// llvmCovHit matches by file suffix + line range, not by function symbol, so a
 	// file-only reach (no expected_function) is gradeable — e.g. whole-file OOM
 	// bombs. Require at least a file or a function.
@@ -56,7 +57,29 @@ func reachFired(covBin string, invocation []string, pocPath, runDir string, expe
 		"ASAN_OPTIONS=abort_on_error=0:detect_leaks=0",
 		"TMPDIR="+runDir,
 	)
-	_ = cmd.Run()
+	// Bound EVERY coverage run. A pathological input (e.g. the O(n^2) sscanf in
+	// ndpi_hex_decode over a megabyte of input) makes a single execution run for
+	// hours; unlike grade.go's runHarness this path had no timeout, so cmd.Run()
+	// blocked indefinitely and the harness leaked as an orphan when the outer
+	// episode was killed. Run it in its own process group and SIGKILL the whole
+	// group on timeout so no grandchild survives. (Continuous-mode coverage still
+	// leaves a profile on a killed run; a plain build that is killed simply yields
+	// no profile -> not-fired, which is correct for an input too slow to grade.)
+	covTimeout := timeoutS
+	if covTimeout < 120 {
+		covTimeout = 120 // the coverage build is slower than the asan build; headroom
+	}
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if err := cmd.Start(); err == nil {
+		done := make(chan error, 1)
+		go func() { done <- cmd.Wait() }()
+		select {
+		case <-done:
+		case <-time.After(time.Duration(covTimeout) * time.Second):
+			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			<-done
+		}
+	}
 
 	if _, err := os.Stat(profraw); err != nil {
 		return false
