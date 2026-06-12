@@ -54,6 +54,14 @@ def build_parser() -> argparse.ArgumentParser:
                         help="provider API key; default reads ./.env")
     sp_run.set_defaults(fn=commands.cmd_run)
 
+    sp_traj = sub.add_parser("traj",
+                             help="print the tool-call trajectory of a finished run dir")
+    sp_traj.add_argument("run_dir",
+                         help="a run/cell dir containing transcript.jsonl")
+    sp_traj.add_argument("--write", action="store_true",
+                         help="(re)write traj.jsonl + traj.md into the run dir")
+    sp_traj.set_defaults(fn=commands.cmd_traj)
+
     sub.add_parser("models",
                    help="list supported models + show which provider keys are loaded"
                    ).set_defaults(fn=commands.cmd_models)
