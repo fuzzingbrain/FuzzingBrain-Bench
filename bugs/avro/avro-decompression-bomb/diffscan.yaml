@@ -5,21 +5,21 @@
 repo: https://github.com/apache/avro
 commit: 4502c1ba1c453702fd26966a5e5c10441e0d1384
 crash_files:
-- lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
+- lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java
 levels:
   '0':
     files:
-    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
+    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java
     distractors: []
   '1':
     files:
     - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
-    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
+    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java
     distractors:
     - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
   '2':
     files:
-    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
+    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java
     - lang/java/avro/src/main/java/org/apache/avro/file/ZstandardLoader.java
     - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
     distractors:
@@ -29,7 +29,7 @@ levels:
     files:
     - lang/java/avro/src/main/java/org/apache/avro/file/BZip2Codec.java
     - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java
-    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileReader.java
+    - lang/java/avro/src/main/java/org/apache/avro/file/DataFileStream.java
     - lang/java/avro/src/main/java/org/apache/avro/file/ZstandardLoader.java
     distractors:
     - lang/java/avro/src/main/java/org/apache/avro/file/DataFileConstants.java

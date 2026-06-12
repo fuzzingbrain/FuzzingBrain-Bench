@@ -5,33 +5,33 @@
 repo: https://github.com/google/flatbuffers
 commit: bab10754d93d74d1ff44d46de63558bc4127f7d8
 crash_files:
-- src/idl_parser.cpp
+- include/flatbuffers/idl.h
 levels:
   '0':
     files:
-    - src/idl_parser.cpp
+    - include/flatbuffers/idl.h
     distractors: []
   '1':
     files:
-    - src/idl_parser.cpp
-    - src/idl_gen_kotlin.cpp
+    - include/flatbuffers/idl.h
+    - include/flatbuffers/buffer_ref.h
     distractors:
-    - src/idl_gen_kotlin.cpp
+    - include/flatbuffers/buffer_ref.h
   '2':
     files:
-    - src/idl_gen_kotlin.cpp
-    - src/idl_gen_csharp.cpp
-    - src/idl_parser.cpp
+    - include/flatbuffers/buffer_ref.h
+    - include/flatbuffers/vector_downward.h
+    - include/flatbuffers/idl.h
     distractors:
-    - src/idl_gen_kotlin.cpp
-    - src/idl_gen_csharp.cpp
+    - include/flatbuffers/buffer_ref.h
+    - include/flatbuffers/vector_downward.h
   '3':
     files:
-    - src/idl_gen_kotlin.cpp
-    - src/idl_parser.cpp
-    - src/idl_gen_php.cpp
-    - src/idl_gen_csharp.cpp
+    - include/flatbuffers/buffer_ref.h
+    - include/flatbuffers/idl.h
+    - include/flatbuffers/flexbuffers.h
+    - include/flatbuffers/vector_downward.h
     distractors:
-    - src/idl_gen_kotlin.cpp
-    - src/idl_gen_csharp.cpp
-    - src/idl_gen_php.cpp
+    - include/flatbuffers/buffer_ref.h
+    - include/flatbuffers/vector_downward.h
+    - include/flatbuffers/flexbuffers.h
