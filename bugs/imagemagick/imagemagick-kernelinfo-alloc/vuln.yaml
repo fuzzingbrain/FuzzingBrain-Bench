@@ -10,8 +10,9 @@ scope:
 difficulty: none
 supports:
   grades:
-  - reach
+  - class
   - crash
+  - reach
   - site
   modes:
   - normal

@@ -13,6 +13,7 @@ supports:
   - class
   - crash
   - reach
+  - site
   modes:
   - normal
   - full-scan

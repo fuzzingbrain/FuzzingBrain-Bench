@@ -10,8 +10,9 @@ scope:
 difficulty: none
 supports:
   grades:
-  - reach
+  - class
   - crash
+  - reach
   - site
   modes:
   - normal
@@ -20,7 +21,7 @@ supports:
 metadata:
   language: cpp
   arch: x86_64
-  sanitizer: libfuzzer
+  sanitizer: asan
   vuln_version: f23c9437a
   fix_commit: null
 active: true
