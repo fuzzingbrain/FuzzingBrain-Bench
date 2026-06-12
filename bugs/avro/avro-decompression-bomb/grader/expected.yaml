@@ -15,7 +15,7 @@ class:
   sanitizer: jazzer
 
 site:
-  expected_file: ""
-  expected_line: 0
-  line_tolerance: 0
-  max_frame_distance: 0
+  expected_file: lang/java/avro/src/main/java/org/apache/avro/file/DeflateCodec.java
+  expected_line: 83
+  line_tolerance: 5
+  max_frame_distance: 6
