@@ -100,6 +100,7 @@ def main() -> int:
             force_full=False,
             full_scan=True,
             require_preset=args.require_preset,
+            task_mode="diffscan",  # reveal the sanitizer (diff-scan is not blind)
         )
     finally:
         shutil.rmtree(workspace, ignore_errors=True)

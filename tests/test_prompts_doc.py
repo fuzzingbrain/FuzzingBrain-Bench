@@ -45,3 +45,28 @@ def test_no_inline_nudges_in_runner():
                    "[Budget: turn "):
         assert marker not in epi, \
             f"inline prompt text {marker!r} leaked back into episode.py"
+
+
+def test_fullscan_system_prompt_is_as_sent():
+    # The catalog must show the EXACT full-scan system prompt the model receives,
+    # not just the un-rewritten fragments. derived_prompts() computes it from the
+    # builder; assert it equals what episode.run_episode sends (system_prompt(True)).
+    derived = {p.id: p.text for p in prompts.derived_prompts()}
+    assert "system_prompt_fullscan_assembled" in derived
+    assert derived["system_prompt_fullscan_assembled"] == prompts.system_prompt(full_scan=True)
+    # and it must actually be in the rendered catalog
+    md = (REPO / "docs" / "PROMPTS.md").read_text()
+    assert prompts.system_prompt(full_scan=True) in md, \
+        "full-scan system prompt (as sent) is not shown verbatim in PROMPTS.md"
+
+
+def test_diffscan_prompt_centralized():
+    # The diff-scan first-turn prompt must come from prompts.build_diffscan_message,
+    # not be re-hardcoded in the diff-scan tooling.
+    lib = (REPO / "tools" / "diffscan_lib.py").read_text()
+    for marker in ("DIFF-SCAN MODE", "A recent pull request modified",
+                   "memory-safety crash (overflow"):
+        assert marker not in lib, \
+            f"diff-scan prompt text {marker!r} leaked back into diffscan_lib.py"
+    assert "build_diffscan_message" in lib, \
+        "diffscan_lib.py should delegate to prompts.build_diffscan_message"

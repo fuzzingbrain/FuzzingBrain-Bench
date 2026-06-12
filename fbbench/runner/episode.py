@@ -95,8 +95,15 @@ def run_episode(
     force_full: bool = False,
     full_scan: bool = False,
     require_preset: bool = False,
+    task_mode: str | None = None,
 ) -> EpisodeResult:
-    mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace, oracle_dir=oracle_dir)
+    # task_mode gates what setup() reveals (sanitizer withheld in full-scan). When
+    # the caller doesn't say, derive it from full_scan; diff-scan passes "diffscan"
+    # explicitly (it runs with full_scan=True but DOES reveal the sanitizer).
+    if task_mode is None:
+        task_mode = "fullscan" if full_scan else "normal"
+    mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace,
+                    oracle_dir=oracle_dir, task_mode=task_mode)
     mcp.initialize()
     kb: set[str] = set(capability_set or ["reach", "crash", "class", "site"])
     poc_root: Path | None = Path(pocs_dir) if pocs_dir else None

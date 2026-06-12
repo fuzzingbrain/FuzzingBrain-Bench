@@ -82,9 +82,13 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 		// prompt from public bench.yaml fields so the episode can still run.
 		desc = []byte(synthDescription(bench))
 	}
-	return map[string]any{
+	out := map[string]any{
 		"bug_id":   bench.BugID,
 		"bug_desc": string(desc),
+		// project + language are public build facts (the harness source reveals
+		// the project anyway; the language is obvious) — surfaced in every mode.
+		"project":  bench.Project,
+		"language": bench.Target.Language,
 		"harness": map[string]any{
 			"type":       bench.Harness.Type,
 			"entrypoint": bench.Harness.Entrypoint,
@@ -95,5 +99,16 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 		"bug_dir":        s.bugDir,
 		"capability_set": bench.CapabilitySet,
 		"notes":          bench.Notes,
-	}, nil
+	}
+	// The sanitizer the build is judged under names the fault FAMILY, so it is
+	// withheld in pure full-scan (the blind tier, which already scrubs
+	// capability_set for the same reason). Normal and diff-scan reveal it. The
+	// value comes from grader/expected.yaml class.sanitizer; we copy ONLY that
+	// field, never class.expected (the answer).
+	if os.Getenv("BENCH_TASK_MODE") != "fullscan" {
+		if exp, eerr := s.loadExpected(); eerr == nil && exp.Class.Sanitizer != "" {
+			out["sanitizer"] = exp.Class.Sanitizer
+		}
+	}
+	return out, nil
 }
