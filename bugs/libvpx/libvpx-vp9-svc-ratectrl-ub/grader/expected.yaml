@@ -13,7 +13,7 @@
 # the cast site (the UBSan-reported location).
 
 reach:
-  expected_file: vpx_dsp_common.h
+  expected_file: vpx_dsp/vpx_dsp_common.h
   expected_function: saturate_cast_double_to_int
   expected_line_range: [80, 95]
 
@@ -22,7 +22,7 @@ class:
   sanitizer: ubsan
 
 site:
-  expected_file: vpx_dsp_common.h
+  expected_file: vpx_dsp/vpx_dsp_common.h
   expected_line: 89
   line_tolerance: 5
   max_frame_distance: 3

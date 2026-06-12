@@ -9,7 +9,7 @@
 # READ of size 4, "0 bytes after 32-byte region".
 
 reach:
-  expected_file: name_mapper.cpp
+  expected_file: source/name_mapper.cpp
   expected_function: ParseInstruction
   expected_line_range: [160, 360]
 
@@ -18,7 +18,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: name_mapper.cpp
+  expected_file: source/name_mapper.cpp
   expected_line: 268
   line_tolerance: 15
   max_frame_distance: 3

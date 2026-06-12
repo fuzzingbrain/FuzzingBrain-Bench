@@ -5,14 +5,14 @@
 #   #1 ToLinearSrgb              sharpyuv/sharpyuv_gamma.c:106
 #   #2 SharpYuvGammaToLinear     sharpyuv/sharpyuv_gamma.c:318
 reach:
-  expected_file: sharpyuv_gamma.c
+  expected_file: sharpyuv/sharpyuv_gamma.c
   expected_function: FixedPointInterpolation
   expected_line_range: [70, 330]
 class:
   expected: segv
   sanitizer: asan
 site:
-  expected_file: sharpyuv_gamma.c
+  expected_file: sharpyuv/sharpyuv_gamma.c
   expected_line: 91
   line_tolerance: 30
   max_frame_distance: 3

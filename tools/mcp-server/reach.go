@@ -131,14 +131,14 @@ func reachFromBacktrace(stderr string, expected *expectedYAML) bool {
 	}
 	// Java fallback: walk Java frames.
 	for _, m := range javaFrameRe.FindAllStringSubmatch(stderr, -1) {
-		file := m[1]
+		file := m[2]
 		if isJavaHarnessFrame(file) {
 			continue
 		}
-		if expected.Reach.ExpectedFile != "" && !javaSuffixMatch(file, expected.Reach.ExpectedFile) {
+		if expected.Reach.ExpectedFile != "" && !javaSuffixMatch(javaQualifiedPath(m[1], file), expected.Reach.ExpectedFile) {
 			continue
 		}
-		line, err := strconv.Atoi(m[2])
+		line, err := strconv.Atoi(m[3])
 		if err != nil {
 			continue
 		}

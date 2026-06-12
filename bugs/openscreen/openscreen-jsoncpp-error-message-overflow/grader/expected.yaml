@@ -10,7 +10,7 @@
 # getLocationLineAndColumn loop is inlined); the :1828 source line is stable.
 
 reach:
-  expected_file: json_reader.cpp
+  expected_file: src/lib_json/json_reader.cpp
   expected_function: getLocationLineAndColumn
   expected_line_range: [1820, 1845]
 
@@ -19,7 +19,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: json_reader.cpp
+  expected_file: src/lib_json/json_reader.cpp
   expected_line: 1828
   line_tolerance: 10
   max_frame_distance: 3

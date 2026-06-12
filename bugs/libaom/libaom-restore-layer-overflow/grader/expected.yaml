@@ -8,7 +8,7 @@
 # av1_update_temporal_layer_framerate rather than av1_restore_layer_context.
 
 reach:
-  expected_file: svc_layercontext.c
+  expected_file: av1/encoder/svc_layercontext.c
   expected_function: av1_update_temporal_layer_framerate
   expected_line_range: [100, 700]
 
@@ -17,7 +17,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: svc_layercontext.c
+  expected_file: av1/encoder/svc_layercontext.c
   expected_line: 192
   line_tolerance: 30
   max_frame_distance: 3

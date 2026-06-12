@@ -7,11 +7,11 @@
 # class omitted: plain C assert()->abort, no sanitizer class token. crash on SIGABRT;
 # libFuzzer prints the symbolized stack -> reach + site.
 reach:
-  expected_file: bitreader_buffer.c
+  expected_file: aom_dsp/bitreader_buffer.c
   expected_function: aom_rb_read_literal
   expected_line_range: [30, 55]
 site:
-  expected_file: bitreader_buffer.c
+  expected_file: aom_dsp/bitreader_buffer.c
   expected_line: 40
   line_tolerance: 20
   max_frame_distance: 3

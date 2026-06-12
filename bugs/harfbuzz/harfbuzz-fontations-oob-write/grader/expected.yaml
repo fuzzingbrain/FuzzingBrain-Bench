@@ -8,7 +8,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: font.rs
+  expected_file: src/rust/font.rs
   expected_line: 988
   line_tolerance: 20
   max_frame_distance: 5

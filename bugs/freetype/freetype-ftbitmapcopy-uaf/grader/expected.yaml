@@ -8,7 +8,7 @@
 # interceptor at frame 0, so the site lives at max_frame_distance 1.
 
 reach:
-  expected_file: ftbitmap.c
+  expected_file: src/base/ftbitmap.c
   expected_function: FT_Bitmap_Copy
   expected_line_range: [100, 140]
 
@@ -17,7 +17,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: ftbitmap.c
+  expected_file: src/base/ftbitmap.c
   expected_line: 123
   line_tolerance: 20
   max_frame_distance: 3

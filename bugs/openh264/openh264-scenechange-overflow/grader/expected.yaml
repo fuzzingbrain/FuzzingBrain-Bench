@@ -8,7 +8,7 @@
 # READ of size 1, 0 bytes to the right of an 864-byte region.
 
 reach:
-  expected_file: sad_common.cpp
+  expected_file: codec/common/src/sad_common.cpp
   expected_function: WelsSampleSad8x8_c
   expected_line_range: [60, 100]
 
@@ -17,7 +17,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: sad_common.cpp
+  expected_file: codec/common/src/sad_common.cpp
   expected_line: 82
   line_tolerance: 20
   max_frame_distance: 3

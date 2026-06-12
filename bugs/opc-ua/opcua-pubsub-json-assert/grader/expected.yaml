@@ -8,12 +8,12 @@
 # SIGABRT; libFuzzer prints the symbolized stack, giving reach + site.
 
 reach:
-  expected_file: ua_types_encoding_json_105.c
+  expected_file: src/ua_types_encoding_json_105.c
   expected_function: lookAheadForKey
   expected_line_range: [1380, 1480]
 
 site:
-  expected_file: ua_types_encoding_json_105.c
+  expected_file: src/ua_types_encoding_json_105.c
   expected_line: 1435
   line_tolerance: 30
   max_frame_distance: 3

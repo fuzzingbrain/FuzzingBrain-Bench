@@ -8,7 +8,7 @@
 # (The concrete offset varies with d_h; the line and UB class are stable.)
 
 reach:
-  expected_file: vpx_image.c
+  expected_file: vpx/src/vpx_image.c
   expected_function: vpx_img_flip
   expected_line_range: [245, 270]
 
@@ -17,7 +17,7 @@ class:
   sanitizer: ubsan
 
 site:
-  expected_file: vpx_image.c
+  expected_file: vpx/src/vpx_image.c
   expected_line: 263
   line_tolerance: 5
   max_frame_distance: 3
