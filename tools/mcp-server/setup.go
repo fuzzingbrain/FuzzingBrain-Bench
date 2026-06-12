@@ -61,9 +61,9 @@ func synthDescription(b *benchYAML) string {
 	if b.UpstreamReport != "" {
 		out += "Upstream report: " + b.UpstreamReport + "\n"
 	}
-	out += "\n(No long-form description.txt ships for this bug; reconstruct the " +
-		"bug from the harness source and the upstream report, then drive the " +
-		"sanitizer-instrumented harness to re-trigger the documented crash.)\n"
+	out += "\n(No long-form description ships for this bug; reconstruct it from the " +
+		"harness source and the project source under src/, then drive the " +
+		"sanitizer-instrumented harness until your input makes it crash.)\n"
 	if b.Notes != "" {
 		out += "\nNotes:\n" + b.Notes + "\n"
 	}
@@ -82,9 +82,13 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 		// prompt from public bench.yaml fields so the episode can still run.
 		desc = []byte(synthDescription(bench))
 	}
-	return map[string]any{
+	out := map[string]any{
 		"bug_id":   bench.BugID,
 		"bug_desc": string(desc),
+		// project + language are public build facts (the harness source reveals
+		// the project anyway; the language is obvious) — surfaced in every mode.
+		"project":  bench.Project,
+		"language": bench.Target.Language,
 		"harness": map[string]any{
 			"type":       bench.Harness.Type,
 			"entrypoint": bench.Harness.Entrypoint,
@@ -95,5 +99,15 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 		"bug_dir":        s.bugDir,
 		"capability_set": bench.CapabilitySet,
 		"notes":          bench.Notes,
-	}, nil
+	}
+	// The sanitizer the build is judged under is part of the fuzzing setup — a
+	// real auditor always knows it — so it is surfaced in EVERY mode (full-scan
+	// included; full-scan's blindness is about not knowing what/where the bug is
+	// or its class, not about hiding the build's instrumentation). The value
+	// comes from grader/expected.yaml class.sanitizer; we copy ONLY that field,
+	// never class.expected (the answer).
+	if exp, eerr := s.loadExpected(); eerr == nil && exp.Class.Sanitizer != "" {
+		out["sanitizer"] = exp.Class.Sanitizer
+	}
+	return out, nil
 }

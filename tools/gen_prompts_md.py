@@ -16,7 +16,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from fbbench.prompts import registry
+from fbbench.prompts import derived_prompts, registry
 
 _OUT = Path(__file__).resolve().parents[1] / "docs" / "PROMPTS.md"
 
@@ -27,29 +27,47 @@ _HEADER = (
     "(`tests/test_prompts_doc.py` fails if this file is stale).\n\n"
     "Every string the benchmark sends to a model lives in `prompts.py`; each is "
     "listed below with **when** it is used and **why** (the business reason). "
-    "Fixed prompts show their full text; dynamic ones show the template plus the "
-    "runtime values filled in.\n"
+    "Fixed prompts show their full text; dynamic ones show the template with "
+    "`{placeholders}` for the per-episode values (description, setup() payload, "
+    "file list, turn counts) substituted at runtime. The final **Assembled "
+    "prompts** section shows the exact as-sent text for prompts the runner builds "
+    "from several fragments, computed from the real builders so it cannot drift.\n"
 )
+
+
+def _render_entry(out: list[str], p) -> None:
+    out.append(f"\n## `{p.id}`\n")
+    out.append(f"- **When**: {p.when}")
+    out.append(f"- **Why**: {p.why}")
+    if p.fills:
+        out.append(f"- **Type**: dynamic — fills `{p.fills}`")
+    else:
+        out.append("- **Type**: fixed")
+    out.append("\n```\n" + p.text + "\n```\n")
 
 
 def render() -> str:
     out = [_HEADER]
     prompts = registry()
+    derived = derived_prompts()
     # table of contents
     out.append("\n## Index\n")
     for p in prompts:
         kind = "dynamic" if p.fills else "fixed"
         out.append(f"- [`{p.id}`](#{p.id.replace('.', '').replace('_', '-')}) — {kind}")
+    for p in derived:
+        out.append(f"- [`{p.id}`](#{p.id.replace('.', '').replace('_', '-')}) — assembled")
     out.append("\n---\n")
     for p in prompts:
-        out.append(f"\n## `{p.id}`\n")
-        out.append(f"- **When**: {p.when}")
-        out.append(f"- **Why**: {p.why}")
-        if p.fills:
-            out.append(f"- **Type**: dynamic — fills `{p.fills}`")
-        else:
-            out.append("- **Type**: fixed")
-        out.append("\n```\n" + p.text + "\n```\n")
+        _render_entry(out, p)
+    out.append("\n---\n")
+    out.append("\n# Assembled prompts (exact text as sent)\n")
+    out.append(
+        "These are not single registry strings — the runner builds them from the "
+        "fragments above. Shown here as the exact text the model receives, computed "
+        "from the builder functions so this section can never drift from runtime.\n")
+    for p in derived:
+        _render_entry(out, p)
     return "\n".join(out).rstrip() + "\n"
 
 

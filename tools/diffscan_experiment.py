@@ -78,7 +78,9 @@ def main() -> int:
     (out_dir / "diff_files.json").write_text(json.dumps({
         "bug_id": args.bug, "diff_level": args.diff_level, **fl}, indent=2))
 
-    workspace = tempfile.mkdtemp(prefix=f"fbbench-{args.bug}-")
+    # Neutral workspace name: the agent sees workspace_path via setup(), and the
+    # descriptive bug id names the fault — diff-scan must not hand that over.
+    workspace = tempfile.mkdtemp(prefix="fbbench-diffscan-")
     bug_view = stage_bug_view(str(bug_dir), full_scan=True)
 
     episode_mod.build_initial_user_message = dl.diffscan_message_builder(
