@@ -1,4 +1,4 @@
-"""The six fb-bench subcommands: list, show, grade, grade-all, run, models."""
+"""The fb-bench subcommands: list, show, grade, grade-all, run, traj, models."""
 from __future__ import annotations
 
 import datetime
@@ -306,3 +306,36 @@ def cmd_run(args) -> int:
     print(dim(f"  output:    {out_dir}"))
     print()
     return subprocess.call(cmd, cwd=str(REPO))
+
+
+def cmd_traj(args) -> int:
+    """Pretty-print the tool-call trajectory of a finished run dir."""
+    from fbbench.runner.traj import build_traj, render_text, write_traj
+
+    d = Path(args.run_dir)
+    tr = d / "transcript.jsonl"
+    if not tr.is_file():
+        if d.is_file() and d.name == "transcript.jsonl":
+            tr, d = d, d.parent
+        else:
+            print(red(f"  no transcript.jsonl under {d}"), file=sys.stderr)
+            return 1
+    nodes = build_traj(tr)
+    if args.write:
+        write_traj(tr, d)
+    grades = [n for n in nodes if n["tool"] == "grade"]
+    hits = [n for n in grades if n["crash"]]
+    print()
+    print(bold(f"  {len(nodes)} tool calls · {len(grades)} grade() · "
+               + (green(f"{len(hits)} faulted") if hits else dim("0 faulted"))))
+    print()
+    for n in nodes:
+        head = f"  {n['n']:>3} t{n['turn']:<3} {n['tool']:<14} {n['arg']:<42}"
+        if n["crash"]:
+            print(green(head) + "  " + green(n["out"]) + "  " + green("💥"))
+        elif not n["ok"]:
+            print(head + "  " + red(n["out"]))
+        else:
+            print(head + "  " + dim(n["out"]))
+    print()
+    return 0
