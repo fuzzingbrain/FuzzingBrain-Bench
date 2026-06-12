@@ -51,7 +51,7 @@ def stage_codex_env(real_bug_dir: str, bug: str) -> tuple[str, str]:
             f'command = "{SERVER}"\n'
             "env = { "
             f'BENCH_BUG_DIR = "{view}", BENCH_WORKSPACE = "{ws}", '
-            f'BENCH_ORACLE_DIR = "{real_bug_dir}", BENCH_TASK_MODE = "normal" '
+            f'BENCH_ORACLE_DIR = "{real_bug_dir}" '
             "}\n"
         )
     return view, ws

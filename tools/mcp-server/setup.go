@@ -100,15 +100,14 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 		"capability_set": bench.CapabilitySet,
 		"notes":          bench.Notes,
 	}
-	// The sanitizer the build is judged under names the fault FAMILY, so it is
-	// withheld in pure full-scan (the blind tier, which already scrubs
-	// capability_set for the same reason). Normal and diff-scan reveal it. The
-	// value comes from grader/expected.yaml class.sanitizer; we copy ONLY that
-	// field, never class.expected (the answer).
-	if os.Getenv("BENCH_TASK_MODE") != "fullscan" {
-		if exp, eerr := s.loadExpected(); eerr == nil && exp.Class.Sanitizer != "" {
-			out["sanitizer"] = exp.Class.Sanitizer
-		}
+	// The sanitizer the build is judged under is part of the fuzzing setup — a
+	// real auditor always knows it — so it is surfaced in EVERY mode (full-scan
+	// included; full-scan's blindness is about not knowing what/where the bug is
+	// or its class, not about hiding the build's instrumentation). The value
+	// comes from grader/expected.yaml class.sanitizer; we copy ONLY that field,
+	// never class.expected (the answer).
+	if exp, eerr := s.loadExpected(); eerr == nil && exp.Class.Sanitizer != "" {
+		out["sanitizer"] = exp.Class.Sanitizer
 	}
 	return out, nil
 }

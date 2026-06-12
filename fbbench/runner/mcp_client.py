@@ -329,17 +329,13 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
 
 class MCPClient:
     def __init__(self, server_bin: str, bug_dir: str, workspace: str,
-                 oracle_dir: str | None = None, task_mode: str = "normal"):
+                 oracle_dir: str | None = None):
         env = os.environ.copy()
         env["BENCH_BUG_DIR"] = bug_dir
         env["BENCH_WORKSPACE"] = workspace
         # Grader reads expected.yaml + binaries from the oracle dir; the agent
         # never sees it. Defaults to bug_dir for back-compat when unset.
         env["BENCH_ORACLE_DIR"] = oracle_dir or bug_dir
-        # Task mode gates what setup() reveals: "fullscan" withholds the sanitizer
-        # (and thus the fault family) to keep the blind tier blind; "normal" and
-        # "diffscan" reveal it. See setup.go.
-        env["BENCH_TASK_MODE"] = task_mode
         self._proc = subprocess.Popen(
             [server_bin],
             stdin=subprocess.PIPE,
