@@ -61,9 +61,9 @@ func synthDescription(b *benchYAML) string {
 	if b.UpstreamReport != "" {
 		out += "Upstream report: " + b.UpstreamReport + "\n"
 	}
-	out += "\n(No long-form description.txt ships for this bug; reconstruct the " +
-		"bug from the harness source and the upstream report, then drive the " +
-		"sanitizer-instrumented harness to re-trigger the documented crash.)\n"
+	out += "\n(No long-form description ships for this bug; reconstruct it from the " +
+		"harness source and the project source under src/, then drive the " +
+		"sanitizer-instrumented harness until your input makes it crash.)\n"
 	if b.Notes != "" {
 		out += "\nNotes:\n" + b.Notes + "\n"
 	}

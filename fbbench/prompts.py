@@ -267,19 +267,18 @@ def sanitizer_capability(sanitizer: str | None) -> str:
     return _SANITIZER_CAP_TMPL.format(display=display, detects=detects)
 
 
-def bug_context(setup_resp: dict, *, reveal_sanitizer: bool = True) -> str:
+def bug_context(setup_resp: dict) -> str:
     """The per-bug context block (project/language, source + harness pointers, and
-    — unless withheld — the sanitizer and its fault family). Built from setup()."""
+    the sanitizer + its fault family). Built from setup(); sent in every mode."""
     lang_raw = (setup_resp.get("language") or "").strip()
     language = _LANGUAGE_DISPLAY.get(lang_raw.lower(), lang_raw or "native")
     entrypoint = (setup_resp.get("harness") or {}).get("entrypoint") or "the entrypoint"
     block = _BUG_CONTEXT_TMPL.format(
         project=setup_resp.get("project") or "the target",
         language=language, entrypoint=entrypoint)
-    if reveal_sanitizer:
-        cap = sanitizer_capability(setup_resp.get("sanitizer"))
-        if cap:
-            block += "\n\n" + cap
+    cap = sanitizer_capability(setup_resp.get("sanitizer"))
+    if cap:
+        block += "\n\n" + cap
     return block
 
 
@@ -329,10 +328,10 @@ def build_initial_user_message(bug_desc: str, setup_resp: dict,
     """
     if full_scan:
         return _FULLSCAN_INITIAL_TMPL.format(
-            context=bug_context(setup_resp, reveal_sanitizer=True),
+            context=bug_context(setup_resp),
             setup_json=json.dumps(_fullscan_safe_setup(setup_resp), indent=2))
     return _INITIAL_USER_TMPL.format(
-        context=bug_context(setup_resp, reveal_sanitizer=True),
+        context=bug_context(setup_resp),
         description=bug_desc, setup_json=json.dumps(setup_resp, indent=2))
 
 
@@ -398,7 +397,7 @@ def build_diffscan_message(files: list[str], setup_resp: dict) -> str:
     scope = _DIFFSCAN_SCOPE_ONE if n == 1 else _DIFFSCAN_SCOPE_MANY.format(n=n)
     listing = "\n".join(f"  - src/{f}" for f in files)
     return _DIFFSCAN_INITIAL_TMPL.format(
-        context=bug_context(setup_resp, reveal_sanitizer=True),
+        context=bug_context(setup_resp),
         scope=scope, listing=listing,
         setup_json=json.dumps(_fullscan_safe_setup(setup_resp), indent=2))
 
@@ -572,7 +571,7 @@ def derived_prompts() -> list[Prompt]:
             when="The per-bug context for a C project judged under AddressSanitizer "
                  "(normal / diff-scan — sanitizer revealed). Example values.",
             why="Shows the concrete ASan wording a C bug's first user turn carries.",
-            text=bug_context(_EXAMPLE_SETUP_C, reveal_sanitizer=True),
+            text=bug_context(_EXAMPLE_SETUP_C),
             fills="",
         ),
         Prompt(
@@ -581,7 +580,7 @@ def derived_prompts() -> list[Prompt]:
                  "(normal / diff-scan — sanitizer revealed). Example values.",
             why="Shows the concrete Jazzer/JVM wording — NOT a memory-safety framing "
                 "— a Java bug's first user turn carries.",
-            text=bug_context(_EXAMPLE_SETUP_JVM, reveal_sanitizer=True),
+            text=bug_context(_EXAMPLE_SETUP_JVM),
             fills="",
         ),
         Prompt(
@@ -590,7 +589,7 @@ def derived_prompts() -> list[Prompt]:
                  "libFuzzer harness itself (no memory sanitizer). Example values.",
             why="Shows the assert / timeout / OOM wording for libFuzzer-only bugs — "
                 "the case where 'memory-safety' would be most wrong.",
-            text=bug_context(_EXAMPLE_SETUP_LIBFUZZER, reveal_sanitizer=True),
+            text=bug_context(_EXAMPLE_SETUP_LIBFUZZER),
             fills="",
         ),
     ]
