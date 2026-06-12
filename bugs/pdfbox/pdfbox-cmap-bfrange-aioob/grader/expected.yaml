@@ -8,7 +8,7 @@ class:
   sanitizer: jazzer
 
 site:
-  expected_file: CMapParser.java
+  expected_file: fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
   expected_line: 813
   line_tolerance: 30
   max_frame_distance: 5

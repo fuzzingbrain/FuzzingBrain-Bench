@@ -8,7 +8,7 @@ class:
   sanitizer: jazzer
 
 site:
-  expected_file: XMLTokener.java
+  expected_file: src/main/java/org/json/XMLTokener.java
   expected_line: 165
   line_tolerance: 40
   max_frame_distance: 12

@@ -8,7 +8,7 @@ class:
   sanitizer: jazzer
 
 site:
-  expected_file: PfbParser.java
+  expected_file: fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
   expected_line: 162
   line_tolerance: 30
   max_frame_distance: 5

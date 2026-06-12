@@ -8,7 +8,7 @@ class:
   sanitizer: jazzer
 
 site:
-  expected_file: PDInlineImage.java
+  expected_file: pdfbox/src/main/java/org/apache/pdfbox/pdmodel/graphics/image/PDInlineImage.java
   expected_line: 281
   line_tolerance: 30
   max_frame_distance: 5

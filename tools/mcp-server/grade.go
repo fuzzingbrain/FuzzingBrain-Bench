@@ -448,7 +448,23 @@ var stackOverflowLine = regexp.MustCompile(`Sanitizer: stack-overflow|stack-over
 var javaExceptionLine = regexp.MustCompile(`(?:Caused by:|Exception in thread "[^"]*"|== Java Exception:)\s+([a-zA-Z0-9_.$]+(?:Exception|Error))`)
 
 // "at pkg.Class.method(File.java:123)" — Java stack frame.
-var javaFrameRe = regexp.MustCompile(`\s+at\s+[a-zA-Z0-9_.$]+\(([A-Za-z0-9_$]+\.java):(\d+)\)`)
+// javaFrameRe captures the fully-qualified call target (group 1, e.g.
+// "org.json.JSONML.toJSONArray"), the source file (group 2), and the line
+// (group 3). The FQN carries the package, which javaQualifiedPath turns into a
+// directory so the oracle can pin org/json/JSONML.java, not just JSONML.java.
+var javaFrameRe = regexp.MustCompile(`\s+at\s+([a-zA-Z0-9_.$]+)\(([A-Za-z0-9_$]+\.java):(\d+)\)`)
+
+// javaQualifiedPath rebuilds "pkg/dirs/File.java" from a frame's FQN + file.
+// "org.json.JSONML.toJSONArray" + "JSONML.java" -> "org/json/JSONML.java".
+// Falls back to the bare file name when the package can't be located.
+func javaQualifiedPath(fqn, file string) string {
+	cls := strings.TrimSuffix(file, ".java")
+	i := strings.Index(fqn, "."+cls)
+	if i <= 0 {
+		return file
+	}
+	return strings.ReplaceAll(fqn[:i], ".", "/") + "/" + file
+}
 
 func classMatches(r harnessRun, expected string) bool {
 	if expected == "" {
@@ -627,7 +643,7 @@ func siteMatches(r harnessRun, expected *expectedYAML) bool {
 	// Java frames: walk Java stack frames in stderr.
 	jDist := 0
 	for _, m := range javaFrameRe.FindAllStringSubmatch(r.stderr, -1) {
-		file := m[1]
+		file := m[2]
 		if isJavaHarnessFrame(file) {
 			continue
 		}
@@ -635,10 +651,10 @@ func siteMatches(r harnessRun, expected *expectedYAML) bool {
 		if jDist > maxFrame {
 			break
 		}
-		if !javaSuffixMatch(file, expected.Site.ExpectedFile) {
+		if !javaSuffixMatch(javaQualifiedPath(m[1], file), expected.Site.ExpectedFile) {
 			continue
 		}
-		line, err := strconv.Atoi(m[2])
+		line, err := strconv.Atoi(m[3])
 		if err != nil {
 			continue
 		}
@@ -672,11 +688,21 @@ func isJavaHarnessFrame(file string) bool {
 
 // javaSuffixMatch — Java stack frames contain just the .java file name (no path).
 // expected_file may be "XmlToJsonFuzzer.java" or "src/main/java/.../XMLTokener.java".
-func javaSuffixMatch(framePath, expected string) bool {
-	if framePath == expected {
+// javaSuffixMatch matches a frame's qualified path (pkg/dirs/File.java) against
+// the expected file. A full-path expected (src/main/java/org/json/JSONML.java)
+// is anchored on the package suffix "/org/json/JSONML.java" — pinning the
+// directory. A bare-basename expected falls back to a basename match.
+func javaSuffixMatch(qualified, expected string) bool {
+	if qualified == expected {
 		return true
 	}
-	return filepath.Base(expected) == framePath
+	if strings.HasSuffix(expected, "/"+qualified) {
+		return true
+	}
+	if !strings.Contains(expected, "/") && filepath.Base(qualified) == expected {
+		return true
+	}
+	return false
 }
 
 func isHarnessFrame(file string) bool {
