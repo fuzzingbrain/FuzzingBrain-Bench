@@ -29,7 +29,10 @@ echo 'ANTHROPIC_API_KEY=sk-ant-...' > .env     # or OPENAI_API_KEY / GEMINI_API_
 
 First run auto-builds the MCP server (needs Go ≥ 1.22), provisions `.venv`,
 and picks a default model from your `.env`. Results land in
-`runs/<exp>/<bug>/<model>/run-N/` as `episode.jsonl`, `score.json`, `cost.json`.
+`runs/<exp>/<bug>/<model>/run-N/` as `episode.jsonl`, `transcript.jsonl`,
+`score.json`, `cost.json`, plus a distilled `traj.jsonl` / `traj.md` — one
+node per tool call (turn, tool, argument, result, crash flag). View it with
+`./fb-bench traj <run-dir>`.
 
 ---
 
@@ -40,6 +43,7 @@ and picks a default model from your `.env`. Results land in
 ./fb-bench show  <bug_id>              # description + upstream link
 ./fb-bench grade <bug_id> [blob]       # grade a PoC — no API key needed
 ./fb-bench run   <bug_id> [--model M]  # drive an LLM agent through one bug
+./fb-bench traj  <run-dir>             # print a run's tool-call trajectory
 ./fb-bench models                      # supported models, prices, loaded keys
 ```
 

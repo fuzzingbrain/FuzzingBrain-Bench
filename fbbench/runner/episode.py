@@ -322,5 +322,14 @@ def run_episode(
             log_fp.close()
         if tlog_fp:
             tlog_fp.close()
+            # Distil the transcript into a readable trajectory chain (traj.jsonl +
+            # traj.md). Best-effort: never let it break a completed episode.
+            try:
+                from fbbench.runner.traj import write_traj
+                d = os.path.dirname(episode_log)
+                write_traj(os.path.join(d, "transcript.jsonl"), d,
+                           f"{bug_id} / {backend.model}")
+            except Exception:
+                pass
         mcp.close()
     return result
