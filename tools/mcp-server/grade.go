@@ -418,6 +418,11 @@ var sanitizerSummary = regexp.MustCompile(`SUMMARY:\s+(Address|UndefinedBehavior
 
 var asanErrorLine = regexp.MustCompile(`AddressSanitizer:\s+([a-zA-Z0-9_-]+)`)
 var ubsanErrorLine = regexp.MustCompile(`runtime error:\s+([^\n]+)`)
+
+// assertFailLine matches a glibc assertion failure (`file:line: func: Assertion
+// `expr' failed.`). The ": Assertion " prefix avoids false-matching a binary
+// path or message that merely contains the word.
+var assertFailLine = regexp.MustCompile(`: Assertion .+ failed`)
 var lsanLeakLine = regexp.MustCompile(`(Direct|Indirect) leak of`)
 
 // stackOverflowLine matches a stack-overflow only on a sanitizer report line,
@@ -468,6 +473,16 @@ func classMatches(r harnessRun, expected string) bool {
 			return true
 		}
 		if strings.Contains(r.stderr, "libFuzzer: timeout") || strings.Contains(r.stderr, "libFuzzer: out-of-memory") {
+			return true
+		}
+	case "abrt":
+		// A reachable assertion aborts (SIGABRT). With ASan + handle_abort=1 this
+		// prints "AddressSanitizer: ABRT" (resolved by asanErrorLine below). But a
+		// bug found via a plain assert() in a libFuzzer-only build (no ASan — the
+		// assert fires before any sanitizer could classify it) only prints
+		// "libFuzzer: deadly signal" with the glibc assertion message above it. The
+		// assertion line is the deterministic signal for that class.
+		if assertFailLine.MatchString(r.stderr) {
 			return true
 		}
 	}
@@ -552,6 +567,10 @@ func mapUBSan(msg string) string {
 		return "integer-overflow"
 	case strings.Contains(low, "implicit conversion"):
 		return "integer-overflow"
+	case strings.Contains(low, "outside the range of representable"):
+		// e.g. "<value> is outside the range of representable values of type
+		// 'int'" — a float-to-integer cast overflow.
+		return "float-cast-overflow"
 	case strings.Contains(low, "out of bounds"):
 		return "oob-read"
 	}

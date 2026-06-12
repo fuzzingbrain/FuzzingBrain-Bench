@@ -4,12 +4,13 @@
 # `sanitizer`/`vuln_version` mirror their source-of-truth in
 # grader/expected.yaml + bench.yaml (regenerate rather than hand-editing those).
 # `difficulty` and `category` refinement are the human passes (#11 / #12).
-category: undefined-behavior
+category: unclassified
 scope:
   type: single-library
 difficulty: none
 supports:
   grades:
+  - class
   - reach
   - crash
   modes:

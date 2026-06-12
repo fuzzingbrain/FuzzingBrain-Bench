@@ -19,3 +19,7 @@ site:
   expected_line: 277
   line_tolerance: 30
   max_frame_distance: 4
+
+class:
+  expected: allocation-size-too-big
+  sanitizer: asan

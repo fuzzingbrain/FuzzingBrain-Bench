@@ -15,3 +15,7 @@ site:
   expected_line: 40
   line_tolerance: 20
   max_frame_distance: 3
+
+class:
+  expected: abrt
+  sanitizer: asan

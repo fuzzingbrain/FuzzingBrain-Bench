@@ -13,6 +13,7 @@ scope:
 difficulty: none
 supports:
   grades:
+  - class
   - crash
   - reach
   modes:

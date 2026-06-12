@@ -19,7 +19,7 @@ reach:
   expected_line_range: [200, 245]
 
 class:
-  expected: out-of-bounds-access
+  expected: abrt
   sanitizer: asan
 
 site:

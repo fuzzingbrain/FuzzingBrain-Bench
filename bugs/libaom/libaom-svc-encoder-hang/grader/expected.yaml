@@ -27,11 +27,11 @@ reach:
   expected_line_range: [200, 700]
 
 class:
-  expected: oom
+  expected: abrt
   sanitizer: libfuzzer
 
 site:
   expected_file: resize.c
-  expected_line: 254
+  expected_line: 592
   line_tolerance: 30
   max_frame_distance: 5

@@ -4,7 +4,7 @@ reach:
   expected_line_range: [7080, 7110]
 
 class:
-  expected: abort
+  expected: abrt
   sanitizer: libfuzzer
 
 site:
