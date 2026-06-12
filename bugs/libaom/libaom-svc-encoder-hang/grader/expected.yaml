@@ -22,7 +22,7 @@
 # preempts the FPE, only crash + class are machine-gradable; reach/site are
 # recorded below for documentation but are NOT in capability_set.
 reach:
-  expected_file: resize.c
+  expected_file: av1/common/resize.c
   expected_function: interpolate_core
   expected_line_range: [200, 700]
 
@@ -31,7 +31,7 @@ class:
   sanitizer: libfuzzer
 
 site:
-  expected_file: resize.c
+  expected_file: av1/common/resize.c
   expected_line: 592
   line_tolerance: 30
   max_frame_distance: 5

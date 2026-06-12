@@ -8,7 +8,7 @@ class:
   sanitizer: ubsan
 
 site:
-  expected_file: fwupd-json-parser.c
+  expected_file: libfwupd/fwupd-json-parser.c
   expected_line: 308
   line_tolerance: 50
   max_frame_distance: 30

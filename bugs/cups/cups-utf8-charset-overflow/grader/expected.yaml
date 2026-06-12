@@ -2,7 +2,7 @@
 # consume the NUL terminator as a continuation byte and read one byte past the
 # heap buffer. Original detection: OSS-Fuzz cups fuzz_transcode, AddressSanitizer.
 reach:
-  expected_file: transcode.c
+  expected_file: cups/transcode.c
   expected_function: cupsUTF8ToCharset
   expected_line_range: [235, 255]
 
@@ -11,7 +11,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: transcode.c
+  expected_file: cups/transcode.c
   expected_line: 245
   line_tolerance: 12
   max_frame_distance: 4

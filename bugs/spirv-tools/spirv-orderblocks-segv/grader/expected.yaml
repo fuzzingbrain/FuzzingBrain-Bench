@@ -5,7 +5,7 @@
 #   #1 EmitCFG      source/disassemble.cpp:495
 
 reach:
-  expected_file: disassemble.cpp
+  expected_file: source/disassemble.cpp
   expected_function: OrderBlocks
   expected_line_range: [400, 500]
 
@@ -14,7 +14,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: disassemble.cpp
+  expected_file: source/disassemble.cpp
   expected_line: 416
   line_tolerance: 30
   max_frame_distance: 3

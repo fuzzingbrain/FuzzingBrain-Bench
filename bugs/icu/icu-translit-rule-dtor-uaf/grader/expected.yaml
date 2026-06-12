@@ -7,7 +7,7 @@
 # masking the wild-pointer deref. ASan reports the SEGV with a full stack.
 
 reach:
-  expected_file: rbt_rule.cpp
+  expected_file: icu4c/source/i18n/rbt_rule.cpp
   expected_function: "~TransliterationRule"
   expected_line_range: [180, 210]
 
@@ -16,7 +16,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: rbt_rule.cpp
+  expected_file: icu4c/source/i18n/rbt_rule.cpp
   expected_line: 196
   line_tolerance: 30
   max_frame_distance: 3

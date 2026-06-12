@@ -8,7 +8,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: persistence_yml.cpp
+  expected_file: modules/core/src/persistence_yml.cpp
   expected_line: 435
   line_tolerance: 30
   max_frame_distance: 5

@@ -8,7 +8,7 @@
 # enabled an internal assert(wpi->header) aborts earlier, masking the real null deref.)
 
 reach:
-  expected_file: muxedit.c
+  expected_file: src/mux/muxedit.c
   expected_function: GetFrameInfo
   expected_line_range: [400, 640]
 
@@ -17,7 +17,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: muxedit.c
+  expected_file: src/mux/muxedit.c
   expected_line: 407
   line_tolerance: 30
   max_frame_distance: 3

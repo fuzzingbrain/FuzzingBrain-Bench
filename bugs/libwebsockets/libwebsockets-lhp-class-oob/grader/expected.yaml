@@ -11,7 +11,7 @@
 # interceptor at frame 0, so the site lives at frame distance 1.
 
 reach:
-  expected_file: lhp.c
+  expected_file: lib/misc/lhp.c
   expected_function: lhp_element_has_class
   expected_line_range: [800, 850]
 
@@ -20,7 +20,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: lhp.c
+  expected_file: lib/misc/lhp.c
   expected_line: 824
   line_tolerance: 20
   max_frame_distance: 3

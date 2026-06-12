@@ -5,7 +5,7 @@
 # discovery log's pixelimage.cc:1625 was a later code layout.
 
 reach:
-  expected_file: pixelimage.cc
+  expected_file: libheif/pixelimage.cc
   expected_function: crop
   expected_line_range: [1270, 1340]
 
@@ -14,7 +14,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: pixelimage.cc
+  expected_file: libheif/pixelimage.cc
   expected_line: 1313
   line_tolerance: 30
   max_frame_distance: 3

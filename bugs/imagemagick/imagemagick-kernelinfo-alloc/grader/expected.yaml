@@ -10,12 +10,12 @@
 # reach + crash + site (see PROVENANCE.md).
 
 reach:
-  expected_file: morphology.c
+  expected_file: MagickCore/morphology.c
   expected_function: AcquireKernelInfo
   expected_line_range: [450, 1100]
 
 site:
-  expected_file: memory.c
+  expected_file: MagickCore/memory.c
   expected_line: 277
   line_tolerance: 30
   max_frame_distance: 4

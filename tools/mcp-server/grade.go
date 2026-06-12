@@ -684,6 +684,11 @@ func isHarnessFrame(file string) bool {
 }
 
 func suffixMatch(framePath, expected string) bool {
+	// Normalize "/./" segments — build-relative include paths sometimes emit
+	// them (e.g. libvpx's "vpx_dsp/./vpx_dsp_common.h"), which would otherwise
+	// break the directory-anchored suffix check below.
+	framePath = strings.ReplaceAll(framePath, "/./", "/")
+	expected = strings.ReplaceAll(expected, "/./", "/")
 	if framePath == expected {
 		return true
 	}

@@ -15,7 +15,7 @@
 #  stride/buffer validation in SharpYuvConvertWithOptions.)
 
 reach:
-  expected_file: sharpyuv.c
+  expected_file: sharpyuv/sharpyuv.c
   expected_function: DoSharpArgbToYuv
   expected_line_range: [330, 400]
 
@@ -24,7 +24,7 @@ class:
   sanitizer: asan
 
 site:
-  expected_file: sharpyuv_gamma.c
+  expected_file: sharpyuv/sharpyuv_gamma.c
   expected_line: 91
   line_tolerance: 20
   max_frame_distance: 6
