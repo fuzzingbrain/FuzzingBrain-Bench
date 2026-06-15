@@ -5,16 +5,14 @@ MODE=${1:-debug}
 
 cd /src/krb5
 
-autoreconf -fi
+test -f src/configure
+
+cd src
 
 ./configure \
   --disable-shared \
   --enable-static \
-  CFLAGS="-O0 -g -fno-omit-frame-pointer" \
-  LDFLAGS="-L/src/krb5/src/lib/krb5/.libs \
-           -L/src/krb5/src/lib/gssapi/krb5/.libs \
-           -L/src/krb5/src/lib/krb5support \
-           -L/src/krb5/src/lib/krb5"
+  CFLAGS="-O0 -g -fno-omit-frame-pointer"
 
 make -j$(nproc)
 
