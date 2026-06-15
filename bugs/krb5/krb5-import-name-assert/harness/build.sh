@@ -1,31 +1,45 @@
 #!/bin/bash
 set -euxo pipefail
 
-MODE=${1:-debug}
+export MODE=${1:-debug}
 
 cd /src/krb5
 
-test -f src/configure
+if [ ! -f ./configure ]; then
+    autoreconf -fi
+fi
 
-cd src
+CFLAGS="-O0 -g -fno-omit-frame-pointer -fPIC"
+ASAN_FLAGS="-fsanitize=address,fuzzer-no-link"
 
-./configure \
-  --disable-shared \
-  --enable-static \
-  CFLAGS="-O0 -g -fno-omit-frame-pointer"
+case "$MODE" in
+  debug)
+    ./configure --disable-shared --enable-static CFLAGS="$CFLAGS"
+    make -j$(nproc)
+    ;;
 
-make -j$(nproc)
+  debug-asan)
+    ./configure --disable-shared --enable-static CC=clang CFLAGS="$CFLAGS $ASAN_FLAGS"
+    make -j$(nproc)
+    ;;
 
-make install DESTDIR=/out/krb5
+  release-asan)
+    ./configure --disable-shared --enable-static CC=clang CFLAGS="-O2 $ASAN_FLAGS"
+    make -j$(nproc)
+    ;;
 
-cd /src/harness
+  coverage)
+    ./configure --disable-shared --enable-static CC=clang CFLAGS="$CFLAGS --coverage"
+    make -j$(nproc)
+    ;;
 
-clang++ -g -O0 \
+esac
+
+$CXX $CXXFLAGS \
   -I/src/krb5/src/include \
-  fuzz_*.c fuzz_*.cc 2>/dev/null || true
-
-clang++ -g -O0 \
-  fuzz_*.o \
-  -L/out/krb5/usr/local/lib \
-  -lkrb5 -lgssapi_krb5 -lkrb5support -lcom_err \
-  -o /out/debug/harness
+  /src/krb5/src/tests/fuzzing/fuzz_gss.c \
+  -o /out/fuzz_gss \
+  -L/src/krb5/src/lib/gssapi/krb5/.libs \
+  -L/src/krb5/src/lib/krb5/.libs \
+  -lFuzzingEngine \
+  -lgssapi_krb5 -lkrb5 -lk5crypto -lcom_err -lkrb5support
