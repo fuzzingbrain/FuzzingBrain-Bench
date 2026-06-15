@@ -3,62 +3,63 @@ set -euo pipefail
 
 CONFIG="${1:?usage: build.sh <config>}"
 OUT="/out/${CONFIG}"
+SRC="/src/krb5"
+
 mkdir -p "${OUT}"
 
+# Compiler flags per config (OSS-Fuzz style)
 case "${CONFIG}" in
-    debug)
-        CFLAGS="-g -O0"
-        SAN="-fsanitize=fuzzer"
-        ;;
-    debug-asan)
-        CFLAGS="-g -O0"
-        SAN="-fsanitize=fuzzer,address"
-        ;;
-    release-asan)
-        CFLAGS="-O2 -g"
-        SAN="-fsanitize=fuzzer,address"
-        ;;
-    coverage)
-        CFLAGS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"
-        SAN="-fsanitize=fuzzer"
-        ;;
-    *)
-        echo "unknown config: ${CONFIG}" >&2
-        exit 2
-        ;;
+  debug)
+    export CFLAGS="-O0 -g"
+    export CXXFLAGS="-O0 -g"
+    SAN="-fsanitize=fuzzer"
+    ;;
+  debug-asan)
+    export CFLAGS="-O0 -g -fsanitize=address"
+    export CXXFLAGS="-O0 -g -fsanitize=address"
+    SAN="-fsanitize=fuzzer,address"
+    ;;
+  release-asan)
+    export CFLAGS="-O2 -g -fsanitize=address"
+    export CXXFLAGS="-O2 -g -fsanitize=address"
+    SAN="-fsanitize=fuzzer,address"
+    ;;
+  coverage)
+    export CFLAGS="-O0 -g -fprofile-instr-generate -fcoverage-mapping"
+    export CXXFLAGS="-O0 -g -fprofile-instr-generate -fcoverage-mapping"
+    SAN="-fsanitize=fuzzer"
+    ;;
+  *)
+    echo "Unknown config: ${CONFIG}" >&2
+    exit 1
+    ;;
 esac
 
-echo "[*] checking fuzz file"
-ls -la /src/krb5/src/tests/fuzzing/
+cd "${SRC}/src"
 
-find /src/krb5 -name "*fuzz*" || true
-
-echo "[*] Building krb5 (base system)..."
-
-pushd /src/krb5/src >/dev/null
-
+# ---- Build krb5 normally (IMPORTANT: let autotools handle libs) ----
 autoreconf -fi
 
-./configure \
-    CC=clang \
+./configure CC=clang CXX=clang++ \
     CFLAGS="-fcommon ${CFLAGS}" \
     --enable-static \
-    --disable-shared
+    --disable-shared \
+    --enable-ossfuzz
 
 make -j"$(nproc)"
 
-popd >/dev/null
-
-echo "[*] Building fuzz harness directly (libFuzzer entrypoint)..."
+# ---- Build fuzz harness (link against already built libs) ----
+echo "[*] Building fuzz harness..."
 
 clang++ \
-  ${SAN} \
-  ${CFLAGS} \
-  /src/krb5/src/tests/fuzzing/fuzz_gss.c \
-  /src/krb5/src/lib/krb5/.libs/libkrb5.a \
-  /src/krb5/src/lib/gssapi/krb5/.libs/libgssapi_krb5.a \
-  /src/krb5/src/lib/krb5support/libkrb5support.a \
-  -o "${OUT}/harness"
+    -std=c++17 \
+    ${SAN} \
+    -I"${SRC}/src/include" \
+    "${SRC}/src/tests/fuzzing/fuzz_gss.c" \
+    -o "${OUT}/harness" \
+    "${LIB_FUZZING_ENGINE:-}" \
+    lib/libkrb5support.a \
+    lib/krb5/.libs/libkrb5.a \
+    lib/gssapi/krb5/.libs/libgssapi_krb5.a
 
 echo "[+] built ${OUT}/harness"
-ls -lh "${OUT}/harness"
