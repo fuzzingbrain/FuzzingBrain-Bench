@@ -1,46 +1,27 @@
 #!/bin/bash
-set -euxo pipefail
-
-export MODE=${1:-debug}
-
-cd /src/krb5
-
-if [ ! -f ./configure ]; then
-    echo "[!] No configure found. Expecting pre-generated build system."
-    exit 1
-fi
-
-CFLAGS="-O0 -g -fno-omit-frame-pointer -fPIC"
-ASAN_FLAGS="-fsanitize=address,fuzzer-no-link"
-
-case "$MODE" in
-  debug)
-    ./configure --disable-shared --enable-static CFLAGS="$CFLAGS"
-    make -j$(nproc)
-    ;;
-
-  debug-asan)
-    ./configure --disable-shared --enable-static CC=clang CFLAGS="$CFLAGS $ASAN_FLAGS"
-    make -j$(nproc)
-    ;;
-
-  release-asan)
-    ./configure --disable-shared --enable-static CC=clang CFLAGS="-O2 $ASAN_FLAGS"
-    make -j$(nproc)
-    ;;
-
-  coverage)
-    ./configure --disable-shared --enable-static CC=clang CFLAGS="$CFLAGS --coverage"
-    make -j$(nproc)
-    ;;
-
+# Build script for krb5-import-name-assert harness.
+# Based on src/tests/fuzzing/oss-fuzz.sh from the krb5 source tree.
+# Produces one harness binary per config under /out/<config>/harness.
+set -euo pipefail
+CONFIG="${1:?usage: build.sh <config>}"
+OUT=/out/${CONFIG}
+mkdir -p "${OUT}"
+case "${CONFIG}" in
+    debug)        CFLAGS="-g -O0"; SAN="-fsanitize=fuzzer" ;;
+    debug-asan)   CFLAGS="-g -O0"; SAN="-fsanitize=fuzzer,address" ;;
+    release-asan) CFLAGS="-O2 -g"; SAN="-fsanitize=fuzzer,address" ;;
+    coverage)     CFLAGS="-g -O0 -fprofile-instr-generate -fcoverage-mapping"; SAN="-fsanitize=fuzzer" ;;
+    *) echo "unknown config: ${CONFIG}" >&2; exit 2 ;;
 esac
+# Build krb5 at the vulnerable commit.
+# OSS-Fuzz image provides clang and build dependencies (autoconf, bison).
+pushd /src/krb5/src/
+autoreconf
+./configure CC=clang CFLAGS="-fcommon ${CFLAGS}" \
+    --enable-static --disable-shared --enable-ossfuzz
+make -j$(nproc)
+popd
+# Copy the fuzz_gss harness binary to out.
+cp /src/krb5/src/tests/fuzzing/fuzz_gss "${OUT}/harness"
+echo "built ${OUT}/harness ($(stat -c %s "${OUT}/harness") bytes)"
 
-$CXX $CXXFLAGS \
-  -I/src/krb5/src/include \
-  /src/krb5/src/tests/fuzzing/fuzz_gss.c \
-  -o /out/fuzz_gss \
-  -L/src/krb5/src/lib/gssapi/krb5/.libs \
-  -L/src/krb5/src/lib/krb5/.libs \
-  -lFuzzingEngine \
-  -lgssapi_krb5 -lkrb5 -lk5crypto -lcom_err -lkrb5support
