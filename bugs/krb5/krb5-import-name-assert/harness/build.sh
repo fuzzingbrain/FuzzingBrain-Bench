@@ -51,15 +51,16 @@ make -j"$(nproc)"
 # ---- Build fuzz harness (link against already built libs) ----
 echo "[*] Building fuzz harness..."
 
+
 clang++ \
-    -std=c++17 \
-    ${SAN} \
-    -I"${SRC}/src/include" \
-    "${SRC}/src/tests/fuzzing/fuzz_gss.c" \
-    -o "${OUT}/harness" \
-    "${LIB_FUZZING_ENGINE:-}" \
-    lib/libkrb5support.a \
-    lib/krb5/.libs/libkrb5.a \
-    lib/gssapi/krb5/.libs/libgssapi_krb5.a
+  -std=c++17 \
+  ${SAN} \
+  -I/src/krb5/src/include \
+  /src/krb5/src/tests/fuzzing/fuzz_gss.c \
+  -o "${OUT}/harness" \
+  -L/src/krb5/src/lib/krb5/.libs \
+  -L/src/krb5/src/lib/gssapi/krb5/.libs \
+  -lkrb5 -lgssapi_krb5 -lkrb5support -lcom_err \
+  $LIB_FUZZING_ENGINE
 
 echo "[+] built ${OUT}/harness"
