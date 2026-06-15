@@ -14,6 +14,9 @@ RUN git clone https://github.com/krb5/krb5 /src/krb5 \
 COPY harness/fuzz_gss.c  /src/krb5/src/tests/fuzzing/fuzz_gss.c
 COPY harness/build.sh    /src/harness/build.sh
 RUN chmod +x /src/harness/build.sh
+RUN find / -name libFuzzingEngine.a 2>/dev/null
+RUN env | grep FUZZ
+RUN echo $LIB_FUZZING_ENGINE
 RUN mkdir -p /out \
  && /src/harness/build.sh debug \
  && /src/harness/build.sh debug-asan \
