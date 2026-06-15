@@ -28,6 +28,11 @@ case "${CONFIG}" in
         ;;
 esac
 
+echo "[*] checking fuzz file"
+ls -la /src/krb5/src/tests/fuzzing/
+
+find /src/krb5 -name "*fuzz*" || true
+
 echo "[*] Building krb5 (base system)..."
 
 pushd /src/krb5/src >/dev/null
@@ -47,13 +52,13 @@ popd >/dev/null
 echo "[*] Building fuzz harness directly (libFuzzer entrypoint)..."
 
 clang++ \
-    ${SAN} \
-    ${CFLAGS} \
-    -I/src/krb5/src/include \
-    -I/src/krb5/src \
-    /src/krb5/src/tests/fuzzing/fuzz_gss.c \
-    /src/krb5/src/lib/.libs/*.a \
-    -o "${OUT}/harness"
+  ${SAN} \
+  ${CFLAGS} \
+  -I/src/krb5/src/include \
+  -I/src/krb5/src \
+  /src/krb5/src/tests/fuzzing/fuzz_gss.c \
+  -o "${OUT}/harness" \
+  -lkrb5 -lgssapi_krb5 -lcrypto -lssl || true
 
 echo "[+] built ${OUT}/harness"
 ls -lh "${OUT}/harness"
