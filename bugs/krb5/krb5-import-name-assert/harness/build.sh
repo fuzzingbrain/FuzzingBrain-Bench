@@ -17,7 +17,7 @@ esac
 # OSS-Fuzz image provides clang and build dependencies (autoconf, bison).
 pushd /src/krb5/src/
 autoreconf
-./configure CFLAGS="-fcommon ${CFLAGS} ${SAN}" \
+./configure CC=clang CFLAGS="-fcommon ${CFLAGS}" \
     --enable-static --disable-shared --enable-ossfuzz
 make -j$(nproc)
 popd
