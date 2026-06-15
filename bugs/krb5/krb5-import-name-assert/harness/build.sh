@@ -54,11 +54,11 @@ echo "[*] Building fuzz harness directly (libFuzzer entrypoint)..."
 clang++ \
   ${SAN} \
   ${CFLAGS} \
-  -I/src/krb5/src/include \
-  -I/src/krb5/src \
   /src/krb5/src/tests/fuzzing/fuzz_gss.c \
-  -o "${OUT}/harness" \
-  -lkrb5 -lgssapi_krb5 -lcrypto -lssl || true
+  /src/krb5/src/lib/krb5/.libs/libkrb5.a \
+  /src/krb5/src/lib/gssapi/krb5/.libs/libgssapi_krb5.a \
+  /src/krb5/src/lib/krb5support/libkrb5support.a \
+  -o "${OUT}/harness"
 
 echo "[+] built ${OUT}/harness"
 ls -lh "${OUT}/harness"
