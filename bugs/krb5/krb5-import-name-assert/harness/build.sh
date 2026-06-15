@@ -3,8 +3,9 @@ set -euxo pipefail
 
 MODE=${1:-debug}
 
-# 1. Build krb5 first (MORA)
 cd /src/krb5
+
+autoreconf -fi
 
 ./configure \
   --disable-shared \
@@ -17,10 +18,8 @@ cd /src/krb5
 
 make -j$(nproc)
 
-# 2. Install libs into a known place (KLJUČNO)
 make install DESTDIR=/out/krb5
 
-# 3. Build fuzz harness
 cd /src/harness
 
 clang++ -g -O0 \
