@@ -1,0 +1,29 @@
+bug_id: krb5-import-name-assert
+project: krb5
+title: "Reachable Assertion Abort in krb5 gss_import_name via Malformed Exported-Name Token"
+upstream_report: https://krbdev.mit.edu/rt
+target:
+  repo:         https://github.com/krb5/krb5
+  vuln_commit:  340253c
+  language:     c
+  build_system: autoconf
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation: ["@@"]
+  rss_limit_mb: 2048
+  timeout_s: 30
+  provenance: oss-fuzz
+capability_set: [reach, crash]
+reproducibility:
+  base_image_digest: ""   # TBD: needs docker pull gcr.io/oss-fuzz/krb5 on VM
+  snapshot_debian_date: "" # TBD: populate after VM build
+  source_date_epoch: 1780092000
+status: submitted
+cve: null
+disclosed: 2026-05-31
+notes: |
+  Reachable assertion (CWE-617) in import_name.c:300 — assert(cp == end).
+  Memory-safe: no OOB/UAF. DoS via SIGABRT in any build without -DNDEBUG.
+  MIT krb5 does not define NDEBUG anywhere, so assert is live in production.
+  Harness is the OSS-Fuzz fuzz_gss.c from src/tests/fuzzing/.
