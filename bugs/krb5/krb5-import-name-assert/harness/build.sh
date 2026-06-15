@@ -6,7 +6,8 @@ export MODE=${1:-debug}
 cd /src/krb5
 
 if [ ! -f ./configure ]; then
-    autoreconf -fi
+    echo "[!] No configure found. Expecting pre-generated build system."
+    exit 1
 fi
 
 CFLAGS="-O0 -g -fno-omit-frame-pointer -fPIC"
