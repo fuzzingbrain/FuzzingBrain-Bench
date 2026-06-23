@@ -6,6 +6,7 @@ upstream_report: https://github.com/net-snmp/net-snmp/issues/1098
 target:
   repo:         https://github.com/net-snmp/net-snmp
   vuln_commit:  1852fec16
+  fix_commit:   f77a116425433316d67ada69afc1aaf81868ddac
   language:     c
   build_system: autoconf
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 90
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

@@ -6,6 +6,7 @@ upstream_report: https://github.com/upx/upx/issues/947
 target:
   repo:         https://github.com/upx/upx
   vuln_commit:  1ebd3356f36780960a03354a8ded23410ebc7e79
+  fix_commit:   ab98f61bbd784b9654118613996bc145a764a682
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

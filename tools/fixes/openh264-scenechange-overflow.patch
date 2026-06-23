@@ -1,0 +1,24 @@
+diff --git a/codec/processing/src/scenechangedetection/SceneChangeDetection.h b/codec/processing/src/scenechangedetection/SceneChangeDetection.h
+index f076851..6c68f50 100644
+--- a/codec/processing/src/scenechangedetection/SceneChangeDetection.h
++++ b/codec/processing/src/scenechangedetection/SceneChangeDetection.h
+@@ -225,6 +225,19 @@ class CSceneChangeDetection : public IStrategy {
+     m_sLocalParam.iCurStride = pSrcPixMap->iStride[0];
+     m_sLocalParam.pStaticBlockIdc = m_sSceneChangeParam.pStaticBlockIdc;
+ 
++    /* strict fix (FB-Bench crash2): the 8x8 SAD scan reads its reference
++     * samples from pRefPixMap, but the block grid above is derived from the
++     * (possibly larger) source dimensions.  Clamp the grid to the reference
++     * pixmap so pRefTmp can never walk past the reference plane
++     * (heap-buffer-overflow read in WelsSampleSad8x8_c).
++     */
++    int32_t iRefBlock8x8Width  = pRefPixMap->sRect.iRectWidth  >> 3;
++    int32_t iRefBlock8x8Height = pRefPixMap->sRect.iRectHeight >> 3;
++    if (m_sLocalParam.iBlock8x8Width > iRefBlock8x8Width)
++      m_sLocalParam.iBlock8x8Width = iRefBlock8x8Width;
++    if (m_sLocalParam.iBlock8x8Height > iRefBlock8x8Height)
++      m_sLocalParam.iBlock8x8Height = iRefBlock8x8Height;
++
+     int32_t iBlock8x8Num = m_sLocalParam.iBlock8x8Width * m_sLocalParam.iBlock8x8Height;
+     int32_t iSceneChangeThresholdLarge = WelsStaticCast (int32_t,
+                                          m_cDetector.GetSceneChangeMotionRatioLarge() * iBlock8x8Num + 0.5f + PESN);

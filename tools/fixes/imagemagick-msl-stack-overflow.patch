@@ -1,0 +1,44 @@
+--- a/coders/msl.c
++++ b/coders/msl.c
+@@ -7320,6 +7320,9 @@
+   ssize_t
+     n;
+
++  static ssize_t
++    depth = 0;  /* strict fix (FB-Bench crash2): bound MSL self-recursion */
++
+   xmlSAXHandler
+     sax_modules;
+
+@@ -7335,6 +7335,15 @@
+   assert(image_info != (const ImageInfo *) NULL);
+   assert(image_info->signature == MagickCoreSignature);
+   assert(image != (Image **) NULL);
++  /* strict fix (FB-Bench crash2): cap recursive MSL <read>/<image> nesting */
++  /* (a self-referential filename re-enters ProcessMSLScript without bound) */
++  if (++depth > 64)
++    {
++      depth--;
++      (void) ThrowMagickException(exception,GetMagickModule(),
++        ResourceLimitError,"NestedTooDeeply","`%s'",image_info->filename);
++      return(MagickFalse);
++    }
+   if (IsEventLogging() != MagickFalse)
+     (void) LogMagickEvent(TraceEvent,GetMagickModule(),"%s",
+       image_info->filename);
+@@ -7345,6 +7354,7 @@
+       ThrowFileException(exception,FileOpenError,"UnableToOpenFile",
+         msl_image->filename);
+       msl_image=DestroyImageList(msl_image);
++      depth--;  /* strict fix (FB-Bench crash2): unwind recursion counter */
+       return(MagickFalse);
+     }
+   msl_image->columns=1;
+@@ -7456,6 +7466,7 @@
+     msl_info.group_info);
+   if (msl_info.content != (char *) NULL)
+     msl_info.content=DestroyString(msl_info.content);
++  depth--;  /* strict fix (FB-Bench crash2): unwind recursion counter */
+   if (msl_info.exception->severity != UndefinedException)
+     return(MagickFalse);
+   return(MagickTrue);

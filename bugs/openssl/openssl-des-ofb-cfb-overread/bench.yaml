@@ -6,6 +6,7 @@ upstream_report: https://github.com/openssl/openssl/issues/30284
 target:
   repo:         https://github.com/openssl/openssl
   vuln_commit:  22be3f1b8e3d8d09de89794a6d59f00176b32b2d
+  fix_commit:   134342e194a23b1d3cc0687b05d97cfdd0f31c4a
   language:     c
   build_system: openssl-configure
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

@@ -6,6 +6,7 @@ upstream_report: https://github.com/ImageMagick/ImageMagick/security/advisories/
 target:
   repo:         https://github.com/ImageMagick/ImageMagick
   vuln_commit:  cbc802d38b2d37a4ae101c6ef80a465678cc6a49
+  fix_commit:   1eefab41bc0ab1c6c2c1fd3e4a49e3ee1849751d
   language:     cpp
   build_system: autoconf
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: oss-fuzz
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

@@ -1,0 +1,14 @@
+--- a/src/read.c
++++ b/src/read.c
+@@ -5118,6 +5118,11 @@ void avifDecoderSetIO(avifDecoder * decoder, avifIO * io)
+ 
+ avifResult avifDecoderSetIOMemory(avifDecoder * decoder, const uint8_t * data, size_t size)
+ {
++    // strict fix (FB-Bench crash2): reject an implausibly large buffer size (e.g. a Java
++    // int length of -1 sign-extended to (size_t)-1 == SIZE_MAX) before it becomes the
++    // memory reader's trusted bound. Otherwise avifROStream's size guard can never shrink
++    // a request and avifDecoderParse() reads past the real allocation (heap-buffer-overflow).
++    AVIF_CHECKERR(size <= (size_t) PTRDIFF_MAX, AVIF_RESULT_INVALID_ARGUMENT);
+     avifIO * io = avifIOCreateMemoryReader(data, size);
+     AVIF_CHECKERR(io != NULL, AVIF_RESULT_OUT_OF_MEMORY);
+     avifDecoderSetIO(decoder, io);

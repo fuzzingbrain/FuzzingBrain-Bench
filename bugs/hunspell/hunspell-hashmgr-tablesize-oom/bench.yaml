@@ -6,6 +6,7 @@ upstream_report: https://github.com/hunspell/hunspell/issues/1116
 target:
   repo:         https://github.com/hunspell/hunspell
   vuln_commit:  f23fcd33052c7c8a307eaa3e1b1a4c0cdcf45651
+  fix_commit:   f51973a963751dbd7b5d57fff7e154951f863c56
   language:     cpp
   build_system: autotools
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

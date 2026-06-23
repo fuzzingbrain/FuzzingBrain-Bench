@@ -6,6 +6,7 @@ upstream_report: https://github.com/OpenPrinting/cups/issues/1438
 target:
   repo:         https://github.com/OpenPrinting/cups
   vuln_commit:  2e818010c9cda04649c872646dd3b90686e309ab
+  fix_commit:   f3ce6d3a3b1070976cc0954b108c8b33e251f4c3
   language:     c
   build_system: configure
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # focused fuzz_transcode harness; sanitizer = asan (oss-fuzz cups default)
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""
