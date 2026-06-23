@@ -6,6 +6,7 @@ upstream_report: https://github.com/apache/pdfbox/pull/411
 target:
   repo:         https://github.com/apache/pdfbox
   vuln_commit:  159ae247091fe217e5f6a1e174946b225b72adbb
+  fix_commit:   488685a28cc637ae191335a6917c8b5626f9efa4
   language:     jvm
   build_system: maven
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

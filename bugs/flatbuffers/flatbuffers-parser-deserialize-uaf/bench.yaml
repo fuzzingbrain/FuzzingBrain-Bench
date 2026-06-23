@@ -6,6 +6,7 @@ upstream_report: https://github.com/google/flatbuffers/issues/9009
 target:
   repo:         https://github.com/google/flatbuffers
   vuln_commit:  bab10754d93d74d1ff44d46de63558bc4127f7d8   # campaign-pinned vulnerable tree (issue #9009); same commit the Dockerfile/binary build from
+  fix_commit:   29f6b0709ed7ce0545d0f846faf8825222ce965a
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]   # heap-use-after-free (idl.h:242), freed by Deserialize
+capability_set: [class, crash, crash2, reach, site]   # heap-use-after-free (idl.h:242), freed by Deserialize
 
 reproducibility:
   base_image_digest: ""

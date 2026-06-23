@@ -6,6 +6,7 @@ upstream_report: https://issues.webmproject.org/issues/501147575
 target:
   repo:         https://chromium.googlesource.com/webm/libwebp
   vuln_commit:  5003e5609eedc5680b8d838a962cbb9a6e9709ce
+  fix_patch:   tools/fixes/libwebp-sharpyuv-convert-stride-oob.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # sharpyuv_fuzzer.cc (public SharpYuvConvert API)
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

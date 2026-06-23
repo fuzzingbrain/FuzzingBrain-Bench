@@ -6,6 +6,7 @@ upstream_report: https://issues.chromium.org/issues/505976409
 target:
   repo:         https://aomedia.googlesource.com/aom
   vuln_commit:  a0968d60cf02acfa324af20498634b572baa06a1
+  fix_commit:   888312c00dbf80aecd962545dbd1390788be0d34
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # libaom_svc_layer_config_fuzzer.cc (AV1E_SET_SVC_PARAMS + aom_codec_encode)
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

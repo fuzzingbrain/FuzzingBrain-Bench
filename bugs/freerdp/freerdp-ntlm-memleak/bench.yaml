@@ -6,6 +6,7 @@ upstream_report: https://github.com/FreeRDP/FreeRDP/issues/12603
 target:
   repo:         https://github.com/FreeRDP/FreeRDP
   vuln_commit:  d0418739c27fe95b0d38fc6aa2e3cb22b7ac1cee
+  fix_patch:   tools/fixes/freerdp-ntlm-memleak.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     c
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

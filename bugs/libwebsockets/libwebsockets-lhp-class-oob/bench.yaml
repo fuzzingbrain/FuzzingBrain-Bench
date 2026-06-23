@@ -6,6 +6,7 @@ upstream_report: "https://github.com/warmcat/libwebsockets (private disclosure t
 target:
   repo:         https://github.com/warmcat/libwebsockets
   vuln_commit:  8a422a736b84191a2fd4ec492d82888096329817
+  fix_commit:   bd57edb5fc3ad284a082ecb0143aede1b7383928
   language:     c
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # lws_lhp_fuzzer.cc
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

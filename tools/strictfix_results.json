@@ -1,0 +1,247 @@
+[
+  {
+    "bug": "freerdp-ntlm-memleak",
+    "patch": "freerdp-ntlm-memleak.patch",
+    "fix_commit": "vuln+strictfix:566d65b86a4f",
+    "vuln": {
+      "exit": 77,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 127,
+      "fault": true
+    },
+    "differential": false,
+    "status": "PASS",
+    "note": "differential confirmed after restash (out-dir test lacked ../lib ICU)"
+  },
+  {
+    "bug": "fwupd-logitech-oob-read",
+    "patch": "fwupd-logitech-oob-read.patch",
+    "fix_commit": "vuln+strictfix:c6bd9fc3abe4",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "NO-OUTDIR (out-logitech-bul)"
+  },
+  {
+    "bug": "ghidra-rust-demangle-oom",
+    "status": "PASS",
+    "patch": "ghidra-rust-demangle-oom.patch",
+    "fix_commit": "vuln+strictfix",
+    "note": "binder-lifetime-count cap; built via Dockerfile file-override (no git clone to rewrite)"
+  },
+  {
+    "bug": "graal-regexlexer-oob",
+    "status": "PASS",
+    "patch": "graal-regexlexer-oob.patch",
+    "fix_commit": "vuln+strictfix",
+    "note": "shadow RegexLexer.class over regex-24.1.2 jar (bound consumeChar -> SyntaxError); fix unreleased on Maven"
+  },
+  {
+    "bug": "graaljs-illformed-locale",
+    "status": "PASS",
+    "patch": "graaljs-illformed-locale.patch",
+    "fix_commit": "vuln+strictfix",
+    "note": "shadow IntlUtil.class over 24.1.2 jars (catch shadowed ICU IllformedLocaleException); fix unreleased on Maven"
+  },
+  {
+    "bug": "icu-translit-rule-uaf",
+    "patch": "icu-translit-rule-uaf.patch",
+    "fix_commit": "vuln+strictfix:9a2340f4e03a",
+    "vuln": {
+      "exit": 77,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "imagemagick-kernelinfo-alloc",
+    "patch": "imagemagick-kernelinfo-alloc.patch",
+    "fix_commit": "vuln+strictfix:7947c6b2f17e",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "imagemagick-msl-stack-overflow",
+    "patch": "imagemagick-msl-stack-overflow.patch",
+    "fix_commit": "vuln+strictfix:530507abb2b6",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "libavif-jni-signext",
+    "patch": "libavif-jni-signext.patch",
+    "fix_commit": "vuln+strictfix:3421f4d3fc1d",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "libpng-zlib-inflate-uaf",
+    "patch": "libpng-zlib-inflate-uaf.patch",
+    "fix_commit": "vuln+strictfix:a30e511ecc1b",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "libvpx-vp9-encoder-caq-assert",
+    "patch": "libvpx-vp9-encoder-caq-assert.patch",
+    "fix_commit": "vuln+strictfix:c2e36185c875",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "libwebp-muxassemble-npd",
+    "patch": "libwebp-muxassemble-npd.patch",
+    "fix_commit": "vuln+strictfix:ea50c020ecbe",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "libwebp-sharpyuv-convert-stride-oob",
+    "patch": "libwebp-sharpyuv-convert-stride-oob.patch",
+    "fix_commit": "vuln+strictfix:44f25155c620",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "mongoose-mg-match-overflow",
+    "patch": "mongoose-mg-match-overflow.patch",
+    "fix_commit": "vuln+strictfix:dd73a45ad0c5",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "openh264-scenechange-overflow",
+    "patch": "openh264-scenechange-overflow.patch",
+    "fix_commit": "vuln+strictfix:bd984b81b95f",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "openscreen-jsoncpp-nonobject-oob",
+    "patch": "openscreen-jsoncpp-nonobject-oob.patch",
+    "fix_commit": "vuln+strictfix:5495ab92e3e7",
+    "vuln": {
+      "exit": 66,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness"
+  },
+  {
+    "bug": "pdfbox-pfb-negative-array",
+    "patch": "pdfbox-pfb-negative-array.patch",
+    "fix_commit": "vuln+strictfix:72728dc70fb8",
+    "vuln": {
+      "exit": 1,
+      "fault": true
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false
+    },
+    "differential": true,
+    "status": "PASS",
+    "stash_note": "harness lib+repoint"
+  }
+]

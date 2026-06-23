@@ -6,6 +6,7 @@ upstream_report: https://issues.chromium.org/issues/501657371
 target:
   repo:         https://aomedia.googlesource.com/aom
   vuln_commit:  f23c9437a
+  fix_commit:   40b50c6f556df8df4e9876ffcdf842fbfd0d25b4
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # libaom_ratectrl_rtc_interface_fuzzer.cc (AV1RateControlRTC public iface)
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

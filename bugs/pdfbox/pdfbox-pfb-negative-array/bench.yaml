@@ -6,6 +6,7 @@ upstream_report: https://github.com/apache/pdfbox/pull/412
 target:
   repo:         https://github.com/apache/pdfbox
   vuln_commit:  4672850ee7eb44c3356499cd44254bdf5b6eb9eb
+  fix_patch:   tools/fixes/pdfbox-pfb-negative-array.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     jvm
   build_system: maven
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

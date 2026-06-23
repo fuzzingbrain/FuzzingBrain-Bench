@@ -6,6 +6,7 @@ upstream_report: https://github.com/stleary/JSON-java/issues/1035
 target:
   repo:         https://github.com/stleary/JSON-java
   vuln_commit:  e635f4023811c80c02b38428ec58e42b397f820f
+  fix_commit:   534ce3c4d1a2024dda21e3e6411a717896d455fe
   language:     jvm
   build_system: maven
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: oss-fuzz
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

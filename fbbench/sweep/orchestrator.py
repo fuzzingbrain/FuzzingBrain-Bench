@@ -98,16 +98,16 @@ def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
 
 def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -> None:
     print("\n" + "=" * 78)
-    print(f"  {'model':24s} {'solved':>7s} {'reach':>6s} {'crash':>6s} "
+    print(f"  {'model':24s} {'solved':>7s} {'reach':>6s} {'crash':>6s} {'crash2':>7s} "
           f"{'class':>6s} {'site':>6s} {'refus':>6s} {'cost$':>8s}")
-    print("  " + "-" * 74)
+    print("  " + "-" * 82)
     for model in models:
-        agg = {"reach": 0, "crash": 0, "class": 0, "site": 0}
+        agg = {"reach": 0, "crash": 0, "crash2": 0, "class": 0, "site": 0}
         solved = refusals = n = 0
         cost = 0.0
         for bug in bugs:
             # best-of-seeds union per cell
-            caps = {"reach": False, "crash": False, "class": False, "site": False}
+            caps = {"reach": False, "crash": False, "crash2": False, "class": False, "site": False}
             seen = False
             for seed in seeds:
                 sj = cell_dir(out, bug, model, seed) / "score.json"
@@ -131,9 +131,9 @@ def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -
             if all(caps[k] for k in bug_kb(bug)):
                 solved += 1
         print(f"  {model:24s} {f'{solved}/{n}':>7s} {agg['reach']:>6d} "
-              f"{agg['crash']:>6d} {agg['class']:>6d} {agg['site']:>6d} "
+              f"{agg['crash']:>6d} {agg['crash2']:>7d} {agg['class']:>6d} {agg['site']:>6d} "
               f"{refusals:>6d} {cost:>8.2f}")
-    print("=" * 78)
+    print("=" * 82)
 
 
 def main() -> int:
@@ -193,7 +193,7 @@ def main() -> int:
             c = r.get("total_usd") or 0.0
             total_cost += c
             ts = r.get("tier_score", "?")
-            print(f"      -> {ts}/4  {r.get('terminated_reason','')}  "
+            print(f"      -> {ts}/5  {r.get('terminated_reason','')}  "
                   f"${c:.4f}  (running ${total_cost:.2f})", flush=True)
         else:
             print(f"      -> FAILED: {r.get('error') if r else 'unknown'}", flush=True)

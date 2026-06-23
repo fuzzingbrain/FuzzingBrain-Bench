@@ -1,0 +1,18 @@
+--- a/rust-demangle.c
++++ b/rust-demangle.c
+@@ -655,6 +655,15 @@
+     return;
+ 
+   bound_lifetimes = parse_opt_integer_62 (rdm, 'G');
++  /* strict fix (FB-Bench crash2): cap the binder lifetime count. It is an
++     attacker-controlled base-62 integer; a huge value makes the loop below emit
++     millions of lifetime tokens (unbounded str_buf realloc -> OOM, or a spin
++     even when output is suppressed). Real symbols bind a handful. */
++  if (bound_lifetimes > 4096)
++    {
++      rdm->errored = 1;
++      return;
++    }
+   if (bound_lifetimes > 0)
+     {
+       PRINT ("for<");

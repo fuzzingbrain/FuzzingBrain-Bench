@@ -6,6 +6,7 @@ upstream_report: https://github.com/jqlang/jq/issues/3458
 target:
   repo:         https://github.com/jqlang/jq
   vuln_commit:  d44baeb67ac21b3ff23ede8d103c21c8830ea8dd
+  fix_commit:   a446611073b7fbb8d9672f2cde5d9015bf4e33fd
   language:     c
   build_system: autoconf
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: oss-fuzz       # tests/jq_fuzz_compile.c — upstream OSS-Fuzz fuzzer
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

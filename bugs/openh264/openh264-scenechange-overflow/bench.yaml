@@ -6,6 +6,7 @@ upstream_report: https://github.com/cisco/openh264/issues/3926
 target:
   repo:         https://github.com/cisco/openh264
   vuln_commit:  cf568c83f71a18778f9a16e344effaf40c11b752
+  fix_patch:   tools/fixes/openh264-scenechange-overflow.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     cpp
   build_system: make
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # processing_fuzzer.cpp
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""
