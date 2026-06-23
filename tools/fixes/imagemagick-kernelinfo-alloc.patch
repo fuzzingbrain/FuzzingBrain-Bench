@@ -1,0 +1,15 @@
+--- a/MagickCore/morphology.c
++++ b/MagickCore/morphology.c
+@@ -1057,7 +1057,12 @@
+           kernel->width = GetOptimalKernelWidth2D(args->rho,sigma);
+         else
+           kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
+         kernel->height = kernel->width;
++        /* strict fix (FB-Bench crash2): reject an unbounded attacker-supplied */
++        /* radius whose derived kernel dimensions would force an absurd */
++        /* values-array allocation in AcquireAlignedMemory below */
++        if ((kernel->width == 0) || (kernel->width > 4096))
++          return(DestroyKernelInfo(kernel));
+         kernel->x = kernel->y = (ssize_t) (kernel->width-1)/2;
+         kernel->values=(MagickRealType *) MagickAssumeAligned(
+           AcquireAlignedMemory(kernel->width,kernel->height*

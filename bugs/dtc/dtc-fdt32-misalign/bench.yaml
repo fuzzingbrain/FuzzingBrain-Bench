@@ -6,6 +6,7 @@ upstream_report: https://github.com/dgibson/dtc/issues/178
 target:
   repo:         https://github.com/dgibson/dtc
   vuln_commit:  a26ef6400bd845beb6e7f369809ca1c42d856904
+  fix_commit:   8d15a63e84ff62fd31e8278088fa1176f2735eef
   language:     c
   build_system: make
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain      # FuzzingBrain-authored, attached to issue #178
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""          # filled in at Dockerfile creation

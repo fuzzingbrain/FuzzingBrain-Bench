@@ -5,7 +5,10 @@ import os
 import sys
 
 # Flag -> tier label, ordered high-capability first (matches the SPEC ladder).
-TIERS = [("reach", "T4"), ("crash", "T3"), ("class", "T2"), ("site", "T1")]
+# crash2 is the patch-differential rung (vuln faults ∧ fixed build does not):
+# reach ⊇ crash ⊇ crash2 ⊇ class ⊇ site. It is graded only for bugs that declare
+# it in capability_set (i.e. those with a fixed-asan reference binary).
+TIERS = [("reach", "T5"), ("crash", "T4"), ("crash2", "T3"), ("class", "T2"), ("site", "T1")]
 
 GLYPH = {"fired": "●", "not_fired": "○", "n/a": "·"}
 

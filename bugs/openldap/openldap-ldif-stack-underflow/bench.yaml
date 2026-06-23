@@ -6,6 +6,7 @@ upstream_report: https://bugs.openldap.org/show_bug.cgi?id=10431
 target:
   repo:         https://github.com/openldap/openldap
   vuln_commit:  2c5388b2da73f4293b3b6c236b2de597b6272d50
+  fix_commit:   cd70bf5082b38162a9d511e2057b56e79111e748
   language:     c
   build_system: autoconf
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain     # pasted into Bugzilla bug body
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

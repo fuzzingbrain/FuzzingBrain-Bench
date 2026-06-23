@@ -6,6 +6,7 @@ upstream_report: https://github.com/opencv/opencv/issues/28619
 target:
   repo:         https://github.com/opencv/opencv
   vuln_commit:  1a3e1e05b71e15197f7decc451a2f650ff2ee591
+  fix_commit:   0589ce13a0cb804f041e4571fbc9778de4ea5d0a
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

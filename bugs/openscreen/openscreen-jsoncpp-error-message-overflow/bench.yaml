@@ -6,6 +6,7 @@ upstream_report: https://github.com/open-source-parsers/jsoncpp/issues/1682
 target:
   repo:         https://github.com/open-source-parsers/jsoncpp
   vuln_commit:  42e892d96e47b1f6e29844cc705e148ec4856448
+  fix_commit:   3c2205cd97838d3c4143107992967e23f0c958b8
   language:     cpp
   build_system: clang
   # jsoncpp is the bundled library that crashes (chromium/openscreen vendor it
@@ -19,7 +20,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # openscreen_receiver_message_json_parse_fuzzer.cc
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

@@ -6,6 +6,7 @@ upstream_report: https://github.com/ImageMagick/ImageMagick/security/advisories/
 target:
   repo:         https://github.com/ImageMagick/ImageMagick
   vuln_commit:  1eefab41bc0ab1c6c2c1fd3e4a49e3ee1849751d
+  fix_patch:   tools/fixes/imagemagick-msl-stack-overflow.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     c
   build_system: autoconf
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: oss-fuzz
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

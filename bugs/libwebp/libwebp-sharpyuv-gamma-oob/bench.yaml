@@ -6,6 +6,7 @@ upstream_report: https://github.com/webmproject/libwebp/security/advisories/GHSA
 target:
   repo:         https://github.com/webmproject/libwebp
   vuln_commit:  b8814a57f0e010969b0d9352d86fa30b855d3fa0
+  fix_commit:   2d5f499bcf905f30eb5e2b60290c29944a353929
   language:     c
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # sharpyuv_convert_fuzzer.cc (public SharpYuvConvert API)
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

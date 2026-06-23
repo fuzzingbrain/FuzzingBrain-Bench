@@ -6,6 +6,7 @@ upstream_report: https://gitlab.freedesktop.org/freetype/freetype/-/issues/1385
 target:
   repo:         https://github.com/freetype/freetype
   vuln_commit:  d41d4943410cb942e02e0a8866f39be02378ecf5
+  fix_commit:   85c8efe0afa5ad0df35114e317a065f544943c52
   language:     c
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # ftfuzzer_glyph.c
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

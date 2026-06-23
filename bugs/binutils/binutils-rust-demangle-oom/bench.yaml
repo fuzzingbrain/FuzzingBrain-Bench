@@ -6,6 +6,7 @@ upstream_report: https://sourceware.org/bugzilla/show_bug.cgi?id=33878
 target:
   repo:         https://sourceware.org/git/binutils-gdb.git
   vuln_commit:  96c87c6dd55c38519ad168230d0893797b62fd52
+  fix_commit:   74b48014179ed612ed0ea6ee4abf3b2102ef764d
   language:     c
   build_system: handrolled
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""
