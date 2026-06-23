@@ -1,0 +1,25 @@
+--- a/plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
++++ b/plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
+@@ -241,9 +241,19 @@
+ 		return NULL;
+ 	response->cmd = fu_struct_logitech_bulkcontroller_send_sync_res_get_cmd(st);
+ 	response->sequence_id = fu_struct_logitech_bulkcontroller_send_sync_res_get_sequence_id(st);
+-	g_byte_array_append(response->data,
+-			    buf + st->buf->len,
+-			    fu_struct_logitech_bulkcontroller_send_sync_res_get_payload_length(st));
++	{
++		guint32 payload_length =
++		    fu_struct_logitech_bulkcontroller_send_sync_res_get_payload_length(st);
++		/* strict fix (FB-Bench crash2): bound attacker payload_length against the receive
++		   buffer (buf is transfer_bufsz, header consumed st->buf->len) so the append cannot
++		   read past buf -> heap-buffer-overflow at the original site. */
++		if (payload_length > self->transfer_bufsz - st->buf->len) {
++			g_set_error_literal(error, FWUPD_ERROR, FWUPD_ERROR_READ,
++			                    "payload length exceeds receive buffer");
++			return NULL;
++		}
++		g_byte_array_append(response->data, buf + st->buf->len, payload_length);
++	}
+ 	/* no payload for UninitBuffer, skip check */
+ 	if ((response->cmd != FU_LOGITECH_BULKCONTROLLER_CMD_UNINIT_BUFFER) &&
+ 	    (response->data->len == 0)) {

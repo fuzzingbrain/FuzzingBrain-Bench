@@ -6,6 +6,7 @@ upstream_report: https://github.com/fwupd/fwupd/issues/9659
 target:
   repo:         https://github.com/fwupd/fwupd
   vuln_commit:  82a0998339c43fd36855492d9c5d68a20102c338
+  fix_commit:   e4f4b7212af1e3ca974ba631edec57476498a622
   language:     c
   build_system: meson
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: oss-fuzz
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

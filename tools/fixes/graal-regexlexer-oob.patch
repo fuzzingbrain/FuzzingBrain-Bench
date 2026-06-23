@@ -1,0 +1,16 @@
+--- a/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java
++++ b/regex/src/com.oracle.truffle.regex/src/com/oracle/truffle/regex/tregex/parser/RegexLexer.java
+@@ -541,6 +541,13 @@
+     }
+ 
+     protected char consumeChar() {
++        // strict fix (FB-Bench crash2): bound the read. Past the pattern end this
++        // threw StringIndexOutOfBoundsException (surfaced as an internal error)
++        // instead of a proper SyntaxError; raise a RegexSyntaxException so GraalJS
++        // reports a normal SyntaxError rather than crashing.
++        if (atEnd()) {
++            throw syntaxError("unexpected end of regular expression");
++        }
+         final char c = pattern.charAt(position);
+         advance();
+         return c;

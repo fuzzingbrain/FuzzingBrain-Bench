@@ -6,6 +6,7 @@ upstream_report: https://github.com/khaledhosny/ots/issues/308
 target:
   repo:         https://github.com/khaledhosny/ots
   vuln_commit:  8510bfd8c95350fc022552940a45120ff6e737b5
+  fix_commit:   36eea1dc724734e6acdd2b232bce8d691063414c
   language:     cpp
   build_system: meson
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

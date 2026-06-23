@@ -1,0 +1,13 @@
+--- a/src/mux/muxedit.c
++++ b/src/mux/muxedit.c
+@@ -402,6 +402,10 @@ static WebPMuxError GetFrameInfo(const WebPChunk* const frame_chunk,
+                                  int* const duration) {
+   const WebPData* const data = &frame_chunk->data;
+   const size_t expected_data_size = ANMF_CHUNK_SIZE;
++  /* strict fix (FB-Bench crash2): a malformed animated WebP can leave a
++     frame's ANMF header chunk (wpi->header) NULL; guard before the
++     production deref of data->size below (asserts are off under NDEBUG). */
++  if (frame_chunk == NULL) return WEBP_MUX_INVALID_ARGUMENT;
+   assert(frame_chunk->tag == kChunks[IDX_ANMF].tag);
+   assert(frame_chunk != NULL);
+   if (data->size != expected_data_size) return WEBP_MUX_INVALID_ARGUMENT;

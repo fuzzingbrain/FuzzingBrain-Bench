@@ -1,0 +1,18 @@
+--- a/fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
++++ b/fontbox/src/main/java/org/apache/fontbox/pfb/PfbParser.java
+@@ -154,10 +154,13 @@
+             size += in.read() << 16;
+             size += in.read() << 24;
+             LOG.debug("record type: {}, segment size: {}", recordType, size);
+-            if (size > pfb.length)
++            // strict fix (FB-Bench crash2): the 4-byte little-endian segment size is signed,
++            // so a top-bit-set high byte makes it negative; reject a negative size here before
++            // new byte[size] throws NegativeArraySizeException.
++            if (size < 0 || size > pfb.length)
+             {
+                 // PDFBOX-6044: avoid potential OOM
+-                throw new IOException("record size " + size + " would be larger than the input");
++                throw new IOException("record size " + size + " out of range (input length " + pfb.length + ")");
+             }
+             byte[] ar = new byte[size];
+             int got = in.read(ar);

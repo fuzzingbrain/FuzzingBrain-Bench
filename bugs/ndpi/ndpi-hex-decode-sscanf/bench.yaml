@@ -6,6 +6,7 @@ upstream_report: https://github.com/ntop/nDPI/issues/3159
 target:
   repo:         https://github.com/ntop/nDPI
   vuln_commit:  68c7159a72dee1c42988eed65c7bfa08c510002e
+  fix_commit:   315a70591afed59112d7a927f555305a2d9cba4e
   language:     c
   build_system: autoconf
 
@@ -21,7 +22,7 @@ harness:
   timeout_s: 60
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

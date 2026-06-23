@@ -6,6 +6,7 @@ upstream_report: https://github.com/AOMediaCodec/libavif/issues/3177
 target:
   repo:         https://github.com/AOMediaCodec/libavif
   vuln_commit:  b357f083ea5ae0ee7b09a65a48621f345e710588
+  fix_patch:   tools/fixes/libavif-jni-signext.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

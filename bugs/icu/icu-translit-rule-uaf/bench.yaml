@@ -6,6 +6,7 @@ upstream_report: https://unicode-org.atlassian.net/browse/ICU-23365
 target:
   repo:         https://github.com/unicode-org/icu
   vuln_commit:  8be6575f5c4ea397d384493a435b2932d5c2eaca
+  fix_patch:   tools/fixes/icu-translit-rule-uaf.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     cpp
   build_system: autoconf
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

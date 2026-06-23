@@ -6,6 +6,7 @@ upstream_report: https://github.com/oracle/graaljs/issues/985
 target:
   repo:         https://github.com/oracle/graaljs
   vuln_commit:  24.1.2
+  fix_patch:   tools/fixes/graaljs-illformed-locale.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     jvm
   build_system: maven
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

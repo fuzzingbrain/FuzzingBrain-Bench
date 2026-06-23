@@ -6,6 +6,7 @@ upstream_report: https://github.com/open62541/open62541/pull/7680
 target:
   repo:         https://github.com/open62541/open62541
   vuln_commit:  0b75ea2c5a78e72dc3c04302be7ec3546a556958
+  fix_commit:   f9212d4f563d155382440057a3d6527c1b729dad
   language:     c
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # fuzz_pubsub_json.cc (UA_NetworkMessage_decodeJson)
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

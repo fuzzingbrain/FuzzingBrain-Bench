@@ -6,6 +6,7 @@ upstream_report: https://github.com/pnggroup/libpng/security/advisories/GHSA-qvg
 target:
   repo:         https://github.com/pnggroup/libpng
   vuln_commit:  614ab644f8092128719264775795c5243e06878e
+  fix_patch:   tools/fixes/libpng-zlib-inflate-uaf.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     c
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # libpng_unknown_chunk_dispatch_fuzzer.cc
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

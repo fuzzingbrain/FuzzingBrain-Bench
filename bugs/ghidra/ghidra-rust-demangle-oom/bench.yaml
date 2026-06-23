@@ -6,6 +6,7 @@ upstream_report: https://github.com/NationalSecurityAgency/ghidra/security/advis
 target:
   repo:         https://github.com/NationalSecurityAgency/ghidra
   vuln_commit:  caeeac88ddb5b004736de440db86380ff6e61229
+  fix_patch:   tools/fixes/ghidra-rust-demangle-oom.patch   # no usable upstream fix; author-supplied root-cause guard
   language:     c
   build_system: handrolled
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [reach, crash, class, site]
+capability_set: [reach, crash, crash2, class, site]
 
 reproducibility:
   base_image_digest: ""

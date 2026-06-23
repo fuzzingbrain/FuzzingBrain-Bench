@@ -1,0 +1,20 @@
+--- a/winpr/libwinpr/sspi/NTLM/ntlm.c
++++ b/winpr/libwinpr/sspi/NTLM/ntlm.c
+@@ -561,10 +561,16 @@
+ 			if (input_buffer->cbBuffer < 1)
+ 				return SEC_E_INVALID_TOKEN;
+ 
+ 			status = ntlm_read_NegotiateMessage(context, input_buffer);
+ 			if (status != SEC_I_CONTINUE_NEEDED)
+-				return status;
++			{
++				/* strict fix (FB-Bench crash2): free the freshly allocated NTLM
++				 * context on this NEGOTIATE error early-return so the ~1KB
++				 * NTLM_CONTEXT does not leak. */
++				ntlm_ContextFree(context);
++				return status;
++			}
+ 
+ 			if (ntlm_get_state(context) == NTLM_STATE_CHALLENGE)
+ 			{
+ 				if (!pOutput)

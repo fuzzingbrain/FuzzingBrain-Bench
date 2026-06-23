@@ -25,11 +25,11 @@ from pathlib import Path
 
 from fbbench.grading import capability_set, find_bug, grade_blob, list_bugs
 from fbbench.paths import REPO, SERVER
-from fbbench.prompts import CODEX_DISABLED_TOOLS, CODEX_TASK_PROMPT
+from fbbench.prompts import CODEX_TASK_PROMPT
 
 MODEL = "codex-gpt-5.5"
 RUNS = REPO / "runs"
-FLAGS = ["reach", "crash", "class", "site"]
+FLAGS = ["reach", "crash", "crash2", "class", "site"]
 
 
 def stage_codex_env(real_bug_dir: str, bug: str) -> tuple[str, str]:
@@ -58,11 +58,21 @@ def stage_codex_env(real_bug_dir: str, bug: str) -> tuple[str, str]:
 
 
 def codex_cmd(view: str, ws: str) -> list[str]:
-    """The `codex exec` argv: headless, sandbox-bypassed, cheat-tools disabled."""
+    """The `codex exec` argv: headless, sandbox-bypassed, cheat-tools disabled.
+
+    Codex CLI >= 0.90 changed `--disable <NAME>` to mean a *feature* flag and
+    aborts on an unknown name (e.g. `Unknown feature flag: browser_use`), so the
+    old per-tool `--disable` loop no longer works. The one cheat vector in headless
+    `codex exec` is web search; in 0.91 that is the `web_search_request` feature
+    (off by default, but we disable it explicitly to be config-independent).
+    `tools.web_search=false` is deprecated and prints a warning whose text trips
+    the cheat scanner, so we use the canonical feature name. Browser/computer/app
+    tools are interactive-only and absent here; shell stays forbidden by
+    CODEX_TASK_PROMPT and any slip is caught by the log scan in run_sweep_cell.
+    """
     cmd = ["codex", "exec", "--dangerously-bypass-approvals-and-sandbox",
-           "--cd", ws, "--add-dir", view, "--skip-git-repo-check", "--ephemeral"]
-    for t in CODEX_DISABLED_TOOLS:
-        cmd += ["--disable", t]
+           "--cd", ws, "--add-dir", view, "--skip-git-repo-check",
+           "--disable", "web_search_request"]
     cmd.append(CODEX_TASK_PROMPT)
     return cmd
 
@@ -197,7 +207,7 @@ def cmd_sweep(args) -> int:
                 continue
         mark = "✓" if s["solved"] else "✗"
         cheat = " ⚠CHEAT" if s.get("cheated_web") else ""
-        print(f"      {mark} {s['tier_score']}/4  {s['terminated_reason']}  "
+        print(f"      {mark} {s['tier_score']}/5  {s['terminated_reason']}  "
               f"{s['duration_s']}s  grades={s['grade_calls']}  blobs={s['blobs_written']}{cheat}")
         solved_total += int(s["solved"])
         cheats += int(bool(s.get("cheated_web")))

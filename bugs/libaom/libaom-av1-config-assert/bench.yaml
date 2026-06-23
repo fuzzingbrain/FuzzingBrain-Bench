@@ -6,6 +6,7 @@ upstream_report: https://aomedia.googlesource.com/aom/
 target:
   repo:         https://aomedia.googlesource.com/aom
   vuln_commit:  f23c9437a
+  fix_commit:   39550c8f9002b54d3bf8cd0f40b4e42805d1c157
   language:     cpp
   build_system: cmake
 
@@ -17,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # av1_config_fuzzer.cc (get_av1config_from_obu / read_av1config)
 
-capability_set: [class, crash, reach, site]
+capability_set: [class, crash, crash2, reach, site]
 
 reproducibility:
   base_image_digest: ""

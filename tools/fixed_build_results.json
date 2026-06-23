@@ -1,0 +1,1171 @@
+[
+  {
+    "bug": "avro-decompression-bomb",
+    "sha": "d28279dace6ffd2deaf6a66e5e82f81a582c3252",
+    "conf": "med",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "sionBombFuzzer.java:17)\n\tat java.base/java.lang.invoke.LambdaForm$DMH/0x00007ff60c001000.invokeStatic(LambdaForm$DMH)\n\tat java.base/java.lang.invoke.LambdaForm$MH/0x00007ff60c002400.invoke(LambdaForm$MH)\n\tat java.base/java.lang.invoke.Invokers$Holder.invokeExact_MT(Invokers$Holder)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invokeImpl(DirectMethodHandleAccessor.java:154)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "SLF4J(W): No SLF4J providers were found.\nSLF4J(W): Defaulting to no-operation (NOP) logger implementation\nSLF4J(W): See https://www.slf4j.org/codes.html#noProviders for further details.\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/avro/avro-decompression-bomb/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "avro-neg-block-size",
+    "sha": "cadf8f948860d4a2038dca8c2411ecbbaa27b7d6",
+    "conf": "high",
+    "status": "cached"
+  },
+  {
+    "bug": "avro-neg-string-len",
+    "sha": "33a64f24d61b90f778af42886087b6ffe3d28b9e",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "2 in main (/data4/ze/FuzzingBrain-Bench/bugs/avro/avro-neg-string-len/binaries/release-asan/harness+0x67f32) (BuildId: e54e918de6c8d42077d749ab71c18af573886631)\n    #9 0x7ffae6829d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n\n==2936792==HINT: if you don't care about these errors you may set allocator_may_return_null=1\nSUMMARY: AddressSanitizer: allocation-size-too-big (/data4/ze/FuzzingBrain-Bench/bugs/avro/avro-neg-string-len/binaries/release-asan/harness+0xeb0e6) (BuildId: e54e918de6c8d42077d749ab71c18af573886631) in __interceptor_realloc\n==2936792==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "9241\nINFO: Loaded 1 modules   (12 inline 8-bit counters): 12 [0x564b7a9c2a40, 0x564b7a9c2a4c), \nINFO: Loaded 1 PC tables (12 PCs): 12 [0x564b7a9c2a50,0x564b7a9c2b10), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/avro-neg-string-len/out-33a64f24d61b/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/avro/avro-neg-string-len/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/avro/avro-neg-string-len/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/avro/avro-neg-string-len/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "binutils-rust-demangle-oom",
+    "sha": "74b48014179ed612ed0ea6ee4abf3b2102ef764d",
+    "conf": "high",
+    "vuln": {
+      "exit": 71,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "utils/binutils-rust-demangle-oom/binaries/release-asan/harness+0xe5bfe) (BuildId: c506228efacbc45d15228e75d6d46c6d1172a378)\n    #1 0x7ff4304ae98b in operator new(unsigned long) (/lib/x86_64-linux-gnu/libstdc++.so.6+0xae98b) (BuildId: eb0991e99bf8c31e942757ab71a6266bffb30e1f)\n    #2 0x55c727402e72 in main (/data4/ze/FuzzingBrain-Bench/bugs/binutils/binutils-rust-demangle-oom/binaries/release-asan/harness+0x62e72) (BuildId: c506228efacbc45d15228e75d6d46c6d1172a378)\n    #3 0x7ff430029d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n\nSUMMARY: libFuzzer: out-of-memory\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "3 inline 8-bit counters): 823 [0x5610c921b330, 0x5610c921b667), \nINFO: Loaded 1 PC tables (823 PCs): 823 [0x5610c921b668,0x5610c921e9d8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/binutils-rust-demangle-oom/out-74b48014179e/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/binutils/binutils-rust-demangle-oom/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/binutils/binutils-rust-demangle-oom/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/binutils/binutils-rust-demangle-oom/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "cups-utf8-charset-overflow",
+    "sha": "f3ce6d3a3b1070976cc0954b108c8b33e251f4c3",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==2946276==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": " 1 modules   (3 inline 8-bit counters): 3 [0x55b8f23fc580, 0x55b8f23fc583), \nINFO: Loaded 1 PC tables (3 PCs): 3 [0x55b8f23fc588,0x55b8f23fc5b8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/cups-utf8-charset-overflow/out-f3ce6d3a3b10/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/cups/cups-utf8-charset-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/cups/cups-utf8-charset-overflow/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/cups/cups-utf8-charset-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "dtc-fdt32-misalign",
+    "sha": "8d15a63e84ff62fd31e8278088fa1176f2735eef",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "82 in main (/data4/ze/FuzzingBrain-Bench/bugs/dtc/dtc-fdt32-misalign/binaries/release-asan/harness+0x4b082) (BuildId: 4b328c1797742759ed5314af819215c4df873509)\n    #10 0x7fd3e1c29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #11 0x7fd3e1c29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #12 0x558bb2ab6ba0 in _start (/data4/ze/FuzzingBrain-Bench/bugs/dtc/dtc-fdt32-misalign/binaries/release-asan/harness+0x15ba0) (BuildId: 4b328c1797742759ed5314af819215c4df873509)\n\nSUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /src/libfdt/fdt.c:173:21 in \n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "4\nINFO: Loaded 1 modules   (1380 inline 8-bit counters): 1380 [0x5569786b6590, 0x5569786b6af4), \nINFO: Loaded 1 PC tables (1380 PCs): 1380 [0x5569786b6af8,0x5569786bc138), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/dtc-fdt32-misalign/out-8d15a63e84ff/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/dtc/dtc-fdt32-misalign/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/dtc/dtc-fdt32-misalign/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/dtc/dtc-fdt32-misalign/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "flatbuffers-flexbuffers-tostring-overflow",
+    "sha": "a6979fe14adfca20c370dfae5baa1d1aea4e8b26",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==2968786==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "bb008e2464), \nINFO: Loaded 1 PC tables (868 PCs): 868 [0x55bb008e2468,0x55bb008e5aa8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-flexbuffers-tostring-overflow/out-a6979fe14adf/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/flatbuffers/flatbuffers-flexbuffers-tostring-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/flatbuffers/flatbuffers-flexbuffers-tostring-overflow/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/flatbuffers/flatbuffers-flexbuffers-tostring-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "flatbuffers-parser-deserialize-uaf",
+    "sha": "29f6b0709ed7ce0545d0f846faf8825222ce965a",
+    "conf": "med",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==2994792==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "x560cb3b567a0, 0x560cb3b56e9f), \nINFO: Loaded 1 PC tables (1791 PCs): 1791 [0x560cb3b56ea0,0x560cb3b5de90), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-parser-deserialize-uaf/out-29f6b0709ed7/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/flatbuffers/flatbuffers-parser-deserialize-uaf/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/flatbuffers/flatbuffers-parser-deserialize-uaf/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/flatbuffers/flatbuffers-parser-deserialize-uaf/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "flatbuffers-reflection-verifier-overflow",
+    "sha": "20715042e2a99ebe5dbcf456d476db5f9e33a743",
+    "conf": "med",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3107598==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "59fbb3db634), \nINFO: Loaded 1 PC tables (1844 PCs): 1844 [0x559fbb3db638,0x559fbb3e2978), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-reflection-verifier-overflow/out-20715042e2a9/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/flatbuffers/flatbuffers-reflection-verifier-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/flatbuffers/flatbuffers-reflection-verifier-overflow/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/flatbuffers/flatbuffers-reflection-verifier-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "freerdp-ntlm-memleak",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "freetype-ftbitmapcopy-uaf",
+    "sha": "85c8efe0afa5ad0df35114e317a065f544943c52",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3017101==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "s   (37 inline 8-bit counters): 37 [0x55c48228bcf0, 0x55c48228bd15), \nINFO: Loaded 1 PC tables (37 PCs): 37 [0x55c48228bd18,0x55c48228bf68), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/freetype-ftbitmapcopy-uaf/out-85c8efe0afa5/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/freetype/freetype-ftbitmapcopy-uaf/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/freetype/freetype-ftbitmapcopy-uaf/poc/poc.bin in 2 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/freetype/freetype-ftbitmapcopy-uaf/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "fwupd-cab-mszip-bomb",
+    "sha": "5e9eb08fff4348752f1b6502ff32b9fbde4f681d",
+    "conf": "high",
+    "vuln": {
+      "exit": 71,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "er schedule (0xFF, 100).\nINFO: Seed: 1647642401\nINFO: Loaded 1 modules   (125271 inline 8-bit counters): 125271 [0x559113a6a2a8, 0x559113a88bff), \nINFO: Loaded 1 PC tables (125271 PCs): 125271 [0x559113a88c00,0x559113c72170), \n/data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-cab-mszip-bomb/binaries/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-cab-mszip-bomb/poc/poc.bin\n==3349342== ERROR: libFuzzer: out-of-memory (used: 492Mb; limit: 256Mb)\n   To change the out-of-memory limit use -rss_limit_mb=<N>\n\nSUMMARY: libFuzzer: out-of-memory\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "dules   (125477 inline 8-bit counters): 125477 [0x55afd7a8f2c8, 0x55afd7aadced), \nINFO: Loaded 1 PC tables (125477 PCs): 125477 [0x55afd7aadcf0,0x55afd7c97f40), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/fwupd-cab-mszip-bomb/out-5e9eb08fff43/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-cab-mszip-bomb/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-cab-mszip-bomb/poc/poc.bin in 10 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/fwupd/fwupd-cab-mszip-bomb/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "fwupd-logitech-oob-read",
+    "sha": "7296abbc0a2133c89c1a390d4b24193e2cbacde6",
+    "conf": "high",
+    "status": "build-fail",
+    "log": null
+  },
+  {
+    "bug": "fwupd-logitech-stack-overflow",
+    "sha": "a9d1cc95b1319fa0a706a628ee0490552eb1d269",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "d_json_parser_load_array /src/fwupd/libfwupd/fwupd-json-parser.c:318:8\n    #245 0x557f292548ed in fwupd_json_parser_load_array /src/fwupd/libfwupd/fwupd-json-parser.c:318:8\n    #246 0x557f292548ed in fwupd_json_parser_load_array /src/fwupd/libfwupd/fwupd-json-parser.c:318:8\n    #247 0x557f292548ed in fwupd_json_parser_load_array /src/fwupd/libfwupd/fwupd-json-parser.c:318:8\n    #248 0x557f292548ed in fwupd_json_parser_load_array /src/fwupd/libfwupd/fwupd-json-parser.c:318:8\n\nSUMMARY: UndefinedBehaviorSanitizer: stack-overflow malloc/./malloc/malloc.c:3982:19 in _int_malloc\n==3370592==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "it counters): 125569 [0x55ea0c8157b8, 0x55ea0c834239), \nINFO: Loaded 1 PC tables (125569 PCs): 125569 [0x55ea0c834240,0x55ea0ca1ea50), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/fwupd-logitech-stack-overflow/out-a9d1cc95b131/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-logitech-stack-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-logitech-stack-overflow/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/fwupd/fwupd-logitech-stack-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "fwupd-sbatlevel-underflow",
+    "sha": "e4f4b7212af1e3ca974ba631edec57476498a622",
+    "conf": "high",
+    "vuln": {
+      "exit": 71,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "27a2dd32b5f)\n    #1 0x5649b83dc23d in fuzzer::FuzzerDriver(int*, char***, int (*)(unsigned char const*, unsigned long)) (/data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-sbatlevel-underflow/binaries/release-asan/harness+0x64f23d) (BuildId: 84c5a5aba0115b9feffbdce975ee527a2dd32b5f)\n    #2 0x5649b83d6792 in main (/data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-sbatlevel-underflow/binaries/release-asan/harness+0x649792) (BuildId: 84c5a5aba0115b9feffbdce975ee527a2dd32b5f)\n    #3 0x7f6f65629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n\nSUMMARY: libFuzzer: out-of-memory\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "9 inline 8-bit counters): 126219 [0x5580925d7740, 0x5580925f644b), \nINFO: Loaded 1 PC tables (126219 PCs): 126219 [0x5580925f6450,0x5580927e3500), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/fwupd-sbatlevel-underflow/out-e4f4b7212af1/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-sbatlevel-underflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/fwupd/fwupd-sbatlevel-underflow/poc/poc.bin in 2 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/fwupd/fwupd-sbatlevel-underflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "ghidra-rust-demangle-oom",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "graal-regexlexer-oob",
+    "sha": "09eadacd970eab274edb87c58e8fe26c8c32a04d",
+    "conf": "high",
+    "status": "build-fail",
+    "log": null
+  },
+  {
+    "bug": "graaljs-illformed-locale",
+    "sha": "d546d5981cd4b331e89e058505613cf920237677",
+    "conf": "high",
+    "status": "build-fail",
+    "log": null
+  },
+  {
+    "bug": "harfbuzz-fontations-oob-write",
+    "sha": "1ea68a9f57d4d9aaccad1109573dbf8e515b3d9b",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3209100==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "nline 8-bit counters): 5 [0x5611ffe6d630, 0x5611ffe6d635), \nINFO: Loaded 1 PC tables (5 PCs): 5 [0x5611ffe6d638,0x5611ffe6d688), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/harfbuzz-fontations-oob-write/out-1ea68a9f57d4/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/harfbuzz/harfbuzz-fontations-oob-write/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/harfbuzz/harfbuzz-fontations-oob-write/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/harfbuzz/harfbuzz-fontations-oob-write/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "hunspell-hashmgr-tablesize-oom",
+    "sha": "f51973a963751dbd7b5d57fff7e154951f863c56",
+    "conf": "high",
+    "vuln": {
+      "exit": 71,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": " #21 0x55c0b5d2d0e2 in main (/data4/ze/FuzzingBrain-Bench/bugs/hunspell/hunspell-hashmgr-tablesize-oom/binaries/release-asan/harness+0x680e2) (BuildId: 9fe1e8800a4530887baa1ae60a17e16147795b03)\n    #22 0x7fd5a3c29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #23 0x7fd5a3c29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #24 0x55c0b5cf7c00 in _start (/data4/ze/FuzzingBrain-Bench/bugs/hunspell/hunspell-hashmgr-tablesize-oom/binaries/release-asan/harness+0x32c00) (BuildId: 9fe1e8800a4530887baa1ae60a17e16147795b03)\n\nSUMMARY: libFuzzer: out-of-memory\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "uts 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/hunspell/hunspell-hashmgr-tablesize-oom/poc/poc.bin\nerror: /tmp/hunspell_fuzz_workdir/dic_harness_3FJuA4.dic: line 1: missing or bad word count in the dic file\nHash Manager Error : 4\nerror: /tmp/hunspell_fuzz_workdir/dic_harness_u0qPVK.dic: line 1: missing or bad word count in the dic file\nHash Manager Error : 4\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/hunspell/hunspell-hashmgr-tablesize-oom/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/hunspell/hunspell-hashmgr-tablesize-oom/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "icu-translit-rule-dtor-uaf",
+    "sha": "5576b074a0cc900ef386c3b390c8030e70cde3cf",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "790ca76f228f95a4201ab561f9)\n    #12 0x7fdd3a629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #13 0x7fdd3a629e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #14 0x558111aa2b00 in _start (/data4/ze/FuzzingBrain-Bench/bugs/icu/icu-translit-rule-dtor-uaf/binaries/release-asan/harness+0x130b00) (BuildId: 84dee12d5dcd20790ca76f228f95a4201ab561f9)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/icu-asan/icu4c/source/i18n/rbt_rule.cpp:196:5 in icu_79::TransliterationRule::~TransliterationRule()\n==3706373==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": " modules   (13 inline 8-bit counters): 13 [0x560098bbb160, 0x560098bbb16d), \nINFO: Loaded 1 PC tables (13 PCs): 13 [0x560098bbb170,0x560098bbb240), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/icu-translit-rule-dtor-uaf/out-5576b074a0cc/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/icu/icu-translit-rule-dtor-uaf/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/icu/icu-translit-rule-dtor-uaf/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/icu/icu-translit-rule-dtor-uaf/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "icu-translit-rule-uaf",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "imagemagick-kernelinfo-alloc",
+    "sha": "960367f3318e650ba8544c0ce3844d7897aba43b",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ignedMemory_POSIX /src/im-asan/MagickCore/memory.c:277:7\n    #2 0x5618b9cee6e0 in AcquireAlignedMemory /src/im-asan/MagickCore/memory.c:355:10\n    #3 0x5618b9cf8114 in AcquireKernelBuiltIn /src/im-asan/MagickCore/morphology.c:1062:43\n\n==3299308==HINT: if you don't care about these errors you may set allocator_may_return_null=1\nSUMMARY: AddressSanitizer: allocation-size-too-big (/data4/ze/FuzzingBrain-Bench/bugs/imagemagick/imagemagick-kernelinfo-alloc/binaries/release-asan/harness+0x2daec7) (BuildId: e3b25f13c553c5f1cf2a3ae61fe7066b4a82dcdb) in __interceptor_posix_memalign\n==3299308==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "SIX /src/im-asan/MagickCore/memory.c:277:7\n    #2 0x55e076567771 in AcquireAlignedMemory /src/im-asan/MagickCore/memory.c:356:10\n    #3 0x55e076571244 in AcquireKernelBuiltIn /src/im-asan/MagickCore/morphology.c:1062:43\n\n==3299643==HINT: if you don't care about these errors you may set allocator_may_return_null=1\nSUMMARY: AddressSanitizer: allocation-size-too-big (/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/imagemagick-kernelinfo-alloc/out-960367f3318e/release-asan/harness+0x2daec7) (BuildId: 1f39d9e99b27eda29c7f991d85f87786b27a894c) in __interceptor_posix_memalign\n==3299643==ABORTING\n"
+    },
+    "differential": false,
+    "status": "DIFF-FAIL"
+  },
+  {
+    "bug": "imagemagick-msl-comment-npd",
+    "sha": "1eefab41bc0ab1c6c2c1fd3e4a49e3ee1849751d",
+    "conf": "med",
+    "status": "cached"
+  },
+  {
+    "bug": "imagemagick-msl-stack-overflow",
+    "sha": "2a09644b10a5b146e0a7c63b778bd74a112ebec3",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "78e in xmlParseStartTag (/lib/x86_64-linux-gnu/libxml2.so.2+0x5278e) (BuildId: c971e94b7aa994c4f5a699358fa0f0be7bc49ee4)\n    #244 0x7fb9f4f9ef97  (/lib/x86_64-linux-gnu/libxml2.so.2+0x180f97) (BuildId: c971e94b7aa994c4f5a699358fa0f0be7bc49ee4)\n    #245 0x7fb9f4e77410 in xmlParseChunk (/lib/x86_64-linux-gnu/libxml2.so.2+0x59410) (BuildId: c971e94b7aa994c4f5a699358fa0f0be7bc49ee4)\n    #246 0x559ed76e35a1 in ProcessMSLScript /src/im-asan/coders/msl.c:7417:31\n\nSUMMARY: AddressSanitizer: stack-overflow asan_interceptors.cpp.o in printf_common(void*, char const*, __va_list_tag*)\n==3389556==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "x7fe7f51acf97  (/lib/x86_64-linux-gnu/libxml2.so.2+0x180f97) (BuildId: c971e94b7aa994c4f5a699358fa0f0be7bc49ee4)\n    #243 0x7fe7f5085410 in xmlParseChunk (/lib/x86_64-linux-gnu/libxml2.so.2+0x59410) (BuildId: c971e94b7aa994c4f5a699358fa0f0be7bc49ee4)\n    #244 0x563d3da445a1 in ProcessMSLScript /src/im-asan/coders/msl.c:7427:31\n    #245 0x563d3da43a39 in ReadMSLImage /src/im-asan/coders/msl.c:7490:10\n    #246 0x563d3d6900ed in ReadImage /src/im-asan/MagickCore/constitute.c\n\nSUMMARY: AddressSanitizer: stack-overflow /src/im-asan/MagickCore/pixel.c:6310 in SetPixelChannelMask\n==3389584==ABORTING\n"
+    },
+    "differential": false,
+    "status": "DIFF-FAIL"
+  },
+  {
+    "bug": "jq-dump-op-npd",
+    "sha": "a446611073b7fbb8d9672f2cde5d9015bf4e33fd",
+    "conf": "med",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "npd/binaries/release-asan/harness+0x9d2a2) (BuildId: 33a5237158935a1949efc1b3a6a84fbfc7007e6f)\n    #10 0x7f502f429d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #11 0x7f502f429e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #12 0x555eee2a7dc0 in _start (/data4/ze/FuzzingBrain-Bench/bugs/jq/jq-dump-op-npd/binaries/release-asan/harness+0x67dc0) (BuildId: 33a5237158935a1949efc1b3a6a84fbfc7007e6f)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/jq-asan/src/bytecode.c:109:40 in dump_operation\n==3423996==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ": 4 [0x55b8ec6c3d28,0x55b8ec6c3d68), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/jq-dump-op-npd/out-a446611073b7/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/jq/jq-dump-op-npd/poc/poc.bin\njq: error: too many subfunctions/closures (max 4095)\njq: 1 compile error\njq: error: too many subfunctions/closures (max 4095)\njq: 1 compile error\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/jq/jq-dump-op-npd/poc/poc.bin in 4284 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/jq/jq-dump-op-npd/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "jsonjava-jsonml-classcast",
+    "sha": "9d14246bee04fae8f7199d281671773c9c11537d",
+    "conf": "high",
+    "status": "cached"
+  },
+  {
+    "bug": "jsonjava-unescape-numformat",
+    "sha": "534ce3c4d1a2024dda21e3e6411a717896d455fe",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "XMLTokener.unescapeEntity(XMLTokener.java:169)\n\tat org.json.XMLTokener.nextEntity(XMLTokener.java:148)\n\tat org.json.XMLTokener.nextContent(XMLTokener.java:117)\n\tat org.json.XML.parse(XML.java:411)\n\tat org.json.XML.toJSONObject(XML.java:784)\n\tat org.json.XML.toJSONObject(XML.java:870)\n\tat org.json.XML.toJSONObject(XML.java:669)\n\tat XmlToJsonFuzzer.fuzzerTestOneInput(XmlToJsonFuzzer.java:12)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ""
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/json-java/jsonjava-unescape-numformat/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "jsonjava-unescape-strindex",
+    "sha": "534ce3c4d1a2024dda21e3e6411a717896d455fe",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "XMLTokener.unescapeEntity(XMLTokener.java:164)\n\tat org.json.XMLTokener.nextEntity(XMLTokener.java:148)\n\tat org.json.XMLTokener.nextContent(XMLTokener.java:117)\n\tat org.json.XML.parse(XML.java:411)\n\tat org.json.XML.toJSONObject(XML.java:784)\n\tat org.json.XML.toJSONObject(XML.java:870)\n\tat org.json.XML.toJSONObject(XML.java:669)\n\tat XmlToJsonFuzzer.fuzzerTestOneInput(XmlToJsonFuzzer.java:12)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ""
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/json-java/jsonjava-unescape-strindex/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "krb5-import-name-assert",
+    "sha": "07818f1fd34560dbfd87c2f65bf8cd705be0e1d2",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "n/harness+0xf4232) (BuildId: e68177bba1dd8471b1b5e6096201c4025866e001)\n    #16 0x7f7da7a29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #17 0x7f7da7a29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #18 0x556cb96f0d50 in _start (/data4/ze/FuzzingBrain-Bench/bugs/krb5/krb5-import-name-assert/binaries/release-asan/harness+0xbed50) (BuildId: e68177bba1dd8471b1b5e6096201c4025866e001)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: ABRT nptl/./nptl/pthread_kill.c:44:76 in __pthread_kill_implementation\n==3519656==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "O: Loaded 1 modules   (7 inline 8-bit counters): 7 [0x55f005cc0120, 0x55f005cc0127), \nINFO: Loaded 1 PC tables (7 PCs): 7 [0x55f005cc0128,0x55f005cc0198), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/krb5-import-name-assert/out-07818f1fd345/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/krb5/krb5-import-name-assert/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/krb5/krb5-import-name-assert/poc/poc.bin in 2 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/krb5/krb5-import-name-assert/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libaom-av1-config-assert",
+    "sha": "39550c8f9002b54d3bf8cd0f40b4e42805d1c157",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "arness+0x5fe32) (BuildId: bf40b61820722c3e8bd4f6193053ca011d707fd4)\n    #16 0x7f492ce29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #17 0x7f492ce29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #18 0x558a7f1d1950 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-av1-config-assert/binaries/release-asan/harness+0x2a950) (BuildId: bf40b61820722c3e8bd4f6193053ca011d707fd4)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: ABRT nptl/./nptl/pthread_kill.c:44:76 in __pthread_kill_implementation\n==3577309==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "d 1 PC tables (163 PCs): 163 [0x55722938a458,0x55722938ae88), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-av1-config-assert/out-39550c8f9002/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-av1-config-assert/poc/poc.bin\nav1c: Could not read bits for num_units_in_display_tick, value=-1077936128 result=-1.\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-av1-config-assert/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libaom/libaom-av1-config-assert/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libaom-restore-layer-overflow",
+    "sha": "40b50c6f556df8df4e9876ffcdf842fbfd0d25b4",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3575938==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "ine 8-bit counters): 155 [0x55d31c165b60, 0x55d31c165bfb), \nINFO: Loaded 1 PC tables (155 PCs): 155 [0x55d31c165c00,0x55d31c1665b0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-restore-layer-overflow/out-40b50c6f556d/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-restore-layer-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-restore-layer-overflow/poc/poc.bin in 3 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libaom/libaom-restore-layer-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libaom-svc-encoder-hang",
+    "sha": "888312c00dbf80aecd962545dbd1390788be0d34",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "arness+0x112ff2) (BuildId: e3bc9c1b6cc316b27704240cab594a5e68e00a96)\n    #23 0x7fdd0fa29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #24 0x7fdd0fa29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #25 0x56156f8b0b10 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-svc-encoder-hang/binaries/release-asan/harness+0xddb10) (BuildId: e3bc9c1b6cc316b27704240cab594a5e68e00a96)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: ABRT nptl/./nptl/pthread_kill.c:44:76 in __pthread_kill_implementation\n==3580103==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "modules   (125 inline 8-bit counters): 125 [0x55b22f817d40, 0x55b22f817dbd), \nINFO: Loaded 1 PC tables (125 PCs): 125 [0x55b22f817dc0,0x55b22f818590), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-svc-encoder-hang/out-888312c00dbf/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-svc-encoder-hang/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libaom/libaom-svc-encoder-hang/poc/poc.bin in 8 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libaom/libaom-svc-encoder-hang/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libavif-jni-signext",
+    "sha": "b54eac58daf563e9150cc6abce7631ac71b999aa",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3520799==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3521374==ABORTING\n"
+    },
+    "differential": false,
+    "status": "DIFF-FAIL"
+  },
+  {
+    "bug": "libheif-image-crop-overflow",
+    "sha": "c6bf6b4b1fa54d47b9bb0cd7817c37ee417c583a",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3612458==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "42 inline 8-bit counters): 42 [0x5555abbb4300, 0x5555abbb432a), \nINFO: Loaded 1 PC tables (42 PCs): 42 [0x5555abbb4330,0x5555abbb45d0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libheif-image-crop-overflow/out-c6bf6b4b1fa5/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libheif/libheif-image-crop-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libheif/libheif-image-crop-overflow/poc/poc.bin in 12 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libheif/libheif-image-crop-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libpng-zlib-inflate-uaf",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "libvpx-vp9-encoder-caq-assert",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "libvpx-vp9-reconfig-overflow",
+    "sha": "76b08021715417b48f01713c6100f86d9b7ab450",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3591233==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "0 inline 8-bit counters): 20 [0x55e1cf1abcc0, 0x55e1cf1abcd4), \nINFO: Loaded 1 PC tables (20 PCs): 20 [0x55e1cf1abcd8,0x55e1cf1abe18), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libvpx-vp9-reconfig-overflow/out-76b080217154/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vp9-reconfig-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vp9-reconfig-overflow/poc/poc.bin in 61 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libvpx/libvpx-vp9-reconfig-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libvpx-vp9-svc-ratectrl-ub",
+    "sha": "5ab243b1ad7a1a67b5385b09433e34bd659f3bda",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "s/libvpx/libvpx-vp9-svc-ratectrl-ub/binaries/release-asan/harness+0x211f02) (BuildId: 9addb4f545f5449b9fd302db0b1685c468d83832)\n    #10 0x7f9163229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #11 0x7f9163229e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #12 0x55e599bc7a20 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vp9-svc-ratectrl-ub/binaries/release-asan/harness+0x1dca20) (BuildId: 9addb4f545f5449b9fd302db0b1685c468d83832)\n\nSUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /src/libvpx/vpx_dsp/./vpx_dsp_common.h:89:10 in \n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "s   (98 inline 8-bit counters): 98 [0x55a36d800028, 0x55a36d80008a), \nINFO: Loaded 1 PC tables (98 PCs): 98 [0x55a36d800090,0x55a36d8006b0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libvpx-vp9-svc-ratectrl-ub/out-5ab243b1ad7a/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vp9-svc-ratectrl-ub/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vp9-svc-ratectrl-ub/poc/poc.bin in 19 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libvpx/libvpx-vp9-svc-ratectrl-ub/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libvpx-vpx-img-flip-ub",
+    "sha": "ca2f535c9ce6fce777864d4ce5b5774516b08978",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "zingBrain-Bench/bugs/libvpx/libvpx-vpx-img-flip-ub/binaries/release-asan/harness+0x5de22) (BuildId: 48bdf32011f4b4fca3a46f391d3102c03f191ae5)\n    #6 0x7ffb19e29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #7 0x7ffb19e29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #8 0x555d36ac5940 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vpx-img-flip-ub/binaries/release-asan/harness+0x28940) (BuildId: 48bdf32011f4b4fca3a46f391d3102c03f191ae5)\n\nSUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /src/libvpx/vpx/src/vpx_image.c:263:32 in \n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "aded 1 modules   (34 inline 8-bit counters): 34 [0x55697d44dc90, 0x55697d44dcb2), \nINFO: Loaded 1 PC tables (34 PCs): 34 [0x55697d44dcb8,0x55697d44ded8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libvpx-vpx-img-flip-ub/out-ca2f535c9ce6/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vpx-img-flip-ub/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libvpx/libvpx-vpx-img-flip-ub/poc/poc.bin in 4 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libvpx/libvpx-vpx-img-flip-ub/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libwebp-muxassemble-npd",
+    "sha": "0c9546f7efc61eac7f79ae115c3f99c91c21c443",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "lease-asan/harness+0x61ee2) (BuildId: a91ba691f358360afdbc1e2bf29966c00e39fef8)\n    #10 0x7f1d79c29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #11 0x7f1d79c29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #12 0x5607ef17ea00 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libwebp/libwebp-muxassemble-npd/binaries/release-asan/harness+0x2ca00) (BuildId: a91ba691f358360afdbc1e2bf29966c00e39fef8)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/libwebp/src/mux/muxedit.c:407:13 in GetFrameInfo\n==3653040==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "+0x61ee2) (BuildId: f746605bb442adf775eacfd08e0997e2b07c37b4)\n    #10 0x7fcca6e29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #11 0x7fcca6e29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #12 0x55a5ee251a00 in _start (/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libwebp-muxassemble-npd/out-0c9546f7efc6/release-asan/harness+0x2ca00) (BuildId: f746605bb442adf775eacfd08e0997e2b07c37b4)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/libwebp/src/mux/muxedit.c:407:13 in GetFrameInfo\n==3653116==ABORTING\n"
+    },
+    "differential": false,
+    "status": "DIFF-FAIL"
+  },
+  {
+    "bug": "libwebp-sharpyuv-convert-stride-oob",
+    "sha": "c601ec96f9f78b616668f445c628da6428be5dc0",
+    "conf": "med",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "uildId: 4b19008700f8bf964890b8f433a87e719d4d97dc)\n    #12 0x7fea4fa29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #13 0x7fea4fa29e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #14 0x56244d7ba9d0 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libwebp/libwebp-sharpyuv-convert-stride-oob/binaries/release-asan/harness+0x289d0) (BuildId: 4b19008700f8bf964890b8f433a87e719d4d97dc)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/libwebp/sharpyuv/sharpyuv_gamma.c:91:29 in FixedPointInterpolation\n==3680440==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "a9284b2d6b9bb6591f730b3afbafa8)\n    #12 0x7f2cf5229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #13 0x7f2cf5229e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #14 0x55e0bd3fc9d0 in _start (/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libwebp-sharpyuv-convert-stride-oob/out-c601ec96f9f7/release-asan/harness+0x289d0) (BuildId: feb9e88184a9284b2d6b9bb6591f730b3afbafa8)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/libwebp/sharpyuv/sharpyuv_gamma.c:91:29 in FixedPointInterpolation\n==3680493==ABORTING\n"
+    },
+    "differential": false,
+    "status": "DIFF-FAIL"
+  },
+  {
+    "bug": "libwebp-sharpyuv-gamma-oob",
+    "sha": "2d5f499bcf905f30eb5e2b60290c29944a353929",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "5deb2) (BuildId: 8bfd93884e2bf646df7a69967184b6efc3b7de46)\n    #12 0x7ff03e229d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #13 0x7ff03e229e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #14 0x5576ad19c9d0 in _start (/data4/ze/FuzzingBrain-Bench/bugs/libwebp/libwebp-sharpyuv-gamma-oob/binaries/release-asan/harness+0x289d0) (BuildId: 8bfd93884e2bf646df7a69967184b6efc3b7de46)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/libwebp/sharpyuv/sharpyuv_gamma.c:91:29 in FixedPointInterpolation\n==3653041==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "   (10 inline 8-bit counters): 10 [0x55fcc65288c0, 0x55fcc65288ca), \nINFO: Loaded 1 PC tables (10 PCs): 10 [0x55fcc65288d0,0x55fcc6528970), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libwebp-sharpyuv-gamma-oob/out-2d5f499bcf90/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libwebp/libwebp-sharpyuv-gamma-oob/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libwebp/libwebp-sharpyuv-gamma-oob/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libwebp/libwebp-sharpyuv-gamma-oob/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "libwebsockets-lhp-class-oob",
+    "sha": "bd57edb5fc3ad284a082ecb0143aede1b7383928",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3744226==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "t counters): 126 [0x56330d0877e0, 0x56330d08785e), \nINFO: Loaded 1 PC tables (126 PCs): 126 [0x56330d087860,0x56330d088040), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libwebsockets-lhp-class-oob/out-bd57edb5fc3a/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/libwebsockets/libwebsockets-lhp-class-oob/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/libwebsockets/libwebsockets-lhp-class-oob/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/libwebsockets/libwebsockets-lhp-class-oob/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "mongoose-mg-match-overflow",
+    "sha": "0d882f1b43ff2308b7486a56a9d60cd6dba8a3f1",
+    "conf": "high",
+    "status": "build-fail",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/mongoose-mg-match-overflow__0d882f1b43ff__release-asan.log"
+  },
+  {
+    "bug": "mongoose-mqtt-nextprop-oob",
+    "sha": "0884338b2a7d330ed1f49c27367767eee440243a",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3710848==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "nline 8-bit counters): 4051 [0x55a6e7166c10, 0x55a6e7167be3), \nINFO: Loaded 1 PC tables (4051 PCs): 4051 [0x55a6e7167be8,0x55a6e7177918), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/mongoose-mqtt-nextprop-oob/out-0884338b2a7d/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/mongoose/mongoose-mqtt-nextprop-oob/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/mongoose/mongoose-mqtt-nextprop-oob/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/mongoose/mongoose-mqtt-nextprop-oob/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "ndpi-hex-decode-sscanf",
+    "sha": "315a70591afed59112d7a927f555305a2d9cba4e",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "release-asan/harness+0x653ff2) (BuildId: 84c204c9381cd093c85aaa03ec1a91ac121c7ee1)\n    #12 0x7efc84629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #13 0x7efc84629e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #14 0x55ec63121b10 in _start (/data4/ze/FuzzingBrain-Bench/bugs/ndpi/ndpi-hex-decode-sscanf/binaries/release-asan/harness+0x61eb10) (BuildId: 84c204c9381cd093c85aaa03ec1a91ac121c7ee1)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV string/../sysdeps/x86_64/multiarch/memchr-evex.S:236 \n==3825042==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "Loaded 1 modules   (4 inline 8-bit counters): 4 [0x55a24d4cf860, 0x55a24d4cf864), \nINFO: Loaded 1 PC tables (4 PCs): 4 [0x55a24d4cf868,0x55a24d4cf8a8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/ndpi-hex-decode-sscanf/out-315a70591afe/release-asan/harness: Running 1 inputs 10000 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/ndpi/ndpi-hex-decode-sscanf/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/ndpi/ndpi-hex-decode-sscanf/poc/poc.bin in 347 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/ndpi/ndpi-hex-decode-sscanf/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "netsnmp-smux-rreq-uaf",
+    "sha": "f77a116425433316d67ada69afc1aaf81868ddac",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3903592==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "ded 1 modules   (49 inline 8-bit counters): 49 [0x562ea10b5e40, 0x562ea10b5e71), \nINFO: Loaded 1 PC tables (49 PCs): 49 [0x562ea10b5e78,0x562ea10b6188), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/netsnmp-smux-rreq-uaf/out-f77a11642543/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/net-snmp/netsnmp-smux-rreq-uaf/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/net-snmp/netsnmp-smux-rreq-uaf/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/net-snmp/netsnmp-smux-rreq-uaf/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "netsnmp-vacm-parse-npd",
+    "sha": "bb2110ebd970138df361d8da13b8c18d1fe55b8d",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "/harness+0xba0b2) (BuildId: f8d75e601138627ce3321d3b695e22638dbe3e53)\n    #9 0x7f898e429d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #10 0x7f898e429e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #11 0x561ffb680bd0 in _start (/data4/ze/FuzzingBrain-Bench/bugs/net-snmp/netsnmp-vacm-parse-npd/binaries/release-asan/harness+0x84bd0) (BuildId: f8d75e601138627ce3321d3b695e22638dbe3e53)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV stdlib/../stdlib/strtol_l.c:291:10 in __GI_____strtol_l_internal\n==3883396==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ", \nINFO: Loaded 1 PC tables (7 PCs): 7 [0x558fd71cd248,0x558fd71cd2b8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/netsnmp-vacm-parse-npd/out-bb2110ebd970/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/net-snmp/netsnmp-vacm-parse-npd/poc/poc.bin\n(null): line 0: Error: incomplete line\n(null): line 0: Error: incomplete line\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/net-snmp/netsnmp-vacm-parse-npd/poc/poc.bin in 4 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/net-snmp/netsnmp-vacm-parse-npd/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "opcua-pubsub-json-assert",
+    "sha": "f9212d4f563d155382440057a3d6527c1b729dad",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ness+0x2deec2) (BuildId: b085e85a8e0a76f1febaaec516358c7c35d90056)\n    #15 0x7fc2b1629d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #16 0x7fc2b1629e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #17 0x557be315d9e0 in _start (/data4/ze/FuzzingBrain-Bench/bugs/opc-ua/opcua-pubsub-json-assert/binaries/release-asan/harness+0x2a99e0) (BuildId: b085e85a8e0a76f1febaaec516358c7c35d90056)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: ABRT nptl/./nptl/pthread_kill.c:44:76 in __pthread_kill_implementation\n==3854577==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": " modules   (47 inline 8-bit counters): 47 [0x55f1a29d9a90, 0x55f1a29d9abf), \nINFO: Loaded 1 PC tables (47 PCs): 47 [0x55f1a29d9ac0,0x55f1a29d9db0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/opcua-pubsub-json-assert/out-f9212d4f563d/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/opc-ua/opcua-pubsub-json-assert/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/opc-ua/opcua-pubsub-json-assert/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/opc-ua/opcua-pubsub-json-assert/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "opencv-yaml-parsekey",
+    "sha": "0589ce13a0cb804f041e4571fbc9778de4ea5d0a",
+    "conf": "med",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==4047637==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "uzzingBrain-Bench/delta-bisect/src-cache/opencv-yaml-parsekey/out-0589ce13a0cb/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/opencv/opencv-yaml-parsekey/poc/poc.bin\nOpenCV(4.14.0-pre) Error: Parsing error (parseKey) in /tmp/fb_opencv_yamlUOT3Kw.yaml(7): An empty key, file /src/opencv-asan/modules/core/src/persistence_yml.cpp, line 436\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/opencv/opencv-yaml-parsekey/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/opencv/opencv-yaml-parsekey/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "openh264-scenechange-overflow",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "openldap-ldif-stack-underflow",
+    "sha": "cd70bf5082b38162a9d511e2057b56e79111e748",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3903297==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "ne 8-bit counters): 10 [0x562e590f6380, 0x562e590f638a), \nINFO: Loaded 1 PC tables (10 PCs): 10 [0x562e590f6390,0x562e590f6430), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/openldap-ldif-stack-underflow/out-cd70bf5082b3/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/openldap/openldap-ldif-stack-underflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/openldap/openldap-ldif-stack-underflow/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/openldap/openldap-ldif-stack-underflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "openldap-parse-whsp",
+    "sha": "1ac9e3806396111020548d743948a1673be14210",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3945073==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "O: Loaded 1 modules   (24 inline 8-bit counters): 24 [0x5630f465c4e0, 0x5630f465c4f8), \nINFO: Loaded 1 PC tables (24 PCs): 24 [0x5630f465c4f8,0x5630f465c678), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/openldap-parse-whsp/out-1ac9e3806396/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/openldap/openldap-parse-whsp/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/openldap/openldap-parse-whsp/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/openldap/openldap-parse-whsp/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "openscreen-jsoncpp-error-message-overflow",
+    "sha": "3c2205cd97838d3c4143107992967e23f0c958b8",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==3926412==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ""
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/openscreen/openscreen-jsoncpp-error-message-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "openscreen-jsoncpp-nonobject-oob",
+    "sha": "NOT_FOUND",
+    "conf": "none",
+    "status": "no-fix"
+  },
+  {
+    "bug": "openssl-des-ofb-cfb-overread",
+    "sha": "134342e194a23b1d3cc0687b05d97cfdd0f31c4a",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==4069591==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": " (9 inline 8-bit counters): 9 [0x558f87672e80, 0x558f87672e89), \nINFO: Loaded 1 PC tables (9 PCs): 9 [0x558f87672e90,0x558f87672f20), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/openssl-des-ofb-cfb-overread/out-134342e194a2/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/openssl/openssl-des-ofb-cfb-overread/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/openssl/openssl-des-ofb-cfb-overread/poc/poc.bin in 6 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/openssl/openssl-des-ofb-cfb-overread/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "ots-processgeneric-npd",
+    "sha": "36eea1dc724734e6acdd2b232bce8d691063414c",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "__libc_start_main csu/../csu/libc-start.c:392:3\n    #10 0x56532f1bba90 in _start (/data4/ze/FuzzingBrain-Bench/bugs/ots/ots-processgeneric-npd/binaries/release-asan/harness+0x5da90) (BuildId: b76a3adb82520f0093ff6bb2b9370a9c5f679d97)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/build-asan/../ots/src/ots.cc:781:16 in (anonymous namespace)::ProcessGeneric(ots::FontFile*, ots::Font*, unsigned int, ots::OTSStream*, unsigned char const*, unsigned long, std::vector<ots::TableEntry, std::allocator<ots::TableEntry> > const&, ots::Buffer&)\n==3975891==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "FO: Loaded 1 modules   (45 inline 8-bit counters): 45 [0x562b7f239360, 0x562b7f23938d), \nINFO: Loaded 1 PC tables (45 PCs): 45 [0x562b7f239390,0x562b7f239660), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/ots-processgeneric-npd/out-36eea1dc7247/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/ots/ots-processgeneric-npd/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/ots/ots-processgeneric-npd/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/ots/ots-processgeneric-npd/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "pdfbox-cmap-bfrange-aioob",
+    "sha": "488685a28cc637ae191335a6917c8b5626f9efa4",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "eption: Index -1 out of bounds for length 0\n\tat org.apache.fontbox.cmap.CMapParser.increment(CMapParser.java:813)\n\tat org.apache.fontbox.cmap.CMapParser.addMappingFrombfrange(CMapParser.java:466)\n\tat org.apache.fontbox.cmap.CMapParser.parseBeginbfrange(CMapParser.java:437)\n\tat org.apache.fontbox.cmap.CMapParser.parse(CMapParser.java:118)\n\tat CMapFuzzer.fuzzerTestOneInput(CMapFuzzer.java:9)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "2026-06-22T20:50:54.456475043Z main ERROR Log4j API could not find a logging provider.\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/pdfbox/pdfbox-cmap-bfrange-aioob/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "pdfbox-inlineimage-type-confusion",
+    "sha": "159ae247091fe217e5f6a1e174946b225b72adbb",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "java.lang.ClassCastException: class org.apache.pdfbox.cos.COSInteger cannot be cast to class org.apache.pdfbox.cos.COSArray (org.apache.pdfbox.cos.COSInteger and org.apache.pdfbox.cos.COSArray are in unnamed module of loader 'app')\n\tat org.apache.pdfbox.pdmodel.graphics.image.PDInlineImage.getDecode(PDInlineImage.java:281)\n\tat InlineImageFuzzer.fuzzerTestOneInput(InlineImageFuzzer.java:19)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "2026-06-22T20:51:28.337142687Z main ERROR Log4j API could not find a logging provider.\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/pdfbox/pdfbox-inlineimage-type-confusion/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "pdfbox-pfb-negative-array",
+    "sha": "205b190e79e776b1c686ad1084c3807cd89bb6aa",
+    "conf": "high",
+    "vuln": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "2026-06-22T20:52:06.040949092Z main ERROR Log4j API could not find a logging provider.\nException in thread \"main\" java.lang.NegativeArraySizeException: -16777215\n\tat org.apache.fontbox.pfb.PfbParser.parsePfb(PfbParser.java:162)\n\tat org.apache.fontbox.pfb.PfbParser.<init>(PfbParser.java:112)\n\tat PfbFuzzer.fuzzerTestOneInput(PfbFuzzer.java:7)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "fixed": {
+      "exit": 1,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "2026-06-22T20:52:06.243928966Z main ERROR Log4j API could not find a logging provider.\nException in thread \"main\" java.io.IOException: record size -16777215 is negative\n\tat org.apache.fontbox.pfb.PfbParser.parsePfb(PfbParser.java:159)\n\tat org.apache.fontbox.pfb.PfbParser.<init>(PfbParser.java:112)\n\tat PfbFuzzer.fuzzerTestOneInput(PfbFuzzer.java:7)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat PocRunner.main(PocRunner.java:24)\n"
+    },
+    "differential": false,
+    "status": "DIFF-FAIL"
+  },
+  {
+    "bug": "simdutf-utf16-utf8-overflow",
+    "sha": "c172256d39baf86364152610f3b50a1592f69d15",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==4028956==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "(50 inline 8-bit counters): 50 [0x5580b824a650, 0x5580b824a682), \nINFO: Loaded 1 PC tables (50 PCs): 50 [0x5580b824a688,0x5580b824a9a8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/simdutf-utf16-utf8-overflow/out-c172256d39ba/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/simdutf/simdutf-utf16-utf8-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/simdutf/simdutf-utf16-utf8-overflow/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/simdutf/simdutf-utf16-utf8-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "skia-raster8888-blur-oob",
+    "sha": "100292563cb53a2489841b389ec3aff111efaf87",
+    "conf": "high",
+    "status": "build-fail",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/skia-raster8888-blur-oob__100292563cb5__release-asan.log"
+  },
+  {
+    "bug": "spirv-orderblocks-segv",
+    "sha": "af15c1bd0e5ec2c3da9e6439bc262cd73c0d79f4",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "5bbb90 in _start (/data4/ze/FuzzingBrain-Bench/bugs/spirv-tools/spirv-orderblocks-segv/binaries/release-asan/harness+0x41b90) (BuildId: ce9bad0de75f352755397e8f649a12a61b82dfe6)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/SPIRV-Tools/source/disassemble.cpp:416:28 in spvtools::(anonymous namespace)::OrderBlocks(spvtools::(anonymous namespace)::ControlFlowGraph&, std::unordered_map<unsigned int, unsigned int, std::hash<unsigned int>, std::equal_to<unsigned int>, std::allocator<std::pair<unsigned int const, unsigned int> > > const&)\n==4031801==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "ules   (16 inline 8-bit counters): 16 [0x55e247ca59c0, 0x55e247ca59d0), \nINFO: Loaded 1 PC tables (16 PCs): 16 [0x55e247ca59d0,0x55e247ca5ad0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-orderblocks-segv/out-af15c1bd0e5e/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/spirv-tools/spirv-orderblocks-segv/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/spirv-tools/spirv-orderblocks-segv/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/spirv-tools/spirv-orderblocks-segv/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "spirv-tools-friendlynamemapper-overflow",
+    "sha": "39813baec458ada43263749757b15fbfbd6be107",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==4031819==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "40, 0x56413db7f198), \nINFO: Loaded 1 PC tables (88 PCs): 88 [0x56413db7f198,0x56413db7f718), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-tools-friendlynamemapper-overflow/out-39813baec458/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/spirv-tools/spirv-tools-friendlynamemapper-overflow/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/spirv-tools/spirv-tools-friendlynamemapper-overflow/poc/poc.bin in 1 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/spirv-tools/spirv-tools-friendlynamemapper-overflow/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "systemd-hwdb-trie-oob-read",
+    "sha": "73fea38cf1344e08213bb10bfc1e1a98382aee78",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "dId: f50da562fc4bf70304e4246a740d7796f720f5c9)\n    #9 0x7fcae2029d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n    #10 0x7fcae2029e3f in __libc_start_main csu/../csu/libc-start.c:392:3\n    #11 0x55f12d991a40 in _start (/data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-hwdb-trie-oob-read/binaries/release-asan/harness+0x27a40) (BuildId: f50da562fc4bf70304e4246a740d7796f720f5c9)\n\nAddressSanitizer can not provide additional info.\nSUMMARY: AddressSanitizer: SEGV /src/build-asan/../systemd/src/libsystemd/sd-hwdb/sd-hwdb.c:187:75 in trie_fnmatch_f\n==4093888==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "50e90, 0x55baad250eb1), \nINFO: Loaded 2 PC tables (126541 PCs): 126508 [0x7fd4b9853870,0x7fd4b9a41b30), 33 [0x55baad250eb8,0x55baad2510c8), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/systemd-hwdb-trie-oob-read/out-73fea38cf134/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-hwdb-trie-oob-read/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-hwdb-trie-oob-read/poc/poc.bin in 0 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/systemd/systemd-hwdb-trie-oob-read/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "systemd-pe-binary-dos",
+    "sha": "0c5cba64209db554077dfe12c5f1f3b1c547f666",
+    "conf": "high",
+    "vuln": {
+      "exit": 124,
+      "fault": true,
+      "killed": true,
+      "stderr_tail": "INFO: Running with entropic power schedule (0xFF, 100).\nINFO: Seed: 1262986171\nINFO: Loaded 2 modules   (126432 inline 8-bit counters): 126402 [0x7f64e6a30ea0, 0x7f64e6a4fc62), 30 [0x558c4b03fcb0, 0x558c4b03fcce), \nINFO: Loaded 2 PC tables (126432 PCs): 126402 [0x7f64e6a4fc68,0x7f64e6c3d888), 30 [0x558c4b03fcd0,0x558c4b03feb0), \n/data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-pe-binary-dos/binaries/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-pe-binary-dos/poc/poc.bin\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ", 30 [0x561cab84dcb0, 0x561cab84dcce), \nINFO: Loaded 2 PC tables (126470 PCs): 126440 [0x7fcad9850dc8,0x7fcad9a3ec48), 30 [0x561cab84dcd0,0x561cab84deb0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/systemd-pe-binary-dos/out-0c5cba64209d/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-pe-binary-dos/poc/poc.bin\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/systemd/systemd-pe-binary-dos/poc/poc.bin in 4 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/systemd/systemd-pe-binary-dos/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "upx-elf32-pack2-memleak",
+    "sha": "68936b6d27312d015c256bf273e830e27272d969",
+    "conf": "high",
+    "vuln": {
+      "exit": 77,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ain-Bench/bugs/upx/upx-elf32-pack2-memleak/binaries/release-asan/harness+0x219726) (BuildId: 404df78bcadf325ed3573f96d13da5af930dc549)\n    #22 0x55c9ac129562 in main (/data4/ze/FuzzingBrain-Bench/bugs/upx/upx-elf32-pack2-memleak/binaries/release-asan/harness+0x243562) (BuildId: 404df78bcadf325ed3573f96d13da5af930dc549)\n    #23 0x7f66cce29d8f in __libc_start_call_main csu/../sysdeps/nptl/libc_start_call_main.h:58:16\n\nSUMMARY: AddressSanitizer: 76 byte(s) leaked in 1 allocation(s).\n\nINFO: a leak has been found in the initial corpus.\n\nINFO: to ignore leaks on libFuzzer side use -detect_leaks=0.\n\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": "43c0), \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/upx-elf32-pack2-memleak/out-68936b6d2731/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/upx/upx-elf32-pack2-memleak/poc/poc.bin\nupx: /tmp/libfuzzer_pack.4089406: InternalError: unknown section SO_HEAD\n\nupx: /tmp/libfuzzer_pack.4089406: InternalError: unknown section SO_HEAD\n\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/upx/upx-elf32-pack2-memleak/poc/poc.bin in 125 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/upx/upx-elf32-pack2-memleak/binaries/fixed-asan/harness"
+  },
+  {
+    "bug": "upx-elf64-generate-overflow",
+    "sha": "ab98f61bbd784b9654118613996bc145a764a682",
+    "conf": "high",
+    "vuln": {
+      "exit": 66,
+      "fault": true,
+      "killed": false,
+      "stderr_tail": "ts 8 application bytes):\n  Addressable:           00\n  Partially addressable: 01 02 03 04 05 06 07 \n  Heap left redzone:       fa\n  Freed heap region:       fd\n  Stack left redzone:      f1\n  Stack mid redzone:       f2\n  Stack right redzone:     f3\n  Stack after return:      f5\n  Stack use after scope:   f8\n  Global redzone:          f9\n  Global init order:       f6\n  Poisoned by user:        f7\n  Container overflow:      fc\n  Array cookie:            ac\n  Intra object redzone:    bb\n  ASan internal:           fe\n  Left alloca redzone:     ca\n  Right alloca redzone:    cb\n==4092919==ABORTING\n"
+    },
+    "fixed": {
+      "exit": 0,
+      "fault": false,
+      "killed": false,
+      "stderr_tail": ", \n/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/upx-elf64-generate-overflow/out-ab98f61bbd78/release-asan/harness: Running 1 inputs 1 time(s) each.\nRunning: /data4/ze/FuzzingBrain-Bench/bugs/upx/upx-elf64-generate-overflow/poc/poc.bin\nupx: /tmp/libfuzzer_pack.4093131: CantPackException: bad sizes Phdr[8]\nupx: /tmp/libfuzzer_pack.4093131: CantPackException: bad sizes Phdr[8]\nExecuted /data4/ze/FuzzingBrain-Bench/bugs/upx/upx-elf64-generate-overflow/poc/poc.bin in 80 ms\n***\n*** NOTE: fuzzing was not performed, you have only\n***       executed the target code on a fixed set of inputs.\n***\n"
+    },
+    "differential": true,
+    "status": "PASS",
+    "stashed": "bugs/upx/upx-elf64-generate-overflow/binaries/fixed-asan/harness"
+  }
+]
