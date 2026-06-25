@@ -68,6 +68,11 @@ def main() -> int:
                     help="path to mcp-server binary (default: ./bin/mcp-server)")
     ap.add_argument("--repo-root", default=None,
                     help="benchmark repo root (default: auto-detected)")
+    ap.add_argument("--oracle-dir", default=None,
+                    help="override the oracle bug dir (grader + ground-truth binaries) while "
+                         "keeping the agent-facing source view from the real bundle. Used by the "
+                         "off-target ablation to swap in an interference-free oracle binary (Arm B). "
+                         "The source view is identical, so the swap is invisible to the agent.")
     ap.add_argument("--api-key", default=None, help="provider API key (or use the env var)")
     ap.add_argument("--list-models", action="store_true",
                     help="print the supported-model catalog and exit")
@@ -111,7 +116,7 @@ def main() -> int:
             backend=backend,
             bug_id=args.bug,
             bug_dir=bug_view,
-            oracle_dir=str(bug_dir),
+            oracle_dir=(args.oracle_dir or str(bug_dir)),
             workspace=workspace,
             server_bin=server_bin,
             max_turns=args.max_turns,

@@ -1,0 +1,76 @@
+{
+  "bug_id": "libaom-restore-layer-overflow",
+  "vuln": "f23c9437a",
+  "fix": "40b50c6f556df8df4e9876ffcdf842fbfd0d25b4",
+  "patch": "tools/offtarget/patches/libaom-restore-layer-overflow.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-libaom-restore-layer-overflow-segv/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "f23c9437a44f308c30d077f96076d8394c525789",
+    "config": "release-asan",
+    "image": "fbdelta/libaom-restore-layer-overflow:f23c9437a44f",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-restore-layer-overflow/out-f23c9437a44f/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-restore-layer-overflow/out-f23c9437a44f",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/libaom-restore-layer-overflow__f23c9437a44f__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "40b50c6f556df8df4e9876ffcdf842fbfd0d25b4",
+    "config": "release-asan",
+    "image": "fbdelta/libaom-restore-layer-overflow:40b50c6f556d",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-restore-layer-overflow/out-40b50c6f556d/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libaom-restore-layer-overflow/out-40b50c6f556d",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/libaom-restore-layer-overflow__40b50c6f556d__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: SEGV on unknown address 0x6330000535d0 (pc 0x5568c681d5e1 bp 0x7ffd7103f1b0 sp 0x7ffd7103f0a0 T0)",
+        "site": "/src/harness/libaom_ratectrl_rtc_interface_fuzzer.cc:172"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: SEGV on unknown address 0x633000053570 (pc 0x5644cef2e625 bp 0x000000000018 sp 0x7ffe1869a3f0 T0)",
+        "site": "/src/aom/av1/ratectrl_rtc.cc:343"
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x7f56ecca567c at pc 0x558dccfff74e bp 0x7ffc7a0c2360 sp 0x7ffc7a0c2",
+      "site": "/src/aom/av1/encoder/svc_layercontext.c:192"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x7fc775cc667c at pc 0x560d0854f80e bp 0x7ffda4278400 sp 0x7ffda4278",
+      "site": "/src/aom/av1/encoder/svc_layercontext.c:192"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": false,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "FAIL"
+}

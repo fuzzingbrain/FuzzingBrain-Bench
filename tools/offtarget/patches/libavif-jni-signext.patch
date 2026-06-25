@@ -1,0 +1,49 @@
+Off-target suppression for libavif-jni-signext.
+
+Off-target (offtarget-libavif-avifROStreamRead-segv): an 8-byte input "ftypisom"
+(66 74 79 70 69 73 6f 6d) is parsed by avifParse as one top-level box whose 32-bit
+size field is 0x66747970 (~1.6 GiB) and whose type "isom" is an unknown, skippable
+box. avifParse advances parseOffset by that ~1.6 GiB and reads the NEXT top-level
+box header at that offset. Because the JNI-signext harness set the IO size to
+(size_t)-1 == SIZE_MAX, the in-memory reader hands back a pointer (buffer + 1.6 GiB)
+far outside the real 8-byte allocation, and the next avifROStreamReadU32 ->
+avifROStreamRead memcpy dereferences that wild pointer:
+  SEGV  #0 avifROStreamRead  #1 avifROStreamReadU32 stream.c:128
+        #2 avifROStreamReadBoxHeaderPartial stream.c:254  #3 avifParse read.c:4839
+
+Mechanism (memcorruption-sourcefix): add a minimal bounds guard at the off-target
+frame (avifROStreamReadBoxHeaderPartial, stream.c) that rejects a TOP-LEVEL box
+whose declared size is implausibly large (> 1 GiB) for an in-memory parse, so the
+crafted header is refused (AVIF_FALSE -> avifParse returns BMFF_PARSE_FAILED)
+BEFORE the parse cursor jumps and the next header read goes wild. The bound is far
+above any realistic top-level box on the preset path: the documented
+heap-buffer-overflow PoC is a 16-byte 'ftyp' box (size == 16), so this guard never
+fires on it and the preset's stream.c:128 heap-buffer-overflow is untouched. The
+guard is scoped to topLevel boxes (the off-target frame); child-box parsing is
+unchanged.
+
+--- a/src/stream.c
++++ b/src/stream.c
+@@ -257,8 +257,22 @@ avifBool avifROStreamReadBoxHeaderPartial(avifROStream * stream, avifBoxHeader *
+     uint64_t size = smallSize;
+     if (size == 1) {
+         AVIF_CHECK(avifROStreamReadU64(stream, &size)); // unsigned int(64) largesize;
+     }
++
++    // [off-target suppression: offtarget-libavif-avifROStreamRead-segv]
++    // Reject a top-level box whose declared size is implausibly large for an
++    // in-memory parse. A crafted 8-byte "ftypisom" header makes size == 0x66747970
++    // (~1.6 GiB); avifParse would then advance the parse cursor ~1.6 GiB past the
++    // (SIZE_MAX-claimed) buffer and the next top-level header read would dereference
++    // a wild pointer -> SEGV in avifROStreamRead. Any realistic top-level box on the
++    // preset decode path is far below this bound (the documented heap-buffer-overflow
++    // PoC is a 16-byte 'ftyp' box), leaving the preset path and its stream.c:128
++    // crash untouched.
++    if (topLevel && (size > ((uint64_t)1 << 30))) {
++        avifDiagnosticsPrintf(stream->diag, "%s: Implausibly large top-level box size", stream->diagContext);
++        return AVIF_FALSE;
++    }
+
+     if (!memcmp(header->type, "uuid", 4)) {
+         AVIF_CHECK(avifROStreamRead(stream, header->usertype, 16)); // unsigned int(8) usertype[16] = extended_type;
+     } else {

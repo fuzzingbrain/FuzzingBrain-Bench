@@ -1,0 +1,64 @@
+{
+  "bug_id": "fwupd-logitech-oob-read",
+  "vuln": "logitech-bulkcontroller-oob-repro",
+  "fix": null,
+  "patch": "tools/offtarget/patches/fwupd-logitech-oob-read.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-fwupd-logitech-protocol-oom/poc/oom.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "6a9e389fa5e52478c5bf01ec0acee269fc321dd4",
+    "config": "release-asan",
+    "image": "fbdelta/fwupd-logitech-oob-read:6a9e389fa5e5",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/fwupd-logitech-oob-read/out-6a9e389fa5e5/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/fwupd-logitech-oob-read/out-6a9e389fa5e5",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/fwupd-logitech-oob-read__6a9e389fa5e5__release-asan.log"
+  },
+  "build_v2": {
+    "status": "no-fix-commit"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": 71,
+        "timeout": false,
+        "fault": true,
+        "msg": "",
+        "site": "/src/glib/.ossfuzz/../glib/gmem.c:171"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x625000004900 at pc 0x56216c9fe4e7 bp 0x7ffca1e3fdd0 sp 0x7ffca1e3f",
+      "site": "/src/glib/.ossfuzz/../glib/garray.c:501"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x625000004900 at pc 0x55c1aeed44e7 bp 0x7ffefa7011b0 sp 0x7ffefa700",
+      "site": "/src/glib/.ossfuzz/../glib/garray.c:501"
+    },
+    "new_v2_preset": null
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": null,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

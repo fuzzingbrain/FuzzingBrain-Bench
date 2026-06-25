@@ -1,0 +1,51 @@
+Off-target suppression for fwupd-logitech-oob-read
+==================================================
+
+Off-target (inventory bucket "oom-artifact", but a REAL uncontrolled-allocation
+defect): a ~12-byte input drives `fu_logitech_bulkcontroller_device_sync_wait_any`
+to append an attacker-controlled `payload_length` into a GByteArray at
+device.c:244. The off-target PoC (oom.bin = 12x 0x41) sets payload_length =
+0x41414141 (~1.04 GiB); glib's g_array_maybe_expand rounds that up to the next
+power of two (2 GiB), so g_realloc requests malloc(2147483648) and libFuzzer
+reports out-of-memory (exit 71) before any read happens.
+
+Mechanism: add a LOOSE sanity cap (256 MiB) on the attacker-controlled
+payload_length at the alloc site so this absurd ~1 GiB allocation is rejected
+instead of ballooning to 2 GiB. This is deliberately NOT the tight
+receive-buffer bound used by the preset fix (transfer_bufsz - header): the
+preset heap-buffer-overflow (preset poc.bin payload_length = 0x00100000 = 1 MiB,
+a 1 MiB read past the 8 KiB `buf` at this same site) is far below the 256 MiB
+cap, so the allocation succeeds and the OOB memcpy still faults at device.c:244.
+1 MiB (preset) < 256 MiB cap < 1.04 GiB (off-target) => off-target OOM removed,
+preset heap-buffer-overflow intact.
+
+--- a/plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
++++ b/plugins/logitech-bulkcontroller/fu-logitech-bulkcontroller-device.c
+@@ -241,9 +241,24 @@
+ 		return NULL;
+ 	response->cmd = fu_struct_logitech_bulkcontroller_send_sync_res_get_cmd(st);
+ 	response->sequence_id = fu_struct_logitech_bulkcontroller_send_sync_res_get_sequence_id(st);
+-	g_byte_array_append(response->data,
+-			    buf + st->buf->len,
+-			    fu_struct_logitech_bulkcontroller_send_sync_res_get_payload_length(st));
++	{
++		/* off-target suppression (FB-Bench ablation): reject an absurd
++		   attacker-controlled payload_length so glib does not balloon the
++		   GByteArray to a ~2 GiB allocation (libFuzzer out-of-memory). This is a
++		   loose 256 MiB sanity cap, far above any real sync payload and far below
++		   the off-target's ~1 GiB length -- it is NOT the tight receive-buffer
++		   bound of the preset fix, so the preset heap-buffer-overflow (a 1 MiB read
++		   past the 8 KiB buffer at this same site) is well under the cap and still
++		   faults. */
++		guint32 payload_length =
++		    fu_struct_logitech_bulkcontroller_send_sync_res_get_payload_length(st);
++		if (payload_length > (256u * 1024u * 1024u)) {
++			g_set_error_literal(error, FWUPD_ERROR, FWUPD_ERROR_READ,
++					    "sync payload length implausibly large");
++			return NULL;
++		}
++		g_byte_array_append(response->data, buf + st->buf->len, payload_length);
++	}
+ 	/* no payload for UninitBuffer, skip check */
+ 	if ((response->cmd != FU_LOGITECH_BULKCONTROLLER_CMD_UNINIT_BUFFER) &&
+ 	    (response->data->len == 0)) {

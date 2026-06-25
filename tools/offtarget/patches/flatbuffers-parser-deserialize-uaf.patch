@@ -1,0 +1,69 @@
+Off-target suppression for flatbuffers-parser-deserialize-uaf.
+
+The agent's off-target crash is a SEGV (real memory corruption, NOT sanitizer-
+suppressible) at flatbuffers::IsStruct(Type const&), include/flatbuffers/idl.h:534:
+`type.struct_def->fixed`. During StructDef::Deserialize -> InlineSize -> IsStruct,
+a bfbs schema buffer that PASSES reflection::VerifySchemaBuffer can carry a field
+typed BASE_TYPE_STRUCT whose `struct_def` cross-reference was never resolved.
+Root cause: Type::Deserialize (idl_parser.cpp) only assigns struct_def when the
+reflection type index is >= 0; a type whose base_type is Obj but index < 0 keeps
+base_type == BASE_TYPE_STRUCT with struct_def left null (default). IsStruct then
+dereferences the null pointer (ASan: SEGV on 0x110 = offsetof(StructDef, fixed)
+from a null base, "address points to the zero page").
+
+This is DISTINCT from the preset heap-use-after-free at idl.h:242 (~SymbolTable
+double-frees an EnumVal during Parser teardown). The preset fault triggers in the
+enum-registration loop of Parser::Deserialize (idl_parser.cpp:4469, delete
+enum_def on a duplicate name) which runs BEFORE the struct-deserialize loop
+(idl_parser.cpp:4481-4487). StructDef::Deserialize is never reached on the preset
+input, so the guards below cannot affect the preset (verified: P2 still faults).
+
+Mechanism (memcorruption-sourcefix): apply the upstream-suggested fix
+(google/flatbuffers#9144). (1) A defensive null guard at the IsStruct off-target
+frame so a BASE_TYPE_STRUCT type with an unresolved struct_def no longer
+dereferences null. (2) The real fix from the issue's "Suggested Fix" option 1:
+StructDef::Deserialize validates, before computing the fixed-struct layout, that
+each struct / array-of-struct field actually resolves to a struct_def, and rejects
+the malformed schema (parser.error_ + return false) otherwise -- required because
+a null struct_def also makes InlineSize return the wrong size and trip the
+FLATBUFFERS_ASSERT(tmp_struct_size == object->bytesize()) at idl_parser.cpp:4173.
+Both changes only alter behavior for an unresolved (null) struct_def; valid
+schemas are byte-for-byte identical. The preset ownership path is untouched.
+
+diff --git a/include/flatbuffers/idl.h b/include/flatbuffers/idl.h
+index 9e58d4b..763f142 100644
+--- a/include/flatbuffers/idl.h
++++ b/include/flatbuffers/idl.h
+@@ -531,7 +531,7 @@ inline bool IsString(const Type& type) {
+ }
+ 
+ inline bool IsStruct(const Type& type) {
+-  return type.base_type == BASE_TYPE_STRUCT && type.struct_def->fixed;
++  return type.base_type == BASE_TYPE_STRUCT && type.struct_def && type.struct_def->fixed;
+ }
+ 
+ inline bool IsIncompleteStruct(const Type& type) {
+diff --git a/src/idl_parser.cpp b/src/idl_parser.cpp
+index b1bdffa..d9e3fb3 100644
+--- a/src/idl_parser.cpp
++++ b/src/idl_parser.cpp
+@@ -4159,6 +4159,19 @@ bool StructDef::Deserialize(Parser& parser, const reflection::Object* object) {
+       has_key = true;
+     }
+     if (fixed) {
++      // Off-target guard (google/flatbuffers#9144): a bfbs schema can pass
++      // reflection::VerifySchemaBuffer yet carry a fixed-struct field whose
++      // struct_def cross-reference was never resolved (reflection type index
++      // < 0 -> struct_def stays null). InlineSize would then dereference a
++      // null struct_def (SEGV), and the recomputed layout would mismatch
++      // object->bytesize() (assert). Reject the malformed schema instead.
++      const auto &ftype = field_def->value.type;
++      if ((ftype.base_type == BASE_TYPE_STRUCT ||
++           (IsArray(ftype) && ftype.element == BASE_TYPE_STRUCT)) &&
++          ftype.struct_def == nullptr) {
++        parser.error_ = "unresolved struct_def in fixed struct field";
++        return false;
++      }
+       // Recompute padding since that's currently not serialized.
+       auto size = InlineSize(field_def->value.type);
+       auto next_field =

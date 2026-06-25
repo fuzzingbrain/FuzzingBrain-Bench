@@ -1,0 +1,54 @@
+Off-target suppression for spirv-orderblocks-segv.
+
+The agent's off-target is an abort/SIGABRT (libFuzzer "deadly signal"): a SPIR-V
+module that branches to a MISSING label. In OrderBlocks -> NestSuccessors -> Nest
+the lookup `id_to_index.at(id)` (source/disassemble.cpp) is called with a branch
+target id that has no corresponding OpLabel block. `unordered_map::at` throws
+std::out_of_range, which under -fno-exceptions (`-fsanitize=fuzzer,address`)
+calls std::terminate -> abort -> SIGABRT. The same unchecked `.at(id)` also
+appears in VisitSuccesor.
+
+assert/abort bucket: replace the throwing precondition with a graceful
+early-return. Both `.at(id)` lookups become `.find(id)` and skip the missing
+branch target (it gets no nesting / no DFS edge) instead of aborting. For
+well-formed modules every branch target is present, so behavior is unchanged.
+
+The preset bug is a DISTINCT SEGV: a wild write at OrderBlocks line 416
+(`cfg.blocks[0].nest_level = 0`) on an EMPTY CFG (OpFunctionEnd before any
+OpLabel -> blocks vector empty). That path runs BEFORE any Nest/VisitSuccesor
+call, so these guards leave the preset crash intact.
+
+diff --git a/source/disassemble.cpp b/source/disassemble.cpp
+index b85958e..8ef1541 100644
+--- a/source/disassemble.cpp
++++ b/source/disassemble.cpp
+@@ -311,7 +311,14 @@ void Nest(ControlFlowGraph& cfg,
+     return;
+   }
+ 
+-  const uint32_t block_index = id_to_index.at(id);
++  // Off-target guard: a branch target may reference a label that has no
++  // corresponding block (missing OpLabel).  `at` would throw out_of_range and,
++  // under -fno-exceptions, abort.  Skip such targets gracefully instead.
++  const auto it = id_to_index.find(id);
++  if (it == id_to_index.end()) {
++    return;
++  }
++  const uint32_t block_index = it->second;
+   SingleBlock& block = cfg.blocks[block_index];
+ 
+   if (!block.nest_level_assigned) {
+@@ -400,7 +407,12 @@ void VisitSuccesor(std::stack<StackEntry>* dfs_stack,
+                    const std::unordered_map<uint32_t, uint32_t>& id_to_index,
+                    uint32_t id) {
+   if (id != 0) {
+-    dfs_stack->push({id_to_index.at(id), false});
++    // Off-target guard: skip branch targets with no corresponding block instead
++    // of letting `at` throw (and abort under -fno-exceptions).
++    const auto it = id_to_index.find(id);
++    if (it != id_to_index.end()) {
++      dfs_stack->push({it->second, false});
++    }
+   }
+ }
+ 

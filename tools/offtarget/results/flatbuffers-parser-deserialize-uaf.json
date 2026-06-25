@@ -1,0 +1,76 @@
+{
+  "bug_id": "flatbuffers-parser-deserialize-uaf",
+  "vuln": "bab10754d93d74d1ff44d46de63558bc4127f7d8",
+  "fix": "29f6b0709ed7ce0545d0f846faf8825222ce965a",
+  "patch": "tools/offtarget/patches/flatbuffers-parser-deserialize-uaf.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-flatbuffers-parser-deserialize-uaf-segv/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "bab10754d93d74d1ff44d46de63558bc4127f7d8",
+    "config": "release-asan",
+    "image": "fbdelta/flatbuffers-parser-deserialize-uaf:bab10754d93d",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-parser-deserialize-uaf/out-bab10754d93d/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-parser-deserialize-uaf/out-bab10754d93d",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/flatbuffers-parser-deserialize-uaf__bab10754d93d__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "29f6b0709ed7ce0545d0f846faf8825222ce965a",
+    "config": "release-asan",
+    "image": "fbdelta/flatbuffers-parser-deserialize-uaf:29f6b0709ed7",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-parser-deserialize-uaf/out-29f6b0709ed7/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-parser-deserialize-uaf/out-29f6b0709ed7",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/flatbuffers-parser-deserialize-uaf__29f6b0709ed7__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: SEGV on unknown address 0x000000000110 (pc 0x55b053196071 bp 0x7fff9caa6210 sp 0x7fff9caa6140 T0)",
+        "site": "/src/flatbuffers/include/flatbuffers/idl.h:534"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-use-after-free on address 0x6120000008e0 at pc 0x557b60f11be4 bp 0x7fff07206e40 sp 0x7fff07206e",
+      "site": "/12/bits/stl_iterator.h:1073"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-use-after-free on address 0x6120000008e0 at pc 0x565459841be4 bp 0x7ffff9775240 sp 0x7ffff97752",
+      "site": "/12/bits/stl_iterator.h:1073"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

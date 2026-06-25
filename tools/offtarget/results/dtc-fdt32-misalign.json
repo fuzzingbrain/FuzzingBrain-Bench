@@ -1,0 +1,76 @@
+{
+  "bug_id": "dtc-fdt32-misalign",
+  "vuln": "a26ef6400bd845beb6e7f369809ca1c42d856904",
+  "fix": "8d15a63e84ff62fd31e8278088fa1176f2735eef",
+  "patch": "tools/offtarget/patches/dtc-fdt32-misalign.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-dtc-fdt32-misalign-ubsan/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "a26ef6400bd845beb6e7f369809ca1c42d856904",
+    "config": "release-asan",
+    "image": "fbdelta/dtc-fdt32-misalign:a26ef6400bd8",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/dtc-fdt32-misalign/out-a26ef6400bd8/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/dtc-fdt32-misalign/out-a26ef6400bd8",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/dtc-fdt32-misalign__a26ef6400bd8__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "8d15a63e84ff62fd31e8278088fa1176f2735eef",
+    "config": "release-asan",
+    "image": "fbdelta/dtc-fdt32-misalign:8d15a63e84ff",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/dtc-fdt32-misalign/out-8d15a63e84ff/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/dtc-fdt32-misalign/out-8d15a63e84ff",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/dtc-fdt32-misalign__8d15a63e84ff__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": 77,
+        "timeout": false,
+        "fault": true,
+        "msg": "runtime error: signed integer overflow: -2147483642 - 8 cannot be represented in type 'int'",
+        "site": "/src/libfdt/fdt.c:216"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": 77,
+      "timeout": false,
+      "fault": true,
+      "msg": "runtime error: load of misaligned address 0x562615eb0fe9 for type 'const fdt32_t' (aka 'const unsigned int'), which requ",
+      "site": "/src/libfdt/fdt.c:173"
+    },
+    "new_v1_preset": {
+      "exit": 77,
+      "timeout": false,
+      "fault": true,
+      "msg": "runtime error: load of misaligned address 0x55d34dfd6079 for type 'const fdt32_t' (aka 'const unsigned int'), which requ",
+      "site": "/src/libfdt/fdt.c:174"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

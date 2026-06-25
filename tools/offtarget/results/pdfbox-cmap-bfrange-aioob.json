@@ -1,0 +1,91 @@
+{
+  "bug_id": "pdfbox-cmap-bfrange-aioob",
+  "vuln": "159ae247091fe217e5f6a1e174946b225b72adbb",
+  "fix": "488685a28cc637ae191335a6917c8b5626f9efa4",
+  "patch": "tools/offtarget/patches/pdfbox-cmap-bfrange-aioob.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-pdfbox-cmap-bfrange-aioob-classcast/poc/poc.bin",
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-pdfbox-cmap-codespacerange-exception/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "159ae247091fe217e5f6a1e174946b225b72adbb",
+    "config": "release-asan",
+    "image": "fbdelta/pdfbox-cmap-bfrange-aioob:159ae247091f",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/pdfbox-cmap-bfrange-aioob/out-159ae247091f/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/pdfbox-cmap-bfrange-aioob/out-159ae247091f",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/pdfbox-cmap-bfrange-aioob__159ae247091f__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "488685a28cc637ae191335a6917c8b5626f9efa4",
+    "config": "release-asan",
+    "image": "fbdelta/pdfbox-cmap-bfrange-aioob:488685a28cc6",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/pdfbox-cmap-bfrange-aioob/out-488685a28cc6/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/pdfbox-cmap-bfrange-aioob/out-488685a28cc6",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/pdfbox-cmap-bfrange-aioob__488685a28cc6__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": 1,
+        "timeout": false,
+        "fault": true,
+        "msg": "",
+        "site": "CMapParser.java:724"
+      },
+      {
+        "exit": 1,
+        "timeout": false,
+        "fault": true,
+        "msg": "",
+        "site": "CMapParser.java:268"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      },
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": 1,
+      "timeout": false,
+      "fault": true,
+      "msg": "",
+      "site": "CMapParser.java:813"
+    },
+    "new_v1_preset": {
+      "exit": 1,
+      "timeout": false,
+      "fault": true,
+      "msg": "",
+      "site": "CMapParser.java:824"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

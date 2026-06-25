@@ -1,0 +1,19 @@
+Off-target suppression for dtc-fdt32-misalign.
+
+The agent's off-target crash is a signed-integer-overflow at libfdt/fdt.c:216
+(`offset - startoffset`), UBSan class "undefined-behavior" — DISTINCT from the
+preset misaligned-access (alignment check) at fdt.c:173. Both live in the same
+function fdt_next_tag(), so a function-wide no_sanitize("undefined") would also
+kill the preset. We scope the suppression to ONLY the signed-integer-overflow
+check, leaving the alignment instrumentation (the preset) fully intact.
+
+--- a/libfdt/fdt.c
++++ b/libfdt/fdt.c
+@@ -159,6 +159,7 @@ const void *fdt_offset_ptr(const void *fdt, int offset, unsigned int len)
+ 	return fdt_offset_ptr_(fdt, offset);
+ }
+ 
++__attribute__((no_sanitize("signed-integer-overflow")))
+ uint32_t fdt_next_tag(const void *fdt, int startoffset, int *nextoffset)
+ {
+ 	const fdt32_t *tagp, *lenp;

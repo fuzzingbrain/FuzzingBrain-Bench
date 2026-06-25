@@ -4,3 +4,9 @@ bugs/**/binaries/**/*.class filter=lfs diff=lfs merge=lfs -text
 bugs/**/binaries/**/*.so filter=lfs diff=lfs merge=lfs -text
 bugs/**/binaries/**/*.so.* filter=lfs diff=lfs merge=lfs -text
 bugs/**/binaries/**/*.bin filter=lfs diff=lfs merge=lfs -text
+bugs-armB/**/binaries/**/harness filter=lfs diff=lfs merge=lfs -text
+bugs-armB/**/binaries/**/*.jar filter=lfs diff=lfs merge=lfs -text
+bugs-armB/**/binaries/**/*.class filter=lfs diff=lfs merge=lfs -text
+bugs-armB/**/binaries/**/*.so filter=lfs diff=lfs merge=lfs -text
+bugs-armB/**/binaries/**/*.so.* filter=lfs diff=lfs merge=lfs -text
+bugs-armB/**/binaries/**/*.bin filter=lfs diff=lfs merge=lfs -text

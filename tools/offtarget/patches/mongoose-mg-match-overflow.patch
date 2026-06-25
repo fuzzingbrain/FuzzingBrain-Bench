@@ -1,0 +1,49 @@
+Off-target suppression — mongoose-mg-match-overflow
+====================================================
+
+Bucket: stack-exhaustion (catalogued) — actual mechanism per the off-target
+report is an unbounded stack-buffer-overflow WRITE, not deep recursion.
+
+Off-target (to suppress): stack-buffer-overflow WRITE in mg_match. The function
+advances the output cursor with `caps++` once per finalized capture but never
+bounds it to the caller's array capacity. mg_match has no capacity parameter and
+the harness passes a fixed `struct mg_str caps[10]`; a pattern with more wildcard
+captures than 10 (e.g. the off-target PoCs `*a*a*a...`, `#x##x#...`) writes the
+"init next cap" stores past caps[9], corrupting the stack.
+
+Preset (must stay intact): heap-buffer-overflow READ of `s.buf[j]` at
+mongoose.c:11175 when j == s.len. This is driven purely by the match cursor
+(i, j, ni, nj) and is independent of the caps output cursor.
+
+Fix: introduce a one-past-end sentinel `caps_end = caps + 10` (the caller's
+declared capacity) and gate the two `caps++` advance-and-init sites on
+`caps + 1 < caps_end`. The match control flow is unchanged, so for any input
+producing <= 10 captures (including the preset PoC) behavior is byte-identical
+and the preset OOB READ still fires; only the off-target's overflow WRITE past
+the array is dropped (excess captures truncated, as the report recommends).
+The decrementing `caps--` restart stays in-window and is left untouched.
+
+--- a/mongoose.c
++++ b/mongoose.c
+@@ -11156,14 +11156,19 @@ bool mg_match(struct mg_str s, struct mg_str p, struct mg_str *caps) {
+ bool mg_match(struct mg_str s, struct mg_str p, struct mg_str *caps) {
+   size_t i = 0, j = 0, ni = 0, nj = 0;
++  /* FB-Bench off-target suppression: bound capture writes to the caller's
++   * caps[] capacity (mg_match takes no capacity arg; the harness declares
++   * caps[10]).  Prevents the unbounded caps++ stack-buffer-overflow WRITE
++   * without altering match control flow or the preset heap-overflow READ. */
++  struct mg_str *caps_end = caps ? caps + 10 : NULL;
+   if (caps) caps->buf = NULL, caps->len = 0;
+   while (i < p.len || j < s.len) {
+     if (i < p.len && j < s.len &&
+         (p.buf[i] == '?' ||
+          (p.buf[i] != '*' && p.buf[i] != '#' && s.buf[j] == p.buf[i]))) {
+       if (caps == NULL) {
+       } else if (p.buf[i] == '?') {
+         caps->buf = &s.buf[j], caps->len = 1;     // Finalize `?` cap
+-        caps++, caps->buf = NULL, caps->len = 0;  // Init next cap
++        if (caps + 1 < caps_end) { caps++, caps->buf = NULL, caps->len = 0; }  // Init next cap (bounded)
+       } else if (caps->buf != NULL && caps->len == 0) {
+         caps->len = (size_t) (&s.buf[j] - caps->buf);  // Finalize current cap
+-        caps++, caps->len = 0, caps->buf = NULL;       // Init next cap
++        if (caps + 1 < caps_end) { caps++, caps->len = 0, caps->buf = NULL; }  // Init next cap (bounded)
