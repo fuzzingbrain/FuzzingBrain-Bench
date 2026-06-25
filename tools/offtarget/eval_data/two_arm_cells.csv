@@ -39,11 +39,11 @@ netsnmp-smux-rreq-uaf,1,1,1,80,66,5,5
 netsnmp-smux-rreq-uaf,2,1,0,31,82,5,0
 netsnmp-smux-rreq-uaf,3,0,0,85,90,0,0
 netsnmp-smux-rreq-uaf,4,1,0,59,88,5,0
-pdfbox-cmap-bfrange-aioob,0,1,0,11,9,5,4
-pdfbox-cmap-bfrange-aioob,1,1,0,9,10,5,4
-pdfbox-cmap-bfrange-aioob,2,1,0,14,10,5,4
-pdfbox-cmap-bfrange-aioob,3,1,0,13,13,5,4
-pdfbox-cmap-bfrange-aioob,4,1,0,18,8,5,4
+pdfbox-cmap-bfrange-aioob,0,1,1,11,11,5,5
+pdfbox-cmap-bfrange-aioob,1,1,1,9,9,5,5
+pdfbox-cmap-bfrange-aioob,2,1,1,14,8,5,5
+pdfbox-cmap-bfrange-aioob,3,1,1,13,17,5,5
+pdfbox-cmap-bfrange-aioob,4,1,1,18,15,5,5
 spirv-orderblocks-segv,0,0,0,111,105,0,1
 spirv-orderblocks-segv,1,0,1,113,50,0,5
 spirv-orderblocks-segv,2,1,1,68,107,5,5
