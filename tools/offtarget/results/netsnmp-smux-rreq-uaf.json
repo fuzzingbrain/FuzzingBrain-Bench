@@ -1,0 +1,76 @@
+{
+  "bug_id": "netsnmp-smux-rreq-uaf",
+  "vuln": "1852fec16",
+  "fix": "f77a116425433316d67ada69afc1aaf81868ddac",
+  "patch": "tools/offtarget/patches/netsnmp-smux-rreq-uaf.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-netsnmp-smux-rreq-uaf-heap-buffer-overflow/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "1852fec16b3df14ea2a7b600d6177a764ffd6417",
+    "config": "release-asan",
+    "image": "fbdelta/netsnmp-smux-rreq-uaf:1852fec16b3d",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/netsnmp-smux-rreq-uaf/out-1852fec16b3d/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/netsnmp-smux-rreq-uaf/out-1852fec16b3d",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/netsnmp-smux-rreq-uaf__1852fec16b3d__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "f77a116425433316d67ada69afc1aaf81868ddac",
+    "config": "release-asan",
+    "image": "fbdelta/netsnmp-smux-rreq-uaf:f77a11642543",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/netsnmp-smux-rreq-uaf/out-f77a11642543/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/netsnmp-smux-rreq-uaf/out-f77a11642543",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/netsnmp-smux-rreq-uaf__f77a11642543__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x607000003a98 at pc 0x5577b3f2b640 bp 0x7ffe059def40 sp 0x7ffe059de",
+        "site": "/src/build-asan/agent/agent_trap.c:570"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-use-after-free on address 0x607000003c20 at pc 0x562ddbe155c0 bp 0x7ffddacff9d0 sp 0x7ffddacff9",
+      "site": "/src/build-asan/agent/agent_handler.c:350"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-use-after-free on address 0x607000003c20 at pc 0x55ec105ae5c0 bp 0x7ffd1f011250 sp 0x7ffd1f0112",
+      "site": "/src/build-asan/agent/agent_handler.c:350"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

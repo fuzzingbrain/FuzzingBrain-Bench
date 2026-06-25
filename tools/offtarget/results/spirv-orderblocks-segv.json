@@ -1,0 +1,76 @@
+{
+  "bug_id": "spirv-orderblocks-segv",
+  "vuln": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+  "fix": "af15c1bd0e5ec2c3da9e6439bc262cd73c0d79f4",
+  "patch": "tools/offtarget/patches/spirv-orderblocks-segv.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-spirv-orderblocks-abort/poc/poc.spv"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+    "config": "release-asan",
+    "image": "fbdelta/spirv-orderblocks-segv:ff5c50339cc1",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-orderblocks-segv/out-ff5c50339cc1/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-orderblocks-segv/out-ff5c50339cc1",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/spirv-orderblocks-segv__ff5c50339cc1__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "af15c1bd0e5ec2c3da9e6439bc262cd73c0d79f4",
+    "config": "release-asan",
+    "image": "fbdelta/spirv-orderblocks-segv:af15c1bd0e5e",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-orderblocks-segv/out-af15c1bd0e5e/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-orderblocks-segv/out-af15c1bd0e5e",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/spirv-orderblocks-segv__af15c1bd0e5e__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: ABRT on unknown address 0x03e9002e9279 (pc 0x7f137b6969fc bp 0x0000002e9279 sp 0x7fff4c947720 T0)",
+        "site": "nptl/./nptl/pthread_kill.c:44"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: SEGV on unknown address 0x000000000050 (pc 0x55571befdc96 bp 0x7ffc80e1d880 sp 0x7ffc80e1d340 T0)",
+      "site": "/src/SPIRV-Tools/source/disassemble.cpp:416"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: SEGV on unknown address 0x000000000050 (pc 0x55bffe8edcee bp 0x7fff17733840 sp 0x7fff177331a0 T0)",
+      "site": "/src/SPIRV-Tools/source/disassemble.cpp:428"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

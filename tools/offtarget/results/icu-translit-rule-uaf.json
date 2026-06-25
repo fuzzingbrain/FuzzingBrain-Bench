@@ -1,0 +1,64 @@
+{
+  "bug_id": "icu-translit-rule-uaf",
+  "vuln": "8be6575f5c4ea397d384493a435b2932d5c2eaca",
+  "fix": null,
+  "patch": "tools/offtarget/patches/icu-translit-rule-uaf.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-icu-rulehalf-parse-leak/poc/poc.bin"
+  ],
+  "leak_env": true,
+  "build_v1": {
+    "status": "built",
+    "sha": "8be6575f5c4ea397d384493a435b2932d5c2eaca",
+    "config": "release-asan",
+    "image": "fbdelta/icu-translit-rule-uaf:8be6575f5c4e",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/icu-translit-rule-uaf/out-8be6575f5c4e/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/icu-translit-rule-uaf/out-8be6575f5c4e",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/icu-translit-rule-uaf__8be6575f5c4e__release-asan.log"
+  },
+  "build_v2": {
+    "status": "no-fix-commit"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": 77,
+        "timeout": false,
+        "fault": true,
+        "msg": ": LeakSanitizer: detected memory leaks",
+        "site": "/src/icu-asan/icu4c/source/common/cmemory.cpp:58"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": 77,
+      "timeout": false,
+      "fault": true,
+      "msg": ": LeakSanitizer: detected memory leaks",
+      "site": "/src/icu-asan/icu4c/source/common/cmemory.cpp:58"
+    },
+    "new_v1_preset": {
+      "exit": 77,
+      "timeout": false,
+      "fault": true,
+      "msg": ": LeakSanitizer: detected memory leaks",
+      "site": "/src/icu-asan/icu4c/source/common/cmemory.cpp:75"
+    },
+    "new_v2_preset": null
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": null,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

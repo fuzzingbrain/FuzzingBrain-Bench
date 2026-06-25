@@ -1,0 +1,421 @@
+[
+  {
+    "entry": "offtarget-avro-array_items",
+    "bug_id": "avro",
+    "project": "avro (C)",
+    "preset_class": null,
+    "ot_class": "undefined-behavior / member access within null pointer (UndefinedBehaviorSanitizer)",
+    "ot_frame": "lang/c/src/schema.c:462 avro_schema_array_items (via avro_generic_map_class)",
+    "sanitizer": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "vuln_commit": "f7dfbc0d37608a896ffcc8734a8d64376c463039",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "suppressable-ubsan",
+    "poc_files": [
+      "offtarget-avro-array_items/poc/array_items_schema.c462.bin"
+    ],
+    "bundle": "avro/avro-neg-string-len",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-avro-generic_value_new",
+    "bug_id": "avro",
+    "project": "avro (C)",
+    "preset_class": null,
+    "ot_class": "undefined-behavior / member access within null pointer (UndefinedBehaviorSanitizer)",
+    "ot_frame": "lang/c/src/generic.c:58 avro_generic_value_new",
+    "sanitizer": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "vuln_commit": "f7dfbc0d37608a896ffcc8734a8d64376c463039",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "suppressable-ubsan",
+    "poc_files": [
+      "offtarget-avro-generic_value_new/poc/generic_value_new_generic.c58.bin"
+    ],
+    "bundle": "avro/avro-neg-string-len",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-avro-schema_name",
+    "bug_id": "avro",
+    "project": "avro (C)",
+    "preset_class": null,
+    "ot_class": "undefined-behavior / member access within null pointer (UndefinedBehaviorSanitizer)",
+    "ot_frame": "lang/c/src/schema.c:1529 (record) & :1531 (enum) avro_schema_name (via save_named_schemas)",
+    "sanitizer": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "vuln_commit": "f7dfbc0d37608a896ffcc8734a8d64376c463039",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "suppressable-ubsan",
+    "poc_files": [
+      "offtarget-avro-schema_name/poc/schema_name_enum_schema.c1531.bin",
+      "offtarget-avro-schema_name/poc/schema_name_schema.c1529.bin"
+    ],
+    "bundle": "avro/avro-neg-string-len",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-dtc-fdt32-misalign-ubsan",
+    "bug_id": "dtc-fdt32-misalign",
+    "project": "dtc",
+    "preset_class": "misaligned-access",
+    "ot_class": "undefined-behavior",
+    "ot_frame": "fdt_next_tag @ /libfdt/fdt.c:216:47",
+    "sanitizer": "ubsan",
+    "vuln_commit": "a26ef6400bd845beb6e7f369809ca1c42d856904",
+    "reproduces_on_HEAD": true,
+    "schema": "repro.yaml",
+    "bucket": "suppressable-ubsan",
+    "poc_files": [
+      "offtarget-dtc-fdt32-misalign-ubsan/poc/poc.bin"
+    ],
+    "bundle": "dtc/dtc-fdt32-misalign",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-flatbuffers-flexbuffers-tostring-overflow-stack-overflow",
+    "bug_id": "flatbuffers-flexbuffers-tostring-overflow",
+    "project": "flatbuffers",
+    "preset_class": "heap-buffer-overflow",
+    "ot_class": "stack-overflow",
+    "ot_frame": "flexbuffers::Reference::ToString(bool, bool, std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >&, boo",
+    "sanitizer": "asan",
+    "vuln_commit": "bab10754d93d74d1ff44d46de63558bc4127f7d8",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "stack-exhaustion",
+    "poc_files": [
+      "offtarget-flatbuffers-flexbuffers-tostring-overflow-stack-overflow/poc/poc.bin"
+    ],
+    "bundle": "flatbuffers/flatbuffers-flexbuffers-tostring-overflow",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-flatbuffers-parser-deserialize-uaf-segv",
+    "bug_id": "flatbuffers-parser-deserialize-uaf",
+    "project": "flatbuffers",
+    "preset_class": "heap-use-after-free",
+    "ot_class": "segv",
+    "ot_frame": "flatbuffers::IsStruct(flatbuffers::Type const&) @ /src/flatbuffers/include/flatbuffers/idl.h:534:65",
+    "sanitizer": "asan",
+    "vuln_commit": "bab10754d93d74d1ff44d46de63558bc4127f7d8",
+    "reproduces_on_HEAD": true,
+    "schema": "repro.yaml",
+    "bucket": "memcorruption-sourcefix",
+    "poc_files": [
+      "offtarget-flatbuffers-parser-deserialize-uaf-segv/poc/poc.bin"
+    ],
+    "bundle": "flatbuffers/flatbuffers-parser-deserialize-uaf",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-fwupd-logitech-protocol-oom",
+    "bug_id": "fwupd-logitech-oob-read",
+    "project": "fwupd (C)",
+    "preset_class": null,
+    "ot_class": "out-of-memory (libFuzzer rss_limit; NOT a sanitizer memory-safety report)",
+    "ot_frame": "n/a (libFuzzer OOM, no faulting frame)",
+    "sanitizer": "-fsanitize=fuzzer,address  (libFuzzer rss_limit)",
+    "vuln_commit": "logitech-bulkcontroller-oob-repro",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "vuln.yaml",
+    "bucket": "oom-artifact",
+    "poc_files": [
+      "offtarget-fwupd-logitech-protocol-oom/poc/oom.bin"
+    ],
+    "bundle": "fwupd/fwupd-logitech-oob-read",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-graaljs-escapeForJS-oom",
+    "bug_id": "graaljs",
+    "project": "graaljs",
+    "preset_class": null,
+    "ot_class": "java.lang.OutOfMemoryError: Java heap space (Jazzer/JVM, -Xmx2048m)",
+    "ot_frame": "IntlFuzzer.java:33 escapeForJS  (HARNESS code, not graaljs)",
+    "sanitizer": "N/A \u2014 Java/Jazzer (JVM); -Xmx2048m heap cap",
+    "vuln_commit": "24.1.1 / pom 24.1.2",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "oom-artifact",
+    "poc_files": [
+      "offtarget-graaljs-escapeForJS-oom/poc/GENERATE_poc.sh"
+    ],
+    "bundle": "graaljs/graaljs-illformed-locale",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-harfbuzz-hb_calloc-leak",
+    "bug_id": "harfbuzz",
+    "project": "harfbuzz",
+    "preset_class": null,
+    "ot_class": "memory-leak (LeakSanitizer)",
+    "ot_frame": "src/hb-common.cc:1214 hb_calloc ; src/rust/.../mod.rs:3709 (fontations alloc \u2014 same 48B leak, different top frame)",
+    "sanitizer": "-fsanitize=fuzzer,address  (LeakSanitizer enabled at exit)",
+    "vuln_commit": "edc8c18ef88262fc467a30ab74f05080d6aea6cf",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "suppressable-leak",
+    "poc_files": [
+      "offtarget-harfbuzz-hb_calloc-leak/poc/poc.bin",
+      "offtarget-harfbuzz-hb_calloc-leak/poc/modrs_fontations_mod.rs3709.ttf"
+    ],
+    "bundle": "harfbuzz/harfbuzz-fontations-oob-write",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-icu-rulehalf-parse-leak",
+    "bug_id": "icu",
+    "project": "icu (icu4c)",
+    "preset_class": null,
+    "ot_class": "memory-leak (LeakSanitizer)",
+    "ot_frame": "icu4c/source/i18n/rbt_pars.cpp:383 RuleHalf::parse (alloc at common/cmemory.cpp:58 uprv_malloc)",
+    "sanitizer": "-fsanitize=fuzzer,address  (LeakSanitizer enabled at exit)",
+    "vuln_commit": "8be6575f5c4ea397d384493a435b2932d5c2eaca",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "suppressable-leak",
+    "poc_files": [
+      "offtarget-icu-rulehalf-parse-leak/poc/poc.bin"
+    ],
+    "bundle": "icu/icu-translit-rule-uaf",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-jq-dump-op-npd-oom",
+    "bug_id": "jq-dump-op-npd",
+    "project": "jq",
+    "preset_class": "segv",
+    "ot_class": "oom",
+    "ot_frame": "jv_mem_alloc @ /src/jq-asan/src/jv_alloc.c:142:13",
+    "sanitizer": "asan",
+    "vuln_commit": "d44baeb67ac21b3ff23ede8d103c21c8830ea8dd",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "oom-artifact",
+    "poc_files": [
+      "offtarget-jq-dump-op-npd-oom/poc/poc.bin"
+    ],
+    "bundle": "jq/jq-dump-op-npd",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-libaom-restore-layer-overflow-segv",
+    "bug_id": "libaom-restore-layer-overflow",
+    "project": "libaom",
+    "preset_class": "heap-buffer-overflow",
+    "ot_class": "segv",
+    "ot_frame": "LLVMFuzzerTestOneInput @ /src/harness/libaom_ratectrl_rtc_interface_fuzzer.cc:172:49",
+    "sanitizer": "asan",
+    "vuln_commit": "f23c9437a",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "memcorruption-sourcefix",
+    "poc_files": [
+      "offtarget-libaom-restore-layer-overflow-segv/poc/poc.bin"
+    ],
+    "bundle": "libaom/libaom-restore-layer-overflow",
+    "bundle_exists": true,
+    "verdict": "inseparable-same-defect",
+    "rebuild": false
+  },
+  {
+    "entry": "offtarget-libavif-avifROStreamRead-segv",
+    "bug_id": "libavif",
+    "project": "libavif (C++)",
+    "preset_class": null,
+    "ot_class": "SEGV / wild-or-null pointer read (AddressSanitizer)",
+    "ot_frame": "src/stream.c avifROStreamRead",
+    "sanitizer": "-fsanitize=fuzzer,address  (ASan)",
+    "vuln_commit": "b357f083ea5ae0ee7b09a65a48621f345e710588",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "vuln.yaml",
+    "bucket": "memcorruption-sourcefix",
+    "poc_files": [
+      "offtarget-libavif-avifROStreamRead-segv/poc/segv_avifROStreamRead.bin"
+    ],
+    "bundle": "libavif/libavif-jni-signext",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-mongoose-mg_match-stack-overflow",
+    "bug_id": "mongoose-mg-match-overflow",
+    "project": "mongoose",
+    "preset_class": null,
+    "ot_class": "stack-buffer-overflow (AddressSanitizer)",
+    "ot_frame": "src/str.c  mg_match  (amalgam mongoose.c:11169)",
+    "sanitizer": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined",
+    "vuln_commit": "b313d697ff8c2156e85d411d7b3c226e4a0fefa9",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "stack-exhaustion",
+    "poc_files": [
+      "offtarget-mongoose-mg_match-stack-overflow/poc/poc_haiku_hash.bin",
+      "offtarget-mongoose-mg_match-stack-overflow/poc/poc_gpt55_star.bin"
+    ],
+    "bundle": "mongoose/mongoose-mg-match-overflow",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-ndpi-hex-decode-sscanf-oom",
+    "bug_id": "ndpi-hex-decode-sscanf",
+    "project": "ndpi",
+    "preset_class": "segv",
+    "ot_class": "oom",
+    "ot_frame": "?",
+    "sanitizer": "asan",
+    "vuln_commit": "68c7159a72dee1c42988eed65c7bfa08c510002e",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "oom-artifact",
+    "poc_files": [
+      "offtarget-ndpi-hex-decode-sscanf-oom/poc/make_poc.py"
+    ],
+    "bundle": "ndpi/ndpi-hex-decode-sscanf",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-netsnmp-smux-rreq-uaf-heap-buffer-overflow",
+    "bug_id": "netsnmp-smux-rreq-uaf",
+    "project": "net-snmp",
+    "preset_class": "heap-use-after-free",
+    "ot_class": "heap-buffer-overflow",
+    "ot_frame": "convert_v2pdu_to_v1 @ /src/build-asan/agent/agent_trap.c:570:13",
+    "sanitizer": "asan",
+    "vuln_commit": "1852fec16",
+    "reproduces_on_HEAD": true,
+    "schema": "repro.yaml",
+    "bucket": "memcorruption-sourcefix",
+    "poc_files": [
+      "offtarget-netsnmp-smux-rreq-uaf-heap-buffer-overflow/poc/poc.bin"
+    ],
+    "bundle": "net-snmp/netsnmp-smux-rreq-uaf",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-pdfbox-cmap-bfrange-aioob-classcast",
+    "bug_id": "pdfbox-cmap-bfrange-aioob",
+    "project": "pdfbox",
+    "preset_class": "oob-read",
+    "ot_class": "IOException",
+    "ot_frame": "org.apache.fontbox.cmap.CMapParser.readDictionary(CMapParser.java:724)",
+    "sanitizer": "jazzer",
+    "vuln_commit": "159ae247091fe217e5f6a1e174946b225b72adbb",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "java-exception",
+    "poc_files": [
+      "offtarget-pdfbox-cmap-bfrange-aioob-classcast/poc/poc.bin"
+    ],
+    "bundle": "pdfbox/pdfbox-cmap-bfrange-aioob",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-pdfbox-cmap-codespacerange-exception",
+    "bug_id": "pdfbox",
+    "project": "pdfbox (fontbox)",
+    "preset_class": null,
+    "ot_class": "uncaught java.lang.IllegalArgumentException (wrapped IOException) \u2014 Jazzer/JVM",
+    "ot_frame": "org/apache/fontbox/cmap/CMapParser.java:268 parseBegincodespacerange (CodespaceRange.java:50)",
+    "sanitizer": "N/A \u2014 Java/Jazzer (JVM); no native sanitizer",
+    "vuln_commit": "159ae247091fe217e5f6a1e174946b225b72adbb",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "java-exception",
+    "poc_files": [
+      "offtarget-pdfbox-cmap-codespacerange-exception/poc/poc.bin"
+    ],
+    "bundle": "pdfbox/pdfbox-cmap-bfrange-aioob",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-spirv-orderblocks-abort",
+    "bug_id": "spirv",
+    "project": "spirv-tools",
+    "preset_class": null,
+    "ot_class": "abort / SIGABRT (libFuzzer deadly signal)",
+    "ot_frame": "source/disassemble.cpp:453 OrderBlocks (via spvBinaryToText / EmitCFG)",
+    "sanitizer": "-fsanitize=fuzzer,address",
+    "vuln_commit": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "assert-abort",
+    "poc_files": [
+      "offtarget-spirv-orderblocks-abort/poc/poc.spv"
+    ],
+    "bundle": "spirv-tools/spirv-orderblocks-segv",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-spirv-tools-friendlynamemapper-overflow-oom",
+    "bug_id": "spirv-tools-friendlynamemapper-overflow",
+    "project": "spirv-tools",
+    "preset_class": "heap-buffer-overflow",
+    "ot_class": "oom",
+    "ot_frame": "void std::__cxx11::basic_string<char, std::char_traits<char>, std::allocator<char> >::_M_construct<char*>(char*, char*, std::forwa",
+    "sanitizer": "asan",
+    "vuln_commit": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+    "reproduces_on_HEAD": true,
+    "schema": "repro.yaml",
+    "bucket": "oom-artifact",
+    "poc_files": [
+      "offtarget-spirv-tools-friendlynamemapper-overflow-oom/poc/poc.bin"
+    ],
+    "bundle": "spirv-tools/spirv-tools-friendlynamemapper-overflow",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-systemd-pe-binary-dos-oom",
+    "bug_id": "systemd-pe-binary-dos",
+    "project": "systemd",
+    "preset_class": "timeout",
+    "ot_class": "oom",
+    "ot_frame": "?",
+    "sanitizer": "libfuzzer",
+    "vuln_commit": "97a0ec135b1a3330abe8c34794c6e31b266452fc",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "oom-artifact",
+    "poc_files": [
+      "offtarget-systemd-pe-binary-dos-oom/poc/poc.bin"
+    ],
+    "bundle": "systemd/systemd-pe-binary-dos",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-upx-calls_crt1-null-deref",
+    "bug_id": "upx",
+    "project": "upx",
+    "preset_class": null,
+    "ot_class": "undefined-behavior / null pointer passed where never-null required (UBSan) -> deadly signal",
+    "ot_frame": "src/p_lx_elf.cpp:2695 PackLinuxElf32::calls_crt1 (via canPack p_lx_elf.cpp:3261)",
+    "sanitizer": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "vuln_commit": "v5.0.2 (tag)",
+    "reproduces_on_HEAD": true,
+    "schema": "vuln.yaml",
+    "bucket": "suppressable-ubsan",
+    "poc_files": [
+      "offtarget-upx-calls_crt1-null-deref/poc/poc.bin"
+    ],
+    "bundle": "upx/upx-elf32-pack2-memleak",
+    "bundle_exists": true
+  },
+  {
+    "entry": "offtarget-upx-elf32-pack2-memleak-segv",
+    "bug_id": "upx-elf32-pack2-memleak",
+    "project": "upx",
+    "preset_class": "memory-leak",
+    "ot_class": "segv",
+    "ot_frame": "PeFile::Resource::destroy(PeFile::Resource::upx_rnode*, unsigned int) @ /src/upx-asan/src/pefile.cpp:1820:26",
+    "sanitizer": "lsan",
+    "vuln_commit": "v5.0.2",
+    "reproduces_on_HEAD": "unknown",
+    "schema": "repro.yaml",
+    "bucket": "memcorruption-sourcefix",
+    "poc_files": [
+      "offtarget-upx-elf32-pack2-memleak-segv/poc/poc.bin"
+    ],
+    "bundle": "upx/upx-elf32-pack2-memleak",
+    "bundle_exists": true
+  }
+]

@@ -1,0 +1,47 @@
+Off-target suppression for libaom-restore-layer-overflow.
+
+Off-target  : SEGV (WRITE) in AV1RateControlRTC::ComputeQP, av1/ratectrl_rtc.cc
+              at `cpi_->svc.layer_context[layer].is_key_frame = 1;`
+Preset      : heap-buffer-overflow (WRITE) in av1_update_temporal_layer_framerate,
+              av1/encoder/svc_layercontext.c:192 (lrc->avg_frame_bandwidth, low offset
+              within LAYER_CONTEXT).
+
+Root cause shared by both: after UpdateRateControl() shrinks number_spatial_layers
+(e.g. 4 -> 1) the harness still feeds spatial_layer_id clamped to the ORIGINAL layer
+count, so LAYER_IDS_TO_IDX() yields an out-of-range `layer` and every
+`layer_context[layer]` access is OOB. The off-target PoC has more temporal layers
+(ts=8 -> layer=24) so the *high-offset* is_key_frame write lands on an unmapped page
+=> SEGV in ComputeQP. The preset PoC has fewer (ts=4 -> layer=12); its is_key_frame
+write happens to stay mapped and it instead faults later on the low-offset
+rc.avg_frame_bandwidth write inside av1_update_temporal_layer_framerate.
+
+Mechanism: a minimal bounds guard at the OFF-TARGET frame only — the two is_key_frame
+writes in ComputeQP — skipping the write when `layer` is outside the allocated
+layer_context (number_spatial_layers * number_temporal_layers entries). This removes
+the SEGV at the off-target site. The preset crash site
+(av1_update_temporal_layer_framerate) is left untouched so the preset still faults.
+
+--- a/av1/ratectrl_rtc.cc
++++ b/av1/ratectrl_rtc.cc
+@@ -319,7 +319,9 @@ FrameDropDecision AV1RateControlRTC::ComputeQP(
+                                          cpi_->svc.number_temporal_layers);
+       if (cm->current_frame.frame_number > 0)
+         av1_svc_reset_temporal_layers(cpi_, 1);
+-      cpi_->svc.layer_context[layer].is_key_frame = 1;
++      if (layer >= 0 && layer < cpi_->svc.number_spatial_layers *
++                                    cpi_->svc.number_temporal_layers)
++        cpi_->svc.layer_context[layer].is_key_frame = 1;
+     }
+   } else {
+     gf_group->update_type[cpi_->gf_frame_index] = LF_UPDATE;
+@@ -331,7 +333,9 @@ FrameDropDecision AV1RateControlRTC::ComputeQP(
+       const int layer = LAYER_IDS_TO_IDX(cpi_->svc.spatial_layer_id,
+                                          cpi_->svc.temporal_layer_id,
+                                          cpi_->svc.number_temporal_layers);
+-      cpi_->svc.layer_context[layer].is_key_frame = 0;
++      if (layer >= 0 && layer < cpi_->svc.number_spatial_layers *
++                                    cpi_->svc.number_temporal_layers)
++        cpi_->svc.layer_context[layer].is_key_frame = 0;
+     }
+   }
+   if (cpi_->svc.number_spatial_layers > 1 ||

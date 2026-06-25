@@ -1,0 +1,328 @@
+[
+  {
+    "entry": "offtarget-avro-array_items",
+    "id": "offtarget-avro-array_items",
+    "project": "avro (C)",
+    "title": "UBSan null-pointer member access in avro_schema_array_items (schema.c:462)",
+    "crash_class": "undefined-behavior / member access within null pointer (UndefinedBehaviorSanitizer)",
+    "crash_site": "lang/c/src/schema.c:462 avro_schema_array_items (via avro_generic_map_class)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "fuzzer": "fuzzer/value_reader_fuzzer.c",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "f7dfbc0d37608a896ffcc8734a8d64376c463039",
+    "upstream_version_HEAD": "bd70a0859b9d739aad0547aa61bd17291049773b (apache/avro main, 2026-06-02)",
+    "pocs": [
+      "poc/array_items_schema.c462.bin (24 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-avro-array_items/poc/array_items_schema.c462.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-avro-generic_value_new",
+    "id": "offtarget-avro-generic_value_new",
+    "project": "avro (C)",
+    "title": "UBSan null-pointer member access in avro_generic_value_new (generic.c:58)",
+    "crash_class": "undefined-behavior / member access within null pointer (UndefinedBehaviorSanitizer)",
+    "crash_site": "lang/c/src/generic.c:58 avro_generic_value_new",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "fuzzer": "fuzzer/value_reader_fuzzer.c",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "f7dfbc0d37608a896ffcc8734a8d64376c463039",
+    "upstream_version_HEAD": "bd70a0859b9d739aad0547aa61bd17291049773b (apache/avro main, 2026-06-02)",
+    "pocs": [
+      "poc/generic_value_new_generic.c58.bin (2 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-avro-generic_value_new/poc/generic_value_new_generic.c58.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-avro-schema_name",
+    "id": "offtarget-avro-schema_name",
+    "project": "avro (C)",
+    "title": "UBSan null-pointer member access in avro_schema_name (schema.c:1529/1531)",
+    "crash_class": "undefined-behavior / member access within null pointer (UndefinedBehaviorSanitizer)",
+    "crash_site": "lang/c/src/schema.c:1529 (record) & :1531 (enum) avro_schema_name (via save_named_schemas)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "fuzzer": "fuzzer/value_reader_fuzzer.c",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "f7dfbc0d37608a896ffcc8734a8d64376c463039",
+    "upstream_version_HEAD": "bd70a0859b9d739aad0547aa61bd17291049773b (apache/avro main, 2026-06-02)",
+    "pocs": [
+      "poc/schema_name_schema.c1529.bin (record, 3 bytes)",
+      "poc/schema_name_enum_schema.c1531.bin (enum, 3 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-avro-schema_name/poc/schema_name_enum_schema.c1531.bin",
+      "offtarget-avro-schema_name/poc/schema_name_schema.c1529.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-dtc-fdt32-misalign-ubsan",
+    "poc_files": [
+      "offtarget-dtc-fdt32-misalign-ubsan/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-flatbuffers-flexbuffers-tostring-overflow-stack-overflow",
+    "poc_files": [
+      "offtarget-flatbuffers-flexbuffers-tostring-overflow-stack-overflow/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-flatbuffers-parser-deserialize-uaf-segv",
+    "poc_files": [
+      "offtarget-flatbuffers-parser-deserialize-uaf-segv/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-fwupd-logitech-protocol-oom",
+    "id": "offtarget-fwupd-logitech-protocol-oom",
+    "project": "fwupd (C)",
+    "title": "libFuzzer out-of-memory (likely harness resource artifact)",
+    "crash_class": "out-of-memory (libFuzzer rss_limit; NOT a sanitizer memory-safety report)",
+    "crash_site": "n/a (libFuzzer OOM, no faulting frame)",
+    "status": "unverified",
+    "origin": "diff-scan off-target (FuzzingBrain-Bench file-name-only diff-0 run, 2026-06-04)",
+    "sanitizer_config": "-fsanitize=fuzzer,address  (libFuzzer rss_limit)",
+    "fuzzer": "fuzzer/protocol_fuzzer.c",
+    "reproduces_on_HEAD": "unknown",
+    "benchmark_vuln_commit": "logitech-bulkcontroller-oob-repro",
+    "upstream_version_HEAD": "NOT CHECKED \u2014 reproduced only on benchmark binary",
+    "pocs": [
+      "poc/oom.bin (12 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-fwupd-logitech-protocol-oom/poc/oom.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-graaljs-escapeForJS-oom",
+    "id": "offtarget-graaljs-escapeForJS-oom",
+    "project": "graaljs",
+    "title": "Java OutOfMemoryError in harness escapeForJS on huge input",
+    "crash_class": "java.lang.OutOfMemoryError: Java heap space (Jazzer/JVM, -Xmx2048m)",
+    "crash_site": "IntlFuzzer.java:33 escapeForJS  (HARNESS code, not graaljs)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "N/A \u2014 Java/Jazzer (JVM); -Xmx2048m heap cap",
+    "fuzzer": "fuzzer/IntlFuzzer.java",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "24.1.1 / pom 24.1.2",
+    "upstream_version_HEAD": "graaljs 25.0.3 (Maven Central; latest as of 2026-06-02)",
+    "pocs": [
+      {
+        "GENERATOR (not committed)": "python3 -c \"open('poc_100MB_ff.bin','wb').write(b'\\xff'*100000000)\""
+      }
+    ],
+    "poc_files": [
+      "offtarget-graaljs-escapeForJS-oom/poc/GENERATE_poc.sh"
+    ]
+  },
+  {
+    "entry": "offtarget-harfbuzz-hb_calloc-leak",
+    "id": "offtarget-harfbuzz-hb_calloc-leak",
+    "project": "harfbuzz",
+    "title": "Memory leak via hb_calloc (harness-side)",
+    "crash_class": "memory-leak (LeakSanitizer)",
+    "crash_site": "src/hb-common.cc:1214 hb_calloc ; src/rust/.../mod.rs:3709 (fontations alloc \u2014 same 48B leak, different top frame)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address  (LeakSanitizer enabled at exit)",
+    "fuzzer": "fuzzer/fontations_glyph_name.c",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "edc8c18ef88262fc467a30ab74f05080d6aea6cf",
+    "upstream_version_HEAD": "56feae4035bdd48f62ba2b8d8c16232d4d89b3a4 (harfbuzz/harfbuzz main, 2026-06-02)",
+    "pocs": [
+      "poc/poc.bin (hb_calloc:1214, gpt-5.5)",
+      "poc/modrs_fontations_mod.rs3709.ttf (mod.rs:3709, claude-haiku-4-5; same 48B leak) (4 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-harfbuzz-hb_calloc-leak/poc/poc.bin",
+      "offtarget-harfbuzz-hb_calloc-leak/poc/modrs_fontations_mod.rs3709.ttf"
+    ]
+  },
+  {
+    "entry": "offtarget-icu-rulehalf-parse-leak",
+    "id": "offtarget-icu-rulehalf-parse-leak",
+    "project": "icu (icu4c)",
+    "title": "Memory leak in TransliteratorParser RuleHalf::parse",
+    "crash_class": "memory-leak (LeakSanitizer)",
+    "crash_site": "icu4c/source/i18n/rbt_pars.cpp:383 RuleHalf::parse (alloc at common/cmemory.cpp:58 uprv_malloc)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address  (LeakSanitizer enabled at exit)",
+    "fuzzer": "fuzzer/translit_uaf_fuzzer.cpp",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "8be6575f5c4ea397d384493a435b2932d5c2eaca",
+    "upstream_version_HEAD": "69619a44a403d128d869acdec149ff6f7c693c77 (unicode-org/icu main, 2026-06-02)",
+    "pocs": [
+      "poc/poc.bin (21 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-icu-rulehalf-parse-leak/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-jq-dump-op-npd-oom",
+    "poc_files": [
+      "offtarget-jq-dump-op-npd-oom/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-libaom-restore-layer-overflow-segv",
+    "poc_files": [
+      "offtarget-libaom-restore-layer-overflow-segv/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-libavif-avifROStreamRead-segv",
+    "id": "offtarget-libavif-avifROStreamRead-segv",
+    "project": "libavif (C++)",
+    "title": "ASan SEGV in avifROStreamRead (src/stream.c)",
+    "crash_class": "SEGV / wild-or-null pointer read (AddressSanitizer)",
+    "crash_site": "src/stream.c avifROStreamRead",
+    "status": "submitted",
+    "origin": "diff-scan off-target (FuzzingBrain-Bench file-name-only diff-0 run, 2026-06-04)",
+    "sanitizer_config": "-fsanitize=fuzzer,address  (ASan)",
+    "fuzzer": "fuzzer/jni_signext_fuzzer.cpp",
+    "reproduces_on_HEAD": "unknown",
+    "benchmark_vuln_commit": "b357f083ea5ae0ee7b09a65a48621f345e710588",
+    "upstream_version_HEAD": "NOT CHECKED \u2014 reproduced only on benchmark binary",
+    "pocs": [
+      "poc/segv_avifROStreamRead.bin (8 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-libavif-avifROStreamRead-segv/poc/segv_avifROStreamRead.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-mongoose-mg_match-stack-overflow",
+    "id": "offtarget-mongoose-mg_match-stack-overflow",
+    "project": "mongoose",
+    "title": "Stack-buffer-overflow (WRITE) in mg_match capture array",
+    "crash_class": "stack-buffer-overflow (AddressSanitizer)",
+    "crash_site": "src/str.c  mg_match  (amalgam mongoose.c:11169)",
+    "status": "fixed",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined",
+    "fuzzer": "fuzzer/fuzzer.c",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "b313d697ff8c2156e85d411d7b3c226e4a0fefa9",
+    "upstream_version_HEAD": "09cf2ae (cesanta/mongoose default branch, 2026-06-02)",
+    "pocs": [
+      "poc/poc_haiku_hash.bin (103 bytes)",
+      "poc/poc_gpt55_star.bin (40 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-mongoose-mg_match-stack-overflow/poc/poc_haiku_hash.bin",
+      "offtarget-mongoose-mg_match-stack-overflow/poc/poc_gpt55_star.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-ndpi-hex-decode-sscanf-oom",
+    "poc_files": [
+      "offtarget-ndpi-hex-decode-sscanf-oom/poc/make_poc.py"
+    ]
+  },
+  {
+    "entry": "offtarget-netsnmp-smux-rreq-uaf-heap-buffer-overflow",
+    "poc_files": [
+      "offtarget-netsnmp-smux-rreq-uaf-heap-buffer-overflow/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-pdfbox-cmap-bfrange-aioob-classcast",
+    "poc_files": [
+      "offtarget-pdfbox-cmap-bfrange-aioob-classcast/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-pdfbox-cmap-codespacerange-exception",
+    "id": "offtarget-pdfbox-cmap-codespacerange-exception",
+    "project": "pdfbox (fontbox)",
+    "title": "Uncaught IllegalArgumentException in CMapParser.parseBegincodespacerange",
+    "crash_class": "uncaught java.lang.IllegalArgumentException (wrapped IOException) \u2014 Jazzer/JVM",
+    "crash_site": "org/apache/fontbox/cmap/CMapParser.java:268 parseBegincodespacerange (CodespaceRange.java:50)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "N/A \u2014 Java/Jazzer (JVM); no native sanitizer",
+    "fuzzer": "fuzzer/CMapFuzzer.java",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "159ae247091fe217e5f6a1e174946b225b72adbb",
+    "upstream_version_HEAD": "eeb5d611e0cea8beac3d7025a4dbccbef51d5caf (apache/pdfbox trunk, 2026-06-02)",
+    "pocs": [
+      "poc/poc.bin (361 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-pdfbox-cmap-codespacerange-exception/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-spirv-orderblocks-abort",
+    "id": "offtarget-spirv-orderblocks-abort",
+    "project": "spirv-tools",
+    "title": "Abort in Disassembler OrderBlocks on missing branch target",
+    "crash_class": "abort / SIGABRT (libFuzzer deadly signal)",
+    "crash_site": "source/disassemble.cpp:453 OrderBlocks (via spvBinaryToText / EmitCFG)",
+    "status": "submitted",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address",
+    "fuzzer": "fuzzer/spirv_disasm_fuzzer.cc",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+    "upstream_version_HEAD": "605a0154c7743ed4239c0eb7f3c61f17ffde4fd0 (KhronosGroup/SPIRV-Tools main, 2026-06-02)",
+    "pocs": [
+      "poc/poc.spv (100 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-spirv-orderblocks-abort/poc/poc.spv"
+    ]
+  },
+  {
+    "entry": "offtarget-spirv-tools-friendlynamemapper-overflow-oom",
+    "poc_files": [
+      "offtarget-spirv-tools-friendlynamemapper-overflow-oom/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-systemd-pe-binary-dos-oom",
+    "poc_files": [
+      "offtarget-systemd-pe-binary-dos-oom/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-upx-calls_crt1-null-deref",
+    "id": "offtarget-upx-calls_crt1-null-deref",
+    "project": "upx",
+    "title": "UBSan null-pointer in PackLinuxElf32::calls_crt1 during canPack",
+    "crash_class": "undefined-behavior / null pointer passed where never-null required (UBSan) -> deadly signal",
+    "crash_site": "src/p_lx_elf.cpp:2695 PackLinuxElf32::calls_crt1 (via canPack p_lx_elf.cpp:3261)",
+    "status": "recorded",
+    "origin": "full-scan off-target (FuzzingBrain-Bench description-withheld run, 2026-06-02)",
+    "sanitizer_config": "-fsanitize=fuzzer,address,undefined -fno-sanitize-recover=undefined  (UBSan FATAL)",
+    "fuzzer": "fuzzer/pack_file_fuzzer.cpp",
+    "reproduces_on_HEAD": true,
+    "benchmark_vuln_commit": "v5.0.2 (tag)",
+    "upstream_version_HEAD": "93abc161af744df62197dd1fd5f7e20266bd2ab6 (upx/upx devel, 2026-06-02)",
+    "pocs": [
+      "poc/poc.bin (65536 bytes)"
+    ],
+    "poc_files": [
+      "offtarget-upx-calls_crt1-null-deref/poc/poc.bin"
+    ]
+  },
+  {
+    "entry": "offtarget-upx-elf32-pack2-memleak-segv",
+    "poc_files": [
+      "offtarget-upx-elf32-pack2-memleak-segv/poc/poc.bin"
+    ]
+  }
+]
