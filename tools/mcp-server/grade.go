@@ -70,6 +70,13 @@ func (s *server) toolGrade(args []byte) (any, error) {
 		return nil, fmt.Errorf("grade target not found or is a directory: %s", p.Path)
 	}
 
+	// Sealed-challenge path: no local oracle on this host. Ship the candidate
+	// input to the remote grading service and return its verdict verbatim. The
+	// answer key (expected.yaml / binaries / poc) lives only behind gradeURL.
+	if s.gradeURL != "" {
+		return s.gradeRemote(abs)
+	}
+
 	bench, err := s.loadBench()
 	if err != nil {
 		return nil, err

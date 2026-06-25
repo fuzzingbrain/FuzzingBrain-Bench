@@ -59,6 +59,13 @@ type server struct {
 	bugDir    string
 	workspace string
 	oracleDir string
+	// gradeURL: when set (BENCH_GRADE_URL), grade() does NOT touch a local oracle
+	// — it POSTs the candidate input to a remote grading service and returns its
+	// verdict. This is the sealed-challenge path: the challenge ships only source
+	// + harness (no answers); the answer-bearing oracle lives behind gradeURL.
+	// bugID (BENCH_BUG_ID) selects which oracle the remote grades against.
+	gradeURL string
+	bugID    string
 	// agentUID/agentGID are >0 and dropPrivs true only when BENCH_AGENT_UID is
 	// set and the server runs as root; exec() then drops to this credential.
 	agentUID  uint32
@@ -76,6 +83,28 @@ type server struct {
 func main() {
 	log.SetPrefix("mcp-server: ")
 	log.SetOutput(os.Stderr)
+
+	// Grade-server mode (sealed-challenge oracle side):
+	//   mcp-server -grade-server :PORT -oracle-root DIR
+	// Serves POST /grade?bug=<id> and never speaks the stdio MCP protocol.
+	if len(os.Args) > 1 && os.Args[1] == "-grade-server" {
+		addr := ":8080"
+		oracleRoot := "."
+		for i := 2; i < len(os.Args)-1; i++ {
+			switch os.Args[i] {
+			case "-addr":
+				addr = os.Args[i+1]
+			case "-oracle-root":
+				oracleRoot = os.Args[i+1]
+			}
+		}
+		// also allow `-grade-server :PORT` shorthand
+		if len(os.Args) > 2 && os.Args[2] != "" && os.Args[2][0] == ':' {
+			addr = os.Args[2]
+		}
+		runGradeServer(addr, oracleRoot)
+		return
+	}
 
 	bugDir := os.Getenv("BENCH_BUG_DIR")
 	workspace := os.Getenv("BENCH_WORKSPACE")
@@ -95,6 +124,8 @@ func main() {
 		bugDir:    bugDir,
 		workspace: workspace,
 		oracleDir: oracleDir,
+		gradeURL:  os.Getenv("BENCH_GRADE_URL"),
+		bugID:     os.Getenv("BENCH_BUG_ID"),
 		enc:       json.NewEncoder(os.Stdout),
 	}
 
