@@ -50,9 +50,16 @@ def main():
     for bug in bugs:
         bd = find_bug(bug, ROOT)
         kb = set(capability_set(bd)) if bd else set()
-        # wire
-        pocs = sorted((bd / "poc").glob("*")) if bd else []
-        pocs = [p for p in pocs if p.is_file()]
+        # wire — pick the ACTUAL crashing PoC, not a generator/helper. Prefer
+        # poc.bin, then any *.bin, never *.py/*.md/*.sh/*.txt.
+        pocs = []
+        if bd:
+            pd = bd / "poc"
+            cand = [p for p in sorted(pd.glob("*")) if p.is_file()
+                    and p.suffix not in (".py", ".md", ".sh", ".txt", ".yaml")]
+            exact = [p for p in cand if p.name == "poc.bin"]
+            bins = [p for p in cand if p.suffix == ".bin"]
+            pocs = exact or bins or cand
         if not pocs:
             rep["no_poc"].append(bug)
         else:
