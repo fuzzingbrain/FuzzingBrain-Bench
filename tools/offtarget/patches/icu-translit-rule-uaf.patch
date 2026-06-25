@@ -1,0 +1,48 @@
+Off-target suppression for icu-translit-rule-uaf (bucket: suppressable-leak).
+
+The benchmark harness (createFromRules) reaches TWO distinct LeakSanitizer leaks:
+  * PRESET  : TransliteratorIDParser::parseFilterID  (tridpars.cpp:229) -- the
+              documented benchmark bug; MUST keep reporting.
+  * OFF-TGT : RuleHalf::parse                          (rbt_pars.cpp:383) -- an
+              unrelated error-path leak parsing a rule half like "(a) > (b);".
+
+We must NOT disable LSan globally (the preset is also a leak). Instead we bake a
+SCOPED LSan suppression into the binary: __lsan_default_suppressions() returns
+"leak:RuleHalf", which matches only allocation backtraces that pass through the
+rule-half parser (RuleHalf::* lives solely in i18n/rbt_pars.cpp). The preset
+leak is allocated in parseFilterID (tridpars.cpp, which never references
+RuleHalf) so it is unaffected and still reports. Program logic is unchanged.
+
+The hook is added to common/cmemory.cpp because uprv_malloc is referenced by
+essentially every ICU allocation, so cmemory.o is always pulled into the static
+link of the harness -- guaranteeing the strong __lsan_default_suppressions
+symbol overrides the sanitizer runtime's weak default.
+
+diff --git a/icu4c/source/common/cmemory.cpp b/icu4c/source/common/cmemory.cpp
+index e59d4b0..6db1c0b 100644
+--- a/icu4c/source/common/cmemory.cpp
++++ b/icu4c/source/common/cmemory.cpp
+@@ -26,6 +26,23 @@
+ #include "uassert.h"
+ #include <stdlib.h>
+ 
++/*
++ * Off-target ablation hook (FuzzingBrain-Bench): a baked-in, SCOPED
++ * LeakSanitizer suppression. It suppresses ONLY the unrelated off-target leak
++ * whose allocation backtrace passes through the rule-half parser
++ * (RuleHalf::* is defined solely in i18n/rbt_pars.cpp). The documented preset
++ * leak in TransliteratorIDParser::parseFilterID (i18n/tridpars.cpp) does not
++ * go through RuleHalf and therefore still reports. LSan is NOT disabled
++ * globally. No program logic is changed.
++ */
++#if defined(__has_feature)
++#  if __has_feature(address_sanitizer) || __has_feature(leak_sanitizer)
++extern "C" const char *__lsan_default_suppressions(void) {
++    return "leak:RuleHalf\n";
++}
++#  endif
++#endif
++
+ /* uprv_malloc(0) returns a pointer to this read-only data. */
+ static const int32_t zeroMem[] = {0, 0, 0, 0, 0, 0};
+ 

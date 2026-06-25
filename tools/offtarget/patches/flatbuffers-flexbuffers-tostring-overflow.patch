@@ -1,0 +1,39 @@
+Off-target suppression: flatbuffers-flexbuffers-tostring-overflow (bucket: stack-exhaustion)
+
+Off-target: stack-overflow in flexbuffers::Reference::ToString / AppendToString
+recursion (a 6-byte self-referential/deeply-nested FlexBuffer drives unbounded
+mutual recursion ToString -> AppendToString -> v[i].ToString -> ... until the
+stack is exhausted; SUMMARY: AddressSanitizer: stack-overflow flexbuffers.h:600).
+
+Mechanism: add a recursion-depth guard at the top of the indented ToString()
+overload. `cur_indent` is incremented by one for every nesting level (the
+IsVector / IsMap branches descend with cur_indent + 1), so it is an exact
+recursion-depth counter. When depth exceeds 100 we append "(...)" and return,
+so cyclic / pathologically nested input unwinds cleanly instead of overflowing
+the stack.
+
+Preset preserved: the preset heap-buffer-overflow (strlen on an FBT_KEY at
+flexbuffers.h:614) fires at depth 0 (a single key / top-level value), far below
+the guard, so the preset PoC still faults with the same class/site.
+
+Context is identical at vuln_commit (bab10754) and fix_commit (a6979fe), so the
+same diff applies to both the New V1 and New V2 builds.
+
+--- a/include/flatbuffers/flexbuffers.h	2026-06-23 21:52:29.107865872 +0000
++++ b/include/flatbuffers/flexbuffers.h	2026-06-23 21:53:20.980328658 +0000
+@@ -598,6 +598,15 @@
+   void ToString(bool strings_quoted, bool keys_quoted, std::string& s,
+                 bool indented, int cur_indent, const char* indent_string,
+                 bool natural_utf8 = false) const {
++    // Off-target suppression (stack-exhaustion): cap ToString recursion depth so
++    // deeply nested / self-referential FlexBuffers return instead of exhausting
++    // the stack. cur_indent tracks nesting depth (incremented per level), so a
++    // single key/string is depth 0 and the preset heap-buffer-overflow path
++    // (strlen on FBT_KEY) is unaffected.
++    if (cur_indent > 100) {
++      s += "(...)";
++      return;
++    }
+     if (type_ == FBT_STRING) {
+       String str(Indirect(), byte_width_);
+       if (strings_quoted) {

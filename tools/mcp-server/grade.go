@@ -633,6 +633,66 @@ func mapUBSan(msg string) string {
 
 var frameRe = regexp.MustCompile(`#(\d+)\s+0x[0-9a-fA-F]+\s+in\s+.+?\s+(/[^\s:]+):(\d+)`)
 
+// frameFuncRe is like frameRe but also captures the function name (group 2),
+// used by actualCrash to record the off-target crash signature even when the
+// `site` capability did not fire.
+var frameFuncRe = regexp.MustCompile(`#(\d+)\s+0x[0-9a-fA-F]+\s+in\s+(\S+)\s+(/[^\s:]+):(\d+)`)
+
+// actualCrash reports the ACTUAL detected crash signature (sanitizer class +
+// top non-harness frames), regardless of whether it matches the preset
+// expected class/site. This powers the off-target inventory: an off-target is a
+// crash whose actual signature is not the preset. Purely diagnostic, additive.
+func actualCrash(r harnessRun) map[string]any {
+	detected := ""
+	if lsanLeakLine.MatchString(r.stderr) {
+		detected = "memory-leak"
+	} else if m := asanErrorLine.FindStringSubmatch(r.stderr); m != nil {
+		detected = canonClass(m[1])
+	} else if m := ubsanErrorLine.FindStringSubmatch(r.stderr); m != nil {
+		detected = mapUBSan(m[1])
+	} else if m := javaExceptionLine.FindStringSubmatch(r.stderr); m != nil {
+		detected = mapJavaException(m[1])
+		if detected == "" {
+			detected = m[1]
+		}
+	}
+	var frames []map[string]any
+	for _, m := range frameFuncRe.FindAllStringSubmatch(r.stderr, -1) {
+		file := m[3]
+		if isHarnessFrame(file) {
+			continue
+		}
+		line, _ := strconv.Atoi(m[4])
+		frames = append(frames, map[string]any{"func": m[2], "file": file, "line": line})
+		if len(frames) >= 4 {
+			break
+		}
+	}
+	if len(frames) == 0 {
+		for _, m := range javaFrameRe.FindAllStringSubmatch(r.stderr, -1) {
+			file := m[2]
+			if isJavaHarnessFrame(file) {
+				continue
+			}
+			line, _ := strconv.Atoi(m[3])
+			frames = append(frames, map[string]any{"func": m[1], "file": javaQualifiedPath(m[1], file), "line": line})
+			if len(frames) >= 4 {
+				break
+			}
+		}
+	}
+	if len(frames) == 0 {
+		for _, re := range []*regexp.Regexp{ubsanSiteLine, chromiumFatalLine} {
+			if m := re.FindStringSubmatch(r.stderr); m != nil {
+				line, _ := strconv.Atoi(m[2])
+				frames = append(frames, map[string]any{"func": "", "file": m[1], "line": line})
+				break
+			}
+		}
+	}
+	return map[string]any{"class": detected, "frames": frames}
+}
+
 func siteMatches(r harnessRun, expected *expectedYAML) bool {
 	if expected.Site.ExpectedFile == "" {
 		return false
@@ -775,6 +835,8 @@ func buildEvidence(last roundOutcome, expected *expectedYAML) map[string]any {
 		"reach": nil, "crash": nil, "crash2": nil, "class": nil, "site": nil,
 	}
 	r := harnessRun{stdout: last.stdout, stderr: last.stderr, exitCode: last.exitCode, signal: last.signal}
+	// Always record the actual crash signature (off-target inventory consumes this).
+	ev["actual"] = actualCrash(r)
 	if last.Capabilities["crash"] == "fired" {
 		ev["crash"] = map[string]any{"vuln_exit": last.exitCode, "vuln_signal": last.signal}
 	}

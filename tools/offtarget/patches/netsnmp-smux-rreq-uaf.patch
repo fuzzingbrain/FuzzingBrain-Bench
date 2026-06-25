@@ -1,0 +1,37 @@
+Off-target suppression for netsnmp-smux-rreq-uaf.
+
+The agent's off-target crash is a heap-buffer-overflow at agent/agent_trap.c:570
+(`convert_v2pdu_to_v1`), READ of size 8 (one `oid`) — DISTINCT from the preset
+heap-use-after-free (smux RReq DELETE path) at agent/agent_handler.c:350.
+
+Root cause (off-target): on the v2->v1 trap conversion path, the code compares
+the snmpTrapOID value (`vblist->val.objid`) against `trap_prefix`, passing
+OID_LENGTH(trap_prefix) as the SOURCE length regardless of the value's actual
+length. When the attacker supplies a snmpTrapOID whose objid is exactly
+OID_LENGTH(trap_prefix) elements long (72 bytes = 9 oids) and equal to the
+standard prefix, snmp_oid_compare matches, and the "standard trap" branch then
+dereferences `vblist->val.objid[OID_LENGTH(trap_prefix)]` (index 9) — one element
+past the end of the 72-byte allocation -> heap-buffer-overflow.
+
+Fix (minimal bounds guard): only take the standard-trap branch when the actual
+objid length strictly exceeds OID_LENGTH(trap_prefix), so the [OID_LENGTH] access
+is in-bounds. Shorter snmpTrapOID values fall through to the enterprise-specific
+branch, which already guards `len <= 2` and accesses only objid[len-1]. No logic
+change for well-formed traps (objid longer than the prefix). The preset UAF path
+(smux_rreq_process -> smux_replace_active -> netsnmp_unregister_handler) is on an
+unrelated SMUX-registration code path and is unaffected.
+
+--- a/agent/agent_trap.c
++++ b/agent/agent_trap.c
+@@ -559,8 +559,9 @@ convert_v2pdu_to_v1( netsnmp_pdu* template_v2pdu )
+      *    and the enterprise field from the v2 varbind list.
+      * If there's an agentIPAddress varbind, set the agent_addr too
+      */
+-    if (!snmp_oid_compare(vblist->val.objid, OID_LENGTH(trap_prefix),
+-                          trap_prefix,       OID_LENGTH(trap_prefix))) {
++    if ((vblist->val_len / sizeof(oid)) > OID_LENGTH(trap_prefix) &&
++        !snmp_oid_compare(vblist->val.objid, OID_LENGTH(trap_prefix),
++                          trap_prefix,       OID_LENGTH(trap_prefix))) {
+         /*
+          * For 'standard' traps, extract the generic trap type
+          *   from the snmpTrapOID value, and take the enterprise

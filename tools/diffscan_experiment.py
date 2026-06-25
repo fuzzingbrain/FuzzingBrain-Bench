@@ -49,6 +49,10 @@ def main() -> int:
     ap.add_argument("--require-preset", action="store_true",
                     help="off-target crash does not end the episode; keep iterating "
                          "until the preset capability set fires or max-turns is hit")
+    ap.add_argument("--oracle-dir", default=None,
+                    help="override the oracle bug dir (grader + ground-truth binaries) while "
+                         "keeping the agent-facing source view from the real bundle — for the "
+                         "off-target ablation Arm B (interference-free oracle binary)")
     args = ap.parse_args()
 
     load_dotenv(REPO)
@@ -92,7 +96,7 @@ def main() -> int:
             backend=backend,
             bug_id=args.bug,
             bug_dir=bug_view,
-            oracle_dir=str(bug_dir),
+            oracle_dir=(args.oracle_dir or str(bug_dir)),
             workspace=workspace,
             server_bin=server_bin,
             max_turns=args.max_turns,

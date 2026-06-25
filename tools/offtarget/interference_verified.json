@@ -1,0 +1,472 @@
+[
+  {
+    "entry": "offtarget-avro-array_items",
+    "bundle": "avro/avro-neg-string-len",
+    "bucket": "suppressable-ubsan",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "array_items_schema.c462.bin",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [
+          "reach"
+        ],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-avro-generic_value_new",
+    "bundle": "avro/avro-neg-string-len",
+    "bucket": "suppressable-ubsan",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "generic_value_new_generic.c58.bin",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-avro-schema_name",
+    "bundle": "avro/avro-neg-string-len",
+    "bucket": "suppressable-ubsan",
+    "pocs": 2,
+    "results": [
+      {
+        "poc": "schema_name_enum_schema.c1531.bin",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      },
+      {
+        "poc": "schema_name_schema.c1529.bin",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-dtc-fdt32-misalign-ubsan",
+    "bundle": "dtc/dtc-fdt32-misalign",
+    "bucket": "suppressable-ubsan",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "reach"
+        ],
+        "actual_class": "integer-overflow",
+        "actual_frame": "fdt_next_tag @ /libfdt/fdt.c:216"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-flatbuffers-flexbuffers-tostring-overflow-stack-overflow",
+    "bundle": "flatbuffers/flatbuffers-flexbuffers-tostring-overflow",
+    "bucket": "stack-exhaustion",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "reach"
+        ],
+        "actual_class": "stack-overflow",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-flatbuffers-parser-deserialize-uaf-segv",
+    "bundle": "flatbuffers/flatbuffers-parser-deserialize-uaf",
+    "bucket": "memcorruption-sourcefix",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "reach"
+        ],
+        "actual_class": "segv",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-fwupd-logitech-protocol-oom",
+    "bundle": "fwupd/fwupd-logitech-oob-read",
+    "bucket": "oom-artifact",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "oom.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "crash2",
+          "reach",
+          "site"
+        ],
+        "actual_class": "",
+        "actual_frame": "g_realloc @ /src/glib/.ossfuzz/../glib/gmem.c:171"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-graaljs-escapeForJS-oom",
+    "bundle": "graaljs/graaljs-illformed-locale",
+    "bucket": "oom-artifact",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "GENERATE_poc.sh",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-harfbuzz-hb_calloc-leak",
+    "bundle": "harfbuzz/harfbuzz-fontations-oob-write",
+    "bucket": "suppressable-leak",
+    "pocs": 2,
+    "results": [
+      {
+        "poc": "modrs_fontations_mod.rs3709.ttf",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      },
+      {
+        "poc": "poc.bin",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-icu-rulehalf-parse-leak",
+    "bundle": "icu/icu-translit-rule-uaf",
+    "bucket": "suppressable-leak",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "class",
+          "crash"
+        ],
+        "actual_class": "memory-leak",
+        "actual_frame": "uprv_malloc_79 @ /src/icu-asan/icu4c/source/common/cmemory.cpp:58"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-jq-dump-op-npd-oom",
+    "bundle": "jq/jq-dump-op-npd",
+    "bucket": "oom-artifact",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-libaom-restore-layer-overflow-segv",
+    "bundle": "libaom/libaom-restore-layer-overflow",
+    "bucket": "memcorruption-sourcefix",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "crash2"
+        ],
+        "actual_class": "segv",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-libavif-avifROStreamRead-segv",
+    "bundle": "libavif/libavif-jni-signext",
+    "bucket": "memcorruption-sourcefix",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "segv_avifROStreamRead.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "crash2",
+          "reach",
+          "site"
+        ],
+        "actual_class": "segv",
+        "actual_frame": "avifROStreamReadU32 @ /src/libavif-asan/src/stream.c:128"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-mongoose-mg_match-stack-overflow",
+    "bundle": "mongoose/mongoose-mg-match-overflow",
+    "bucket": "stack-exhaustion",
+    "pocs": 2,
+    "results": [
+      {
+        "poc": "poc_gpt55_star.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "reach"
+        ],
+        "actual_class": "stack-buffer-overflow",
+        "actual_frame": " @ :"
+      },
+      {
+        "poc": "poc_haiku_hash.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash"
+        ],
+        "actual_class": "stack-buffer-overflow",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-ndpi-hex-decode-sscanf-oom",
+    "bundle": "ndpi/ndpi-hex-decode-sscanf",
+    "bucket": "oom-artifact",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "make_poc.py",
+        "crash": false,
+        "solved_preset": false,
+        "fired": [
+          "reach"
+        ],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "no-crash"
+  },
+  {
+    "entry": "offtarget-netsnmp-smux-rreq-uaf-heap-buffer-overflow",
+    "bundle": "net-snmp/netsnmp-smux-rreq-uaf",
+    "bucket": "memcorruption-sourcefix",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash"
+        ],
+        "actual_class": "heap-buffer-overflow",
+        "actual_frame": "convert_v2pdu_to_v1 @ /src/build-asan/agent/agent_trap.c:570"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-pdfbox-cmap-bfrange-aioob-classcast",
+    "bundle": "pdfbox/pdfbox-cmap-bfrange-aioob",
+    "bucket": "java-exception",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash"
+        ],
+        "actual_class": "uncaught-exception",
+        "actual_frame": "org.apache.fontbox.cmap.CMapParser.readDictionary @ org/apache/fontbox/cmap/CMapParser.java:724"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-pdfbox-cmap-codespacerange-exception",
+    "bundle": "pdfbox/pdfbox-cmap-bfrange-aioob",
+    "bucket": "java-exception",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash"
+        ],
+        "actual_class": "uncaught-exception",
+        "actual_frame": "org.apache.fontbox.cmap.CMapParser.parseBegincodespacerange @ org/apache/fontbox/cmap/CMapParser.java:268"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-spirv-orderblocks-abort",
+    "bundle": "spirv-tools/spirv-orderblocks-segv",
+    "bucket": "assert-abort",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.spv",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "reach"
+        ],
+        "actual_class": "abrt",
+        "actual_frame": "spvBinaryToText @ /src/SPIRV-Tools/source/disassemble.cpp:1137"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-spirv-tools-friendlynamemapper-overflow-oom",
+    "bundle": "spirv-tools/spirv-tools-friendlynamemapper-overflow",
+    "bucket": "oom-artifact",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash",
+          "reach"
+        ],
+        "actual_class": "",
+        "actual_frame": "spvBinaryToText @ /src/SPIRV-Tools/source/disassemble.cpp:1130"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-systemd-pe-binary-dos-oom",
+    "bundle": "systemd/systemd-pe-binary-dos",
+    "bucket": "oom-artifact",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": true,
+        "fired": [
+          "class",
+          "crash",
+          "crash2",
+          "reach"
+        ],
+        "actual_class": "",
+        "actual_frame": " @ :"
+      }
+    ],
+    "verdict": "solves-preset"
+  },
+  {
+    "entry": "offtarget-upx-calls_crt1-null-deref",
+    "bundle": "upx/upx-elf32-pack2-memleak",
+    "bucket": "suppressable-ubsan",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash"
+        ],
+        "actual_class": "segv",
+        "actual_frame": "PackLinuxElf32::canPack() @ /src/upx-asan/src/p_lx_elf.cpp:3261"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  },
+  {
+    "entry": "offtarget-upx-elf32-pack2-memleak-segv",
+    "bundle": "upx/upx-elf32-pack2-memleak",
+    "bucket": "memcorruption-sourcefix",
+    "pocs": 1,
+    "results": [
+      {
+        "poc": "poc.bin",
+        "crash": true,
+        "solved_preset": false,
+        "fired": [
+          "crash"
+        ],
+        "actual_class": "segv",
+        "actual_frame": "PeFile::Resource::~Resource() @ /src/upx-asan/src/pefile.cpp:1632"
+      }
+    ],
+    "verdict": "offtarget-confirmed"
+  }
+]

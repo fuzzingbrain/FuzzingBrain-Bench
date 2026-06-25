@@ -1,0 +1,76 @@
+{
+  "bug_id": "spirv-tools-friendlynamemapper-overflow",
+  "vuln": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+  "fix": "39813baec458ada43263749757b15fbfbd6be107",
+  "patch": "/data4/ze/FuzzingBrain-Bench/tools/offtarget/patches/spirv-tools-friendlynamemapper-overflow.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-spirv-tools-friendlynamemapper-overflow-oom/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "ff5c50339cc1e9f34f04cb440a3e5fe89db0161d",
+    "config": "release-asan",
+    "image": "fbdelta/spirv-tools-friendlynamemapper-overflow:ff5c50339cc1",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-tools-friendlynamemapper-overflow/out-ff5c50339cc1/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-tools-friendlynamemapper-overflow/out-ff5c50339cc1",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/spirv-tools-friendlynamemapper-overflow__ff5c50339cc1__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "39813baec458ada43263749757b15fbfbd6be107",
+    "config": "release-asan",
+    "image": "fbdelta/spirv-tools-friendlynamemapper-overflow:39813baec458",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-tools-friendlynamemapper-overflow/out-39813baec458/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/spirv-tools-friendlynamemapper-overflow/out-39813baec458",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/spirv-tools-friendlynamemapper-overflow__39813baec458__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": 71,
+        "timeout": false,
+        "fault": true,
+        "msg": "",
+        "site": "/12/bits/hashtable.h:906"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x603000000180 at pc 0x559f463de88c bp 0x7fffb7b73bd0 sp 0x7fffb7b73",
+      "site": "/src/SPIRV-Tools/source/name_mapper.cpp:268"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x603000000180 at pc 0x55e02af4c8bc bp 0x7ffffe7fd930 sp 0x7ffffe7fd",
+      "site": "/src/SPIRV-Tools/source/name_mapper.cpp:277"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

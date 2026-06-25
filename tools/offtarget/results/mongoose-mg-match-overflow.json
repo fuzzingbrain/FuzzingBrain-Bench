@@ -1,0 +1,79 @@
+{
+  "bug_id": "mongoose-mg-match-overflow",
+  "vuln": "b313d697ff8c2156e85d411d7b3c226e4a0fefa9",
+  "fix": null,
+  "patch": "tools/offtarget/patches/mongoose-mg-match-overflow.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-mongoose-mg_match-stack-overflow/poc/poc_haiku_hash.bin",
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-mongoose-mg_match-stack-overflow/poc/poc_gpt55_star.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "b313d697ff8c2156e85d411d7b3c226e4a0fefa9",
+    "config": "release-asan",
+    "image": "fbdelta/mongoose-mg-match-overflow:b313d697ff8c",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/mongoose-mg-match-overflow/out-b313d697ff8c/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/mongoose-mg-match-overflow/out-b313d697ff8c",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/mongoose-mg-match-overflow__b313d697ff8c__release-asan.log"
+  },
+  "build_v2": {
+    "status": "no-fix-commit"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: stack-buffer-overflow on address 0x7ffd88c02be0 at pc 0x55fdbbb7929c bp 0x7ffd88c02a90 sp 0x7ffd88c0",
+        "site": "/src/harness/fuzzer.c:20"
+      },
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: stack-buffer-overflow on address 0x7ffdea5598e0 at pc 0x55ea5ddc929c bp 0x7ffdea559790 sp 0x7ffdea55",
+        "site": "/src/harness/fuzzer.c:20"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      },
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x602000000036 at pc 0x561d5956a45c bp 0x7fffe76be530 sp 0x7fffe76be",
+      "site": "/src/mongoose.c:11175"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x602000000036 at pc 0x556350ebf4e8 bp 0x7fff92ad60a0 sp 0x7fff92ad6",
+      "site": "/src/mongoose.c:11180"
+    },
+    "new_v2_preset": null
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": null,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

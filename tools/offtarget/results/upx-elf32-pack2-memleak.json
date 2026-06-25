@@ -1,0 +1,91 @@
+{
+  "bug_id": "upx-elf32-pack2-memleak",
+  "vuln": "v5.0.2",
+  "fix": "68936b6d27312d015c256bf273e830e27272d969",
+  "patch": "tools/offtarget/patches/upx-elf32-pack2-memleak.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-upx-calls_crt1-null-deref/poc/poc.bin",
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-upx-elf32-pack2-memleak-segv/poc/poc.bin"
+  ],
+  "leak_env": true,
+  "build_v1": {
+    "status": "built",
+    "sha": "c4113b6bd625d2f0268e46d6b6e09cd7e5a70f80",
+    "config": "release-asan",
+    "image": "fbdelta/upx-elf32-pack2-memleak:c4113b6bd625",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/upx-elf32-pack2-memleak/out-c4113b6bd625/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/upx-elf32-pack2-memleak/out-c4113b6bd625",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/upx-elf32-pack2-memleak__c4113b6bd625__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "68936b6d27312d015c256bf273e830e27272d969",
+    "config": "release-asan",
+    "image": "fbdelta/upx-elf32-pack2-memleak:68936b6d2731",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/upx-elf32-pack2-memleak/out-68936b6d2731/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/upx-elf32-pack2-memleak/out-68936b6d2731",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/upx-elf32-pack2-memleak__68936b6d2731__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: SEGV on unknown address 0x000000000000 (pc 0x555b3fd98fc0 bp 0x7ffec0ce6e90 sp 0x7ffec0ce6640 T0)",
+        "site": "/src/upx-asan/src/p_lx_elf.cpp:2695"
+      },
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: SEGV on unknown address (pc 0x564c0ad2dc51 bp 0x7ffd8b5a0650 sp 0x7ffd8b5a0610 T0)",
+        "site": "/src/upx-asan/src/pefile.cpp:1820"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      },
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": 77,
+      "timeout": false,
+      "fault": true,
+      "msg": ": LeakSanitizer: detected memory leaks",
+      "site": "/src/upx-asan/src/linker.cpp:369"
+    },
+    "new_v1_preset": {
+      "exit": 77,
+      "timeout": false,
+      "fault": true,
+      "msg": ": LeakSanitizer: detected memory leaks",
+      "site": "/src/upx-asan/src/linker.cpp:369"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}
