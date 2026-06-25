@@ -50,3 +50,11 @@ repo split. Flagged for an explicit call — not bulldozed under "全部搞定".
 ## Leak-audit rule (for batch)
 Flag ONLY a bug's OWN answer artifacts: `poc/`, `grader/`, `binaries/`, and `fix_commit`/`fix_patch`
 in bench.yaml. Do NOT flag files under `src/` (upstream source can contain *.bin test fixtures).
+
+## Push DONE + one follow-up (visibility)
+2026-06-25: all 68 challenge images pushed to ghcr.io/owensanzas/fbbench-challenge-<bug>:latest
+(0 failures). They default to PRIVATE on ghcr. To let users pull without auth, set each
+package to PUBLIC — needs a token with `write:packages`/`admin:packages` (the session token
+only has `repo`), so it's an owner action: GitHub → Packages → each pkg → Settings → Change
+visibility → Public. (Or `gh api -X PATCH /user/packages/container/<pkg> -f visibility=public`
+with a packages-scoped token.)
