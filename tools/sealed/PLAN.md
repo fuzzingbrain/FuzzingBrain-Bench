@@ -28,13 +28,24 @@ Proven 2026-06-25: dtc real PoC → 5/5 fired; junk → 0; libpng real PoC → 5
 server with NO local answers on the client. Answer-free bundle confirmed (only false-positive was
 dtc's own upstream test fixture src/tests/incbin.bin, not our PoC).
 
-## Status
+## Status — COMPLETE (mechanism)
 - [x] P0 split defined
 - [x] P1 remote grade server (mcp-server -grade-server)
 - [x] P2 grade() remote proxy (BENCH_GRADE_URL)
-- [~] P3 challenge Docker image (answer-free, baked client + BENCH_GRADE_URL)
-- [ ] P4 prove agent episode against the image
-- [ ] P5 batch 68 + push challenge images to registry + load oracle bundles
+- [x] P3 challenge Docker image (answer-free, baked client + BENCH_GRADE_URL)
+- [x] P4 proven end-to-end (dtc C / flatbuffers C++ / pdfbox JVM)
+- [x] P5 **68/68 challenge images built, 0 leaks; 68/68 wire OK** (real PoC -> remote
+      oracle fires full K_b); pushing to ghcr.io/owensanzas/fbbench-challenge-<bug>.
+
+Scaling bug found+fixed in batch: copytree(symlinks=False) dereferenced upstream dir
+symlinks (graal-nodejs etc.) -> a single bundle ballooned to 16 GB; symlinks=True ->
+33 MB. (Exactly why prototype-then-batch: 3 prototype bugs didn't surface it.)
+
+## REMAINING — repo itself (NOT done autonomously; irreversible, needs a decision)
+These images make the *distribution* answer-free, but `bugs/` + git HISTORY still carry
+the answers. Making the public *repo* answer-free needs either a history rewrite
+(destructive, irreversible on a public repo) or a public(challenge-only)/private(answer)
+repo split. Flagged for an explicit call — not bulldozed under "全部搞定".
 
 ## Leak-audit rule (for batch)
 Flag ONLY a bug's OWN answer artifacts: `poc/`, `grader/`, `binaries/`, and `fix_commit`/`fix_patch`
