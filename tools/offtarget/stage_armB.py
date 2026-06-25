@@ -74,19 +74,14 @@ def stage_one(bug_id):
     # release-asan launcher via ../lib = binaries/lib), NOT in the harness launcher
     # itself. Swap that lib too, else Arm B silently runs the UNPATCHED jar.
     jvm_v1 = _swap_lib(nv1, dst / "binaries" / "lib")
-    # optional new V2 -> fixed-asan
-    b2 = r.get("build_v2", {})
-    if b2.get("status") == "built" and Path(b2["binary"]).exists():
-        fa = dst / "binaries" / "fixed-asan" / "harness"
-        if fa.exists() or fa.is_symlink(): fa.unlink()
-        fa.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(b2["binary"], fa); os.chmod(fa, 0o755)
-        # fixed-asan launcher loads ./lib = binaries/fixed-asan/lib
-        _swap_lib(Path(b2["binary"]), dst / "binaries" / "fixed-asan" / "lib")
-        v2 = "new-V2"
-    else:
-        v2 = "old-V2(kept)"
-    if jvm_v1: v2 += " +patched-lib"
+    # crash2 oracle: KEEP the original fixed-asan (old V2), do NOT swap in a
+    # "new V2" (fix_commit + off-target patch). Off-target suppression is a
+    # V1-ONLY concern; crash2 only needs the fixed binary to not-fault on the
+    # input, which the original validated fixed binary already does. Building a
+    # new V2 risks the off-target patch (authored against the VULN commit's line
+    # numbers) landing wrong on the FIX tree and breaking the preset fix — which
+    # is exactly what corrupted pdfbox's crash2. So we leave fixed-asan untouched.
+    v2 = "old-V2(kept)" + (" +patched-lib" if jvm_v1 else "")
     return (bug_id, f"STAGED ({v2})")
 
 def relink_one(bug_id):
