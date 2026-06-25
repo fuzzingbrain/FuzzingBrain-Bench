@@ -1,0 +1,59 @@
+Off-target suppression for pdfbox-cmap-bfrange-aioob (bucket: java-exception)
+
+Two catalogued off-targets map to this bundle, both of which surface to the
+Jazzer/JVM harness as an UNCAUGHT java.io.IOException (the agent saw them as
+crashes), at CMapParser frames different from the preset:
+
+  1) offtarget-pdfbox-cmap-bfrange-aioob-classcast
+       java.io.IOException: "Error: expected hex character and not z:122"
+       thrown while reading a malformed hex byte-array (parseByteArray, ~line 724)
+       -> parseNextToken -> readDictionary -> parse
+  2) offtarget-pdfbox-cmap-codespacerange-exception
+       java.io.IOException wrapping java.lang.IllegalArgumentException
+       "The start and the end values must not have different lengths."
+       thrown by parseBegincodespacerange (line 268) for a malformed codespacerange.
+
+Both are intentional input-validation rejections that the parser raises as
+IOException; they are NOT memory-safety defects. The PRESET bug is a genuine
+ArrayIndexOutOfBoundsException (oob-read) thrown from increment() at
+CMapParser.java:813 via parseBeginbfrange -> addMappingFrombfrange. That is a
+java.lang.RuntimeException (ArrayIndexOutOfBoundsException extends
+IndexOutOfBoundsException extends RuntimeException) and is propagated WITHOUT any
+IOException wrapping (addMappingFrombfrange has no try/catch).
+
+Mechanism: wrap the top-level parse() loop in a try/catch that catches ONLY
+java.io.IOException and stops parsing gracefully (returns the partial CMap), so a
+malformed CMap no longer propagates an uncaught IOException as a crash. Because
+the catch is scoped to IOException, the preset's RuntimeException (AIOOBE at line
+813) is NOT caught and still propagates -> preset bug intact. Minimal logic change
+that removes exactly the off-target exception class while leaving the preset
+memory-safety path untouched.
+
+diff --git a/fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java b/fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
+index 7e733f2..7ad7eb5 100644
+--- a/fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
++++ b/fontbox/src/main/java/org/apache/fontbox/cmap/CMapParser.java
+@@ -87,6 +87,8 @@ public class CMapParser
+     {
+         CMap result = new CMap();
+         Object previousToken = null;
++        try
++        {
+         Object token = parseNextToken(randomAccessRead);
+         while (token != null)
+         {
+@@ -134,6 +136,15 @@ public class CMapParser
+             previousToken = token;
+             token = parseNextToken(randomAccessRead);
+         }
++        }
++        catch (java.io.IOException offTargetSuppression)
++        {
++            // OFF-TARGET ABLATION: a malformed CMap that the parser rejects with
++            // IOException must not surface as a crash. Stop parsing and return the
++            // partial result. The preset ArrayIndexOutOfBoundsException thrown in
++            // increment() (CMapParser.java:813) is a RuntimeException and is NOT
++            // caught here, so it still propagates -> preset oob-read bug intact.
++        }
+         return result;
+     }

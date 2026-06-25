@@ -1,0 +1,48 @@
+Off-target suppression: spirv-tools-friendlynamemapper-overflow (bucket: oom)
+
+Off-target (issue #6756): libFuzzer out-of-memory via spvtools::FriendlyNameMapper.
+With SPV_BINARY_TO_TEXT_OPTION_FRIENDLY_NAMES, ParseInstruction builds human-readable
+type names by concatenating the names of component/child types
+(OpTypeVector/Matrix/Array/Pointer/...: `_arr_<name(w2)>_<name(w3)>` etc.) and stores
+them via SaveName (source/name_mapper.cpp:83). Adversarial nested/recursive type
+structures make each level concatenate two already-large child names, so the generated
+name length grows super-linearly (effectively doubling per level) into multi-GB strings
+from a tiny 431-byte module -> OOM. The allocation top frame is
+std::string::_M_construct via NameForId (name_mapper.cpp:58) <- ParseInstruction
+(name_mapper.cpp:253). There is no bound on the generated-name size.
+
+Mechanism (minimal bound on name-map growth): cap the stored friendly-name length in
+SaveName. Because every name fed back into NameForId (and thus into the next level's
+concatenation) is now bounded, the super-linear propagation is broken: each generation
+produces a temporary of at most ~2*MAX bytes which is then truncated back to MAX before
+storage, so total memory is bounded by (#ids * MAX). Friendly names are cosmetic
+disassembly identifiers; truncating pathologically long ones does not change any program
+result. 1024 bytes is far larger than any real type/OpName identifier.
+
+This does NOT touch the preset path: the preset heap-buffer-overflow is an out-of-bounds
+READ of inst.words[] in ParseInstruction (OpTypePointer arm, name_mapper.cpp:268) on a
+short word-count instruction, which occurs while *forming* the suggested_name argument,
+before SaveName is entered. SaveName's length cap cannot affect it, so the preset bug
+still faults (P2).
+
+--- a/source/name_mapper.cpp
++++ b/source/name_mapper.cpp
+@@ -78,7 +78,16 @@ void FriendlyNameMapper::SaveName(uint32_t id,
+                                   const std::string& suggested_name) {
+   if (name_for_id_.find(id) != name_for_id_.end()) return;
+ 
+-  const std::string sanitized_suggested_name = Sanitize(suggested_name);
++  std::string sanitized_suggested_name = Sanitize(suggested_name);
++  // Off-target OOM guard: bound the generated friendly-name length so that
++  // adversarial nested/recursive type structures cannot drive super-linear
++  // (effectively exponential) name growth into multi-GB allocations. Stored
++  // names feed NameForId at the next concatenation level, so bounding the
++  // stored name bounds the whole chain. Friendly names are cosmetic
++  // disassembly identifiers; truncating pathologically long ones is harmless.
++  constexpr size_t kMaxFriendlyNameLength = 1024;
++  if (sanitized_suggested_name.size() > kMaxFriendlyNameLength)
++    sanitized_suggested_name.resize(kMaxFriendlyNameLength);
+   std::string name = sanitized_suggested_name;
+   auto inserted = used_names_.insert(name);
+   if (!inserted.second) {
+ 

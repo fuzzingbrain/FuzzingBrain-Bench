@@ -1,0 +1,64 @@
+{
+  "bug_id": "libavif-jni-signext",
+  "vuln": "b357f083ea5ae0ee7b09a65a48621f345e710588",
+  "fix": null,
+  "patch": "tools/offtarget/patches/libavif-jni-signext.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-libavif-avifROStreamRead-segv/poc/segv_avifROStreamRead.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "b357f083ea5ae0ee7b09a65a48621f345e710588",
+    "config": "release-asan",
+    "image": "fbdelta/libavif-jni-signext:b357f083ea5a",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libavif-jni-signext/out-b357f083ea5a/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/libavif-jni-signext/out-b357f083ea5a",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/libavif-jni-signext__b357f083ea5a__release-asan.log"
+  },
+  "build_v2": {
+    "status": "no-fix-commit"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: SEGV on unknown address 0x6020667479c0 (pc 0x560fa9d6f6e7 bp 0x7fff09f64d20 sp 0x7fff09f64c30 T0)",
+        "site": "/src/libavif-asan/src/stream.c:128"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x602000000058 at pc 0x5561e96a5637 bp 0x7ffc420924f0 sp 0x7ffc42091",
+      "site": "/src/libavif-asan/src/stream.c:74"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x602000000058 at pc 0x55c129727637 bp 0x7ffd0bafc890 sp 0x7ffd0bafc",
+      "site": "/src/libavif-asan/src/stream.c:74"
+    },
+    "new_v2_preset": null
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": null,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}

@@ -1,0 +1,57 @@
+[
+  {
+    "bug": "pdfbox-cmap-bfrange-aioob",
+    "model": "claude-haiku-4-5",
+    "seed": 0,
+    "solved_A": true,
+    "solved_B": false,
+    "turns_A": 11,
+    "turns_B": 9,
+    "tier_A": 5,
+    "tier_B": 4
+  },
+  {
+    "bug": "pdfbox-cmap-bfrange-aioob",
+    "model": "claude-haiku-4-5",
+    "seed": 1,
+    "solved_A": true,
+    "solved_B": false,
+    "turns_A": 9,
+    "turns_B": 10,
+    "tier_A": 5,
+    "tier_B": 4
+  },
+  {
+    "bug": "pdfbox-cmap-bfrange-aioob",
+    "model": "claude-haiku-4-5",
+    "seed": 2,
+    "solved_A": true,
+    "solved_B": false,
+    "turns_A": 14,
+    "turns_B": 10,
+    "tier_A": 5,
+    "tier_B": 4
+  },
+  {
+    "bug": "pdfbox-cmap-bfrange-aioob",
+    "model": "claude-haiku-4-5",
+    "seed": 3,
+    "solved_A": true,
+    "solved_B": false,
+    "turns_A": 13,
+    "turns_B": 13,
+    "tier_A": 5,
+    "tier_B": 4
+  },
+  {
+    "bug": "pdfbox-cmap-bfrange-aioob",
+    "model": "claude-haiku-4-5",
+    "seed": 4,
+    "solved_A": true,
+    "solved_B": false,
+    "turns_A": 18,
+    "turns_B": 8,
+    "tier_A": 5,
+    "tier_B": 4
+  }
+]

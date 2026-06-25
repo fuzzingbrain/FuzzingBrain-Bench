@@ -34,3 +34,9 @@ runs/
 
 # Experiment-only scripts (analysis, sweep runners, report generators — not shipped)
 tools/experiments/
+
+# Off-target ablation Arm-B tree: commit ONLY the binaries/ (LFS); the source
+# symlinks are absolute and machine-local — regenerate with
+#   tools/offtarget/stage_armB.py --relink
+bugs-armB/*/*/*
+!bugs-armB/*/*/binaries

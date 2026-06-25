@@ -1,0 +1,76 @@
+{
+  "bug_id": "flatbuffers-flexbuffers-tostring-overflow",
+  "vuln": "bab10754d93d74d1ff44d46de63558bc4127f7d8",
+  "fix": "a6979fe14adfca20c370dfae5baa1d1aea4e8b26",
+  "patch": "tools/offtarget/patches/flatbuffers-flexbuffers-tostring-overflow.patch",
+  "offtarget_pocs": [
+    "/data4/ze/O2_Vulnerability_Management/incoming_report/offtarget-flatbuffers-flexbuffers-tostring-overflow-stack-overflow/poc/poc.bin"
+  ],
+  "leak_env": false,
+  "build_v1": {
+    "status": "built",
+    "sha": "bab10754d93d74d1ff44d46de63558bc4127f7d8",
+    "config": "release-asan",
+    "image": "fbdelta/flatbuffers-flexbuffers-tostring-overflow:bab10754d93d",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-flexbuffers-tostring-overflow/out-bab10754d93d/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-flexbuffers-tostring-overflow/out-bab10754d93d",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/flatbuffers-flexbuffers-tostring-overflow__bab10754d93d__release-asan.log"
+  },
+  "build_v2": {
+    "status": "built",
+    "sha": "a6979fe14adfca20c370dfae5baa1d1aea4e8b26",
+    "config": "release-asan",
+    "image": "fbdelta/flatbuffers-flexbuffers-tostring-overflow:a6979fe14adf",
+    "binary": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-flexbuffers-tostring-overflow/out-a6979fe14adf/release-asan/harness",
+    "out_dir": "/data4/ze/FuzzingBrain-Bench/delta-bisect/src-cache/flatbuffers-flexbuffers-tostring-overflow/out-a6979fe14adf",
+    "log": "/data4/ze/FuzzingBrain-Bench/delta-bisect/logs/flatbuffers-flexbuffers-tostring-overflow__a6979fe14adf__release-asan.log"
+  },
+  "checks": {
+    "old_v1_offtarget": [
+      {
+        "exit": -6,
+        "timeout": false,
+        "fault": true,
+        "msg": ": AddressSanitizer: stack-overflow on address 0x7ffcba3d6fd8 (pc 0x560dbfe410db bp 0x7ffcba3d70c0 sp 0x7ffcba3d6f80 T0)",
+        "site": "/src/flatbuffers/include/flatbuffers/flexbuffers.h:600"
+      }
+    ],
+    "new_v1_offtarget": [
+      {
+        "exit": 0,
+        "timeout": false,
+        "fault": false,
+        "msg": "",
+        "site": ""
+      }
+    ],
+    "old_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x602000000034 at pc 0x562db1a8b116 bp 0x7ffc4182b370 sp 0x7ffc4182a",
+      "site": "/12/bits/char_traits.h:395"
+    },
+    "new_v1_preset": {
+      "exit": -6,
+      "timeout": false,
+      "fault": true,
+      "msg": ": AddressSanitizer: heap-buffer-overflow on address 0x602000000034 at pc 0x5654ca7ae126 bp 0x7fffb0685f90 sp 0x7fffb0685",
+      "site": "/12/bits/char_traits.h:395"
+    },
+    "new_v2_preset": {
+      "exit": 0,
+      "timeout": false,
+      "fault": false,
+      "msg": "",
+      "site": ""
+    }
+  },
+  "properties": {
+    "P1_offtarget_removed": true,
+    "P2_preset_intact": true,
+    "P3_v2_no_preset_fault": true,
+    "CTRL_old_v1_faults_offtarget": true
+  },
+  "verdict": "PASS"
+}
