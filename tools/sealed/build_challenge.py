@@ -80,7 +80,11 @@ def main():
     ctx = Path(tempfile.mkdtemp(prefix=f"fbchal-{a.bug_id}-"))
     bundle_src = Path(stage_bug_view(str(bug_dir), full_scan=False))
     bundle = ctx / "bundle"
-    shutil.copytree(bundle_src, bundle, symlinks=False)
+    # symlinks=True is CRITICAL: never dereference. Upstream source trees contain
+    # directory symlinks (e.g. graal-nodejs, vendored node_modules) and some point
+    # at ancestors — dereferencing recurses and balloons a bundle to tens of GB.
+    # Preserve symlinks as-is; docker COPY tars them without following either.
+    shutil.copytree(bundle_src, bundle, symlinks=True, ignore_dangling_symlinks=True)
     shutil.rmtree(bundle_src, ignore_errors=True)
 
     leaks = leak_audit(bundle)
