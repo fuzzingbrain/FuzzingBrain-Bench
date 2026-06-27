@@ -340,7 +340,20 @@ class MCPClient:
             # BENCH_GRADE_URL) are baked into the image, so what we measure here
             # is byte-identical to what any external user runs — no local-vs-Docker
             # divergence. The container is ephemeral (--rm) and self-contained.
-            cmd = ["docker", "run", "-i", "--rm", image, "mcp-server"]
+            #
+            # seccomp=unconfined lets the in-container mcp-server create the
+            # user+network namespace that exec() isolation needs (the default
+            # Docker seccomp profile blocks unshare(CLONE_NEWUSER)). Without it,
+            # exec() would be REFUSED inside the container and the agent couldn't
+            # compile/run test inputs. With it, exec'd children still get `-n`
+            # (no network — they cannot brute-force the remote oracle), while the
+            # server's own grade() call keeps the container's network. The
+            # container is ephemeral and answer-free, so this relaxation leaks
+            # nothing. (--security-opt is a `docker run` flag — must precede the
+            # image name.)
+            cmd = ["docker", "run", "-i", "--rm",
+                   "--security-opt", "seccomp=unconfined",
+                   image, "mcp-server"]
             bug_dir, workspace = "/challenge", "/workspace"
         else:
             # Dev/local path: a host mcp-server graded against the local oracle.

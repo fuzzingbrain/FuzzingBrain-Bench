@@ -89,12 +89,23 @@ func (s *server) toolExec(args []byte) (any, error) {
 	useEnv := agentEnv()
 	if s.netIsolate {
 		inner := `exec /bin/bash -c "$BENCH_USER_CMD"`
+		// -r (userns) + -n (no network) are ALWAYS applied: the agent's shell
+		// must never reach the network — otherwise it could brute-force the
+		// remote oracle or fetch upstream material. This matches probeNetNS().
+		nsArgs := []string{"-r", "-n"}
+		// A private mount namespace (-m) is added ONLY when there is a distinct
+		// oracle dir to tmpfs-mask (the dev/local path). -m must remount root
+		// propagation, which needs privileges a plain container lacks; the
+		// canonical challenge image is answer-free (oracleDir == bugDir) so
+		// there is nothing to mask and -m is skipped — keeping exec() working
+		// inside the container while still denying it network access.
 		if s.oracleDir != "" && s.oracleDir != s.bugDir {
+			nsArgs = []string{"-r", "-m", "-n"}
 			inner = "mount -t tmpfs none " + shSingleQuote(s.oracleDir) +
 				" 2>/dev/null || true; " + inner
 		}
 		name = "unshare"
-		argv = []string{"-r", "-m", "-n", "--", "/bin/bash", "-c", inner}
+		argv = append(append([]string{}, nsArgs...), "--", "/bin/bash", "-c", inner)
 		useEnv = append(useEnv, "BENCH_USER_CMD="+p.Cmd)
 	}
 	cmd := exec.CommandContext(ctx, name, argv...)
