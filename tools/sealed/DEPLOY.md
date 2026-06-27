@@ -60,6 +60,15 @@ build environment. On a fresh Ubuntu 24.04 these were missing and had to be adde
   no flake fabricates a crash — so it never creates a false positive.
 - Keep ASan's default alt stack ON (stack-overflow bugs need it); best-of-N
   covers the occasional alt-stack-overflow truncation under load.
+- **crash2 fixed-run retry** (`BENCH_FIXED_RUN_ATTEMPTS`, default 5): the patched
+  binary is deterministically clean on kernel 6.8 but SEGVs ~27% on the grading
+  host's kernel 6.17 (ASan signal-handling regression), which sporadically dropped
+  crash2 for memory-class bugs. The differential re-runs the fixed binary up to N
+  and fires as soon as ANY run is clean — a genuinely-unfixed binary faults every
+  time, so this rescues host flakes without ever passing a real post-patch crash.
+  NOTE: do NOT raise `BENCH_GRADE_ATTEMPTS` to compensate — more whole-round
+  retries heat the small (7 GB / 2 CPU) host and make crash2 flakier, not better;
+  the targeted fixed-run retry is the right knob.
 
 ## Status
 
