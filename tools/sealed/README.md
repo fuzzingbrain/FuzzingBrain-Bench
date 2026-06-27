@@ -44,11 +44,20 @@ The oracle root and its bundles are **gitignored** — they never enter the publ
 
 ## Use a challenge (end user)
 
+Public images live on Docker Hub (anonymous pull, answer-free). The full list of
+challenge ids is in [CHALLENGES.md](CHALLENGES.md).
+
 ```bash
-docker run -it ghcr.io/<owner>/fbbench-challenge-<bug>:latest   # answer-free
-# inside: your agent drives mcp-server over stdio (setup/read/list/write/exec/grade).
-# grade() POSTs to BENCH_GRADE_URL and returns the verdict — no answers on this host.
+docker pull docker.io/osanzas/fbbench-challenge-dtc-01:latest      # answer-free
+docker run -it docker.io/osanzas/fbbench-challenge-dtc-01:latest
+# inside /challenge: read src/ + harness/, craft an input, and your agent drives
+# the mcp-server over stdio (setup/read/list/write/exec/grade). grade() POSTs the
+# candidate to BENCH_GRADE_URL (the remote oracle) and returns ONLY the capability
+# verdict {reach,crash,crash2,class,site} — no answer key is ever on this host.
 ```
+
+The image names use neutral `<project>-NN` aliases on purpose: the registry name
+must not reveal what the bug is. Discovering the class and location is the task.
 
 ## Verify
 
