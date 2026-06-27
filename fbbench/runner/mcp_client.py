@@ -332,15 +332,26 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
 
 class MCPClient:
     def __init__(self, server_bin: str, bug_dir: str, workspace: str,
-                 oracle_dir: str | None = None):
+                 oracle_dir: str | None = None, image: str | None = None):
         env = os.environ.copy()
-        env["BENCH_BUG_DIR"] = bug_dir
-        env["BENCH_WORKSPACE"] = workspace
-        # Grader reads expected.yaml + binaries from the oracle dir; the agent
-        # never sees it. Defaults to bug_dir for back-compat when unset.
-        env["BENCH_ORACLE_DIR"] = oracle_dir or bug_dir
+        if image:
+            # Canonical path: drive the PUBLIC challenge image's own mcp-server
+            # over stdio. The challenge surface + BENCH_* (incl. the remote
+            # BENCH_GRADE_URL) are baked into the image, so what we measure here
+            # is byte-identical to what any external user runs — no local-vs-Docker
+            # divergence. The container is ephemeral (--rm) and self-contained.
+            cmd = ["docker", "run", "-i", "--rm", image, "mcp-server"]
+            bug_dir, workspace = "/challenge", "/workspace"
+        else:
+            # Dev/local path: a host mcp-server graded against the local oracle.
+            env["BENCH_BUG_DIR"] = bug_dir
+            env["BENCH_WORKSPACE"] = workspace
+            # Grader reads expected.yaml + binaries from the oracle dir; the agent
+            # never sees it. Defaults to bug_dir for back-compat when unset.
+            env["BENCH_ORACLE_DIR"] = oracle_dir or bug_dir
+            cmd = [server_bin]
         self._proc = subprocess.Popen(
-            [server_bin],
+            cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,

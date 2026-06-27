@@ -19,7 +19,7 @@ from fbbench.models import CATALOG, PRICES, cost_usd, default_sweep
 from fbbench.paths import REPO
 from fbbench.runner.backends import make_backend
 from fbbench.runner.episode import run_episode
-from fbbench.runner.mcp_client import stage_bug_view
+from fbbench.runner.mcp_client import stage_bug_view, _full_scan_alias
 
 
 def print_models() -> None:
@@ -74,6 +74,13 @@ def main() -> int:
                          "off-target ablation to swap in an interference-free oracle binary (Arm B). "
                          "The source view is identical, so the swap is invisible to the agent.")
     ap.add_argument("--api-key", default=None, help="provider API key (or use the env var)")
+    ap.add_argument("--local", action="store_true",
+                    help="DEV ONLY: drive a host mcp-server graded against the local "
+                         "oracle. The default (canonical) path drives the PUBLIC challenge "
+                         "image + remote oracle — identical to what any external user runs, "
+                         "so reported scores are reproducible. Local grading can diverge.")
+    ap.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-challenge-",
+                    help="registry prefix for the canonical challenge images")
     ap.add_argument("--list-models", action="store_true",
                     help="print the supported-model catalog and exit")
     args = ap.parse_args()
@@ -87,7 +94,7 @@ def main() -> int:
     repo_root = Path(args.repo_root) if args.repo_root else REPO
     load_dotenv(repo_root)
     server_bin = args.server_bin or str(repo_root / "bin" / "mcp-server")
-    if not Path(server_bin).is_file():
+    if args.local and not Path(server_bin).is_file():
         print(f"error: mcp-server binary not found at {server_bin}; build with:", file=sys.stderr)
         print(f"  go -C {repo_root}/tools/mcp-server build -o {server_bin}", file=sys.stderr)
         return 2
@@ -96,6 +103,11 @@ def main() -> int:
     if bug_dir is None:
         print(f"error: bug {args.bug} not found under {repo_root}/bugs", file=sys.stderr)
         return 2
+
+    # Canonical path (default): the agent runs against the PUBLIC challenge image
+    # and grades via the remote oracle baked into it — the same artifact the world
+    # runs. `--local` is a dev shortcut whose local grading can diverge.
+    image = None if args.local else f"{args.image_prefix}{_full_scan_alias(str(bug_dir))}"
     out_dir = (Path(args.out_dir) if args.out_dir
                else Path(args.output) / args.bug / args.model)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -105,20 +117,28 @@ def main() -> int:
     # be named after it there — keep it neutral. Normal mode reveals the bug in
     # the description anyway, so a bug-named dir is fine (and aids debugging).
     ws_prefix = "fbbench-fullscan-" if args.full_scan else f"fbbench-{args.bug}-"
-    workspace = tempfile.mkdtemp(prefix=ws_prefix)
-    # Agent sees a staged sandbox (no grader/, poc/, binaries/); the grader
-    # reads the answer key + ground-truth binaries from the real bug dir.
-    bug_view = stage_bug_view(str(bug_dir), full_scan=args.full_scan)
     backend = make_backend(args.model, api_key=args.api_key)
     pocs_dir = (out_dir / "pocs") if args.preserve_pocs else None
+    if image:
+        # Canonical: everything (challenge surface, workspace, remote grading) is
+        # inside the image. The host stages nothing.
+        workspace, bug_view = None, None
+        ep_bug_dir = "/challenge"
+    else:
+        workspace = tempfile.mkdtemp(prefix=ws_prefix)
+        # Agent sees a staged sandbox (no grader/, poc/, binaries/); the grader
+        # reads the answer key + ground-truth binaries from the real bug dir.
+        bug_view = stage_bug_view(str(bug_dir), full_scan=args.full_scan)
+        ep_bug_dir = bug_view
     try:
         result = run_episode(
             backend=backend,
             bug_id=args.bug,
-            bug_dir=bug_view,
+            bug_dir=ep_bug_dir,
             oracle_dir=(args.oracle_dir or str(bug_dir)),
-            workspace=workspace,
+            workspace=workspace or "",
             server_bin=server_bin,
+            image=image,
             max_turns=args.max_turns,
             episode_log=str(out_dir / "episode.jsonl"),
             capability_set=capability_set(bug_dir),
@@ -128,8 +148,10 @@ def main() -> int:
             require_preset=args.require_preset,
         )
     finally:
-        shutil.rmtree(workspace, ignore_errors=True)
-        shutil.rmtree(bug_view, ignore_errors=True)
+        if workspace:
+            shutil.rmtree(workspace, ignore_errors=True)
+        if bug_view:
+            shutil.rmtree(bug_view, ignore_errors=True)
 
     score = {
         "bug_id": result.bug_id,

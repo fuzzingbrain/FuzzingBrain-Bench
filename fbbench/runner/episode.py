@@ -95,9 +95,10 @@ def run_episode(
     force_full: bool = False,
     full_scan: bool = False,
     require_preset: bool = False,
+    image: str | None = None,
 ) -> EpisodeResult:
     mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace,
-                    oracle_dir=oracle_dir)
+                    oracle_dir=oracle_dir, image=image)
     mcp.initialize()
     kb: set[str] = set(capability_set or ["reach", "crash", "class", "site"])
     poc_root: Path | None = Path(pocs_dir) if pocs_dir else None

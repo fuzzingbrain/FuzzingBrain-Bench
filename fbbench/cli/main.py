@@ -52,6 +52,14 @@ def build_parser() -> argparse.ArgumentParser:
                              "gets only the harness and must find a crashing input")
     sp_run.add_argument("--api-key", default=None,
                         help="provider API key; default reads ./.env")
+    sp_run.add_argument("--local", action="store_true",
+                        help="DEV ONLY: drive a host mcp-server graded against the "
+                             "local oracle. The default (canonical) path pulls the "
+                             "PUBLIC challenge image and grades via the remote oracle "
+                             "baked into it — identical to what anyone else runs, so "
+                             "scores are reproducible. Needs only Docker, not Go.")
+    sp_run.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-challenge-",
+                        help="registry prefix for the canonical challenge images")
     sp_run.set_defaults(fn=commands.cmd_run)
 
     sp_traj = sub.add_parser("traj",

@@ -57,11 +57,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 WORKDIR /challenge
 COPY bundle/ /challenge/
 COPY mcp-server /usr/local/bin/mcp-server
+RUN mkdir -p /workspace && chmod 0777 /workspace
 ENV BENCH_BUG_ID={bug}
 ENV BENCH_GRADE_URL={grade_url}
 ENV BENCH_BUG_DIR=/challenge
-# The user's agent drives the mcp-server over stdio (setup/read/list/write/exec/grade).
-# grade() is a network call to BENCH_GRADE_URL; everything else is local to /challenge.
+ENV BENCH_WORKSPACE=/workspace
+# Self-driveable: `docker run -i <image> mcp-server` speaks the stdio MCP protocol
+# (setup/read/list/write/exec/grade) with everything baked in — this is the single
+# canonical runtime for the benchmark, identical for us and any external user.
+# grade() is a network call to BENCH_GRADE_URL; everything else is local to the image.
 LABEL fbbench.role="challenge" fbbench.bug="{bug}"
 """
 

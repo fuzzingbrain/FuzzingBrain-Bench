@@ -59,6 +59,26 @@ docker run -it docker.io/osanzas/fbbench-challenge-dtc-01:latest
 The image names use neutral `<project>-NN` aliases on purpose: the registry name
 must not reveal what the bug is. Discovering the class and location is the task.
 
+### Run end-to-end with an LLM agent (canonical path)
+
+`fb-bench run` is the one execution path for **everyone, including the maintainers**:
+it pulls the public challenge image, drives the agent loop through the image's own
+`mcp-server` over `docker run -i … mcp-server`, and grades via the remote oracle baked
+into the image. What we measure is byte-identical to what any external user runs, so
+reported scores are reproducible — there is no separate "local" eval that could diverge.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...        # or OPENAI_API_KEY / GEMINI_API_KEY
+./fb-bench run dtc-fdt32-misalign --model claude-opus-4-7 --max-turns 300
+#  -> pulls docker.io/osanzas/fbbench-challenge-dtc-01:latest (answer-free)
+#  -> agent reads src/+harness, crafts inputs, grade() hits the remote oracle
+#  -> writes runs/<exp>/<bug>/<model>/run-N/{score.json,episode.jsonl,traj.md}
+```
+
+Requirements for the canonical path: **Docker + a Python venv** (`make setup`, one-time)
+and a provider API key. No Go toolchain and no host `mcp-server` are needed — those are
+only for `--local` (dev shortcut, grades against a local oracle and can diverge).
+
 ## Verify
 
 ```bash
@@ -70,12 +90,16 @@ python tools/sealed/verify_sealed.py --grade-url http://localhost:8077
 ## Publish images
 
 ```bash
-python tools/sealed/push_all.py --registry ghcr.io --owner <owner>
+# live registry: Docker Hub (public-by-default; anonymous pull, answer-free)
+python tools/sealed/push_all.py --registry docker.io --owner osanzas
 ```
 
 ## Scope note — the git repo itself
 
-These images make the *distribution* answer-free. The `bugs/` tree in this repo
-still contains the answers (poc/grader/binaries/fix_commit) and so does git history.
-Making the *public repository* answer-free (private answer repo + public challenge-
-only repo, or history rewrite) is a separate, deliberate step — see PLAN.md.
+Both the *distribution* (images) and the *public repository* are now answer-free.
+The git history was rewritten so `origin/main` carries **zero** `poc/ grader/ binaries/`
+or `expected.yaml`/`fix_commit` paths (verify: `git ls-tree -r origin/main --name-only
+| grep -E '/(poc|grader|binaries)/|expected\.yaml$'` returns nothing). The answers
+live only in the private oracle bundles on the grade host (`oracle-root/`, gitignored).
+A maintainer's local working tree may still hold the answer dirs for rebuilds — they
+are gitignored and never re-enter the repo. See PLAN.md for the rewrite procedure.

@@ -255,7 +255,9 @@ def cmd_run(args) -> int:
                 f"  add it to ./.env or pass --api-key."))
 
     # ---- build + venv -----------------------------------------------------
-    if not SERVER.exists():
+    # Canonical (default) path drives the public challenge image's own baked-in
+    # mcp-server over `docker run`, so the host binary is only needed for --local.
+    if getattr(args, "local", False) and not SERVER.exists():
         print(dim("  bin/mcp-server missing — building (requires go ≥ 1.22)…"))
         if subprocess.call(["make", "mcp-server"], cwd=str(REPO)) != 0:
             sys.exit(red("  build failed; run `make mcp-server` manually"))
@@ -298,6 +300,10 @@ def cmd_run(args) -> int:
         cmd.append("--force-full")
     if getattr(args, "full_scan", False):
         cmd.append("--full-scan")
+    if getattr(args, "local", False):
+        cmd.append("--local")
+    if getattr(args, "image_prefix", None):
+        cmd += ["--image-prefix", args.image_prefix]
 
     print()
     print(bold("  fb-bench run  ") + cyan(args.bug_id) +
