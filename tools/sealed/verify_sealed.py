@@ -18,6 +18,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 from fbbench.grading.bench_yaml import find_bug, capability_set  # noqa: E402
+from fbbench.runner.mcp_client import _full_scan_alias  # noqa: E402
 
 def remote_grade(url, bug, poc_bytes):
     req = urllib.request.Request(f"{url}/grade?bug={bug}", data=poc_bytes,
@@ -50,6 +51,8 @@ def main():
     for bug in bugs:
         bd = find_bug(bug, ROOT)
         kb = set(capability_set(bd)) if bd else set()
+        # The public handle (image tag + oracle key) is the neutral alias.
+        alias = _full_scan_alias(str(bd)) if bd else bug
         # wire — pick the ACTUAL crashing PoC, not a generator/helper. Prefer
         # poc.bin, then any *.bin, never *.py/*.md/*.sh/*.txt.
         pocs = []
@@ -64,7 +67,7 @@ def main():
             rep["no_poc"].append(bug)
         else:
             try:
-                caps = remote_grade(a.grade_url, bug, pocs[0].read_bytes()).get("capabilities", {})
+                caps = remote_grade(a.grade_url, alias, pocs[0].read_bytes()).get("capabilities", {})
                 fired = {k for k, v in caps.items() if v == "fired"}
                 if kb.issubset(fired):
                     rep["wire_ok"].append(bug)
@@ -73,7 +76,7 @@ def main():
             except Exception as e:
                 rep["wire_fail"].append((bug, str(e)[:80]))
         # image leak
-        leak = image_leak(bug)
+        leak = image_leak(alias)
         if leak is None:
             rep["no_image"].append(bug)
         elif leak:
