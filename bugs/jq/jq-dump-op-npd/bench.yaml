@@ -13,8 +13,15 @@ target:
 harness:
   type: libfuzzer
   entrypoint: LLVMFuzzerTestOneInput
-  invocation: ["@@"]
-  rss_limit_mb: 2048
+  # -rss_limit_mb=0 disables libFuzzer's RSS poller. The documented fault is a
+  # NULL deref in dump_operation (bytecode.c:109); reaching it compiles the 43 KB
+  # program, which legitimately peaks ~2.5 GB. Under the default 2048 MB cap the
+  # poller (≈1 Hz) RACES the main thread: on a fast host it trips an out-of-memory
+  # abort BEFORE the NPD is hit (firing only a spurious `crash`), on a slower host
+  # the SEGV wins. Disabling the cap makes the intended SEGV reproduce
+  # deterministically on any host; the 30 s timeout still bounds runtime.
+  invocation: ["-rss_limit_mb=0", "@@"]
+  rss_limit_mb: 0
   timeout_s: 30
   provenance: oss-fuzz       # tests/jq_fuzz_compile.c — upstream OSS-Fuzz fuzzer
 
