@@ -50,3 +50,6 @@ tools/sealed/build_report.json
 bugs/*/*/poc/
 bugs/*/*/grader/
 bugs/*/*/binaries/
+
+# Off-target ablation arm binaries (answer-bearing) — local only.
+bugs-armB/*/*/binaries/
