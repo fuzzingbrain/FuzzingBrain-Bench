@@ -21,7 +21,16 @@ harness:
   timeout_s: 10
   provenance: fuzzingbrain
 
-capability_set: [class, crash, crash2, reach]
+# Reproducible set on the deployed oracle. This is a timeout-style
+# algorithmic-complexity DoS: `crash` (the slow-unit / wall-clock alarm
+# trips) and `crash2` (the fixed parser no longer wedges) fire robustly.
+# `class`=timeout is CPU-speed-dependent (a fast host completes the ~4.17M
+# SHA-256 iterations in ~5.5 s, under the 10 s alarm, so no timeout banner);
+# `reach`/`site` are not machine-gradable because the timeout banner carries
+# no symbolized stack frames (see grader/expected.yaml). They are kept there
+# for documentation only and intentionally excluded here — declaring them
+# would overclaim a capability the oracle cannot reproduce.
+capability_set: [crash, crash2]
 
 reproducibility:
   base_image_digest: ""
@@ -37,11 +46,11 @@ notes: |
   crash was a libFuzzer slow-unit: a 382-byte PE32+ with a single section
   whose VirtualSize is ~4 GiB and SizeOfRawData is 0 drives uki_hash()
   (src/shared/pe-binary.c) into ~4.17 million 1024-byte SHA-256 update
-  iterations, wedging the parser for >10 s with no termination. Modeled
-  with the minimal [crash, class] capability set and a timeout-style
-  oracle (sanitizer: libfuzzer) because the observable signature is a
-  wall-clock timeout banner that carries no symbolized stack frames; the
-  true hot-loop location is recorded in grader/expected.yaml for
-  documentation only. Maintainer classified the underlying issue Severity
+  iterations, wedging the parser for >10 s with no termination. Graded with
+  a timeout-style oracle (sanitizer: libfuzzer) on the reproducible
+  [crash, crash2] set: the observable signature is a wall-clock timeout
+  banner that carries no symbolized stack frames, and the hot loop is fast
+  enough that `class`=timeout is CPU-speed-dependent, so the true hot-loop
+  location is recorded in grader/expected.yaml for documentation only. Maintainer classified the underlying issue Severity
   "None" (UKI inputs are trusted and signed); the fix was still accepted
   because a 382-byte file should not take ten seconds to reject.
