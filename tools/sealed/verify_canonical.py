@@ -51,8 +51,8 @@ def pick_poc(bd: Path) -> bytes | None:
     return chosen[0].read_bytes() if chosen else None
 
 
-def verify_one(bug: str, image_prefix: str) -> dict:
-    import base64
+def verify_one(bug: str, image_prefix: str, settle: float = 0.0) -> dict:
+    import base64, time
     bd = find_bug(bug, ROOT)
     res = {"bug": bug, "checks": {}, "errors": []}
     if bd is None:
@@ -127,6 +127,10 @@ def verify_one(bug: str, image_prefix: str) -> dict:
             try: m.close()
             except Exception: pass
     res["pass"] = bool(res["checks"]) and all(res["checks"].values()) and not res["errors"]
+    if settle:
+        # Let the (small) oracle host release a memory-heavy grade's RSS before
+        # the next one — reduces transient crash2 misses under back-to-back load.
+        time.sleep(settle)
     return res
 
 
@@ -135,6 +139,8 @@ def main():
     ap.add_argument("--only", default=None)
     ap.add_argument("--sample", type=int, default=0)
     ap.add_argument("--workers", type=int, default=3)
+    ap.add_argument("--settle", type=float, default=0.0,
+                    help="seconds to pause after each bug (eases oracle host memory pressure)")
     ap.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-challenge-")
     ap.add_argument("--out", default=str(ROOT / "tools" / "sealed" / "verify_canonical_report.json"))
     a = ap.parse_args()
@@ -147,7 +153,7 @@ def main():
 
     results = {}
     with ThreadPoolExecutor(max_workers=a.workers) as ex:
-        futs = {ex.submit(verify_one, b, a.image_prefix): b for b in bugs}
+        futs = {ex.submit(verify_one, b, a.image_prefix, a.settle): b for b in bugs}
         for fut in as_completed(futs):
             r = fut.result()
             results[r["bug"]] = r
