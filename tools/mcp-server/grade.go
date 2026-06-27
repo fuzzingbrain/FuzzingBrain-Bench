@@ -308,10 +308,22 @@ func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYA
 		if caps["crash"] == "fired" {
 			fixedBin := filepath.Join(s.oracleDir, "binaries", "fixed-asan", "harness")
 			if st, err := os.Stat(fixedBin); err == nil && !st.IsDir() {
-				fout := runHarness(fixedBin, bench.Harness.Invocation, pocPath, runDir,
-					bench.Harness.TimeoutS, isLeakClass(expected.Class.Expected))
-				if !fixedFaulted(fout) {
-					caps["crash2"] = "fired"
+				// crash2 means "the patched code does NOT fault on this input".
+				// The fixed binary should exit cleanly, but on some hosts (notably
+				// kernel 6.17 + ASan) it intermittently SEGVs for environmental
+				// reasons unrelated to the input — a binary that is deterministically
+				// clean elsewhere faults ~1-in-4 here. So run it up to N times and
+				// fire as soon as ANY run is clean: that proves the fix holds on
+				// this input. A genuinely-unfixed binary faults on every attempt, so
+				// crash2 stays unfired — this rescues host flakes without ever
+				// turning a real post-patch crash into a pass.
+				for attempt := 0; attempt < fixedRunAttempts(); attempt++ {
+					fout := runHarness(fixedBin, bench.Harness.Invocation, pocPath, runDir,
+						bench.Harness.TimeoutS, isLeakClass(expected.Class.Expected))
+					if !fixedFaulted(fout) {
+						caps["crash2"] = "fired"
+						break
+					}
 				}
 			}
 		}
@@ -472,6 +484,19 @@ func signalName(ee *exec.ExitError) string {
 // removed the crash.
 func fixedFaulted(r harnessRun) bool {
 	return r.timedOut || r.exitCode != 0 || crashFired(r)
+}
+
+// fixedRunAttempts is how many times the crash2 differential re-runs the fixed
+// binary before concluding it faults. The fixed binary is deterministically
+// clean on a healthy host, so 1 would do; the retries exist solely to absorb
+// host-environment SEGV flakes (kernel 6.17 + ASan). Tunable via env.
+func fixedRunAttempts() int {
+	if v := os.Getenv("BENCH_FIXED_RUN_ATTEMPTS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return 5
 }
 
 func crashFired(r harnessRun) bool {
