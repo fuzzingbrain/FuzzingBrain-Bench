@@ -43,6 +43,10 @@ func (s *server) gradeRemote(abs string) (any, error) {
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
+	// When the oracle sits behind an ngrok free/dev domain, browser-like requests
+	// get an HTML interstitial. This header tells ngrok to skip it so the verdict
+	// JSON always comes back clean, regardless of how the request is classified.
+	req.Header.Set("ngrok-skip-browser-warning", "true")
 	cl := &http.Client{Timeout: 600 * time.Second}
 	resp, err := cl.Do(req)
 	if err != nil {

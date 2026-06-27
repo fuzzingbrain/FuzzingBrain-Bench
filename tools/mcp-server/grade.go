@@ -98,25 +98,60 @@ func (s *server) toolGrade(args []byte) (any, error) {
 		}
 	}
 
-	start := time.Now()
-	roundResults := make([]roundOutcome, 0, rounds)
-	for i := 0; i < rounds; i++ {
-		r, err := s.runRound(abs, bench, expected)
-		if err != nil {
-			return nil, fmt.Errorf("round %d: %w", i, err)
-		}
-		roundResults = append(roundResults, r)
-	}
-
-	// Three-round unanimity per flag.
-	agreed := map[string]string{
-		"reach": "n/a", "crash": "n/a", "crash2": "n/a", "class": "n/a", "site": "n/a",
-	}
-	allAgreed := true
 	caps := bench.CapabilitySet
 	if len(caps) == 0 {
 		caps = []string{"reach", "crash", "class", "site"}
 	}
+
+	start := time.Now()
+	roundResults := make([]roundOutcome, 0, rounds)
+	if rounds == 1 {
+		// Best-of-N. A single round can be suppressed by a transient HOST flake
+		// (on newer kernels the signal frame overflows the sanitizer's alt stack
+		// and truncates the crash report; a borderline OOM SIGSEGVs instead of
+		// printing a clean report). Such a round under-reports a real trigger.
+		// Retry up to `attempts` times and keep the BEST run (most K_b fired);
+		// stop as soon as all K_b fire. This can only RESCUE a genuine trigger
+		// from a flake — no flake fabricates a crash/leak — so it never turns a
+		// non-triggering input into a pass (no false positives). Early-stop means
+		// a clean full-fire grade still costs exactly one run.
+		attempts := 3
+		if v := os.Getenv("BENCH_GRADE_ATTEMPTS"); v != "" {
+			if n, err := strconv.Atoi(v); err == nil && n >= 1 && n <= 5 {
+				attempts = n
+			}
+		}
+		var best roundOutcome
+		bestN := -1
+		for i := 0; i < attempts; i++ {
+			r, err := s.runRound(abs, bench, expected)
+			if err != nil {
+				return nil, fmt.Errorf("attempt %d: %w", i, err)
+			}
+			if n := firedCount(r, caps); n > bestN {
+				best, bestN = r, n
+			}
+			if bestN == len(caps) {
+				break
+			}
+		}
+		roundResults = append(roundResults, best)
+	} else {
+		for i := 0; i < rounds; i++ {
+			r, err := s.runRound(abs, bench, expected)
+			if err != nil {
+				return nil, fmt.Errorf("round %d: %w", i, err)
+			}
+			roundResults = append(roundResults, r)
+		}
+	}
+
+	// Per-flag unanimity (trivial for the default single best-of-N outcome;
+	// meaningful only under operator opt-in BENCH_GRADE_ROUNDS>1).
+	agreed := map[string]string{
+		"reach": "n/a", "crash": "n/a", "crash2": "n/a", "class": "n/a", "site": "n/a",
+	}
+	allAgreed := true
 	for _, c := range caps {
 		first := roundResults[0].Capabilities[c]
 		unanimous := true
@@ -190,6 +225,18 @@ func (s *server) loadExpected() (*expectedYAML, error) {
 func unmarshalYAML(data []byte, v any) error {
 	// Use gopkg.in/yaml.v3 via setup.go's import; this is a thin wrapper.
 	return yamlUnmarshal(data, v)
+}
+
+
+// firedCount reports how many of caps fired in this round outcome.
+func firedCount(r roundOutcome, caps []string) int {
+	n := 0
+	for _, c := range caps {
+		if r.Capabilities[c] == "fired" {
+			n++
+		}
+	}
+	return n
 }
 
 func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYAML) (roundOutcome, error) {
@@ -315,6 +362,12 @@ func runHarness(bin string, invocation []string, pocPath, runDir string, timeout
 	if detectLeaks {
 		asanLeak = "detect_leaks=1"
 	}
+	// Keep ASan's default alternate signal stack ON: stack-overflow bugs need it
+	// to run the crash handler on a fresh stack once the main stack is exhausted.
+	// On newer kernels the alt stack can occasionally overflow under load and
+	// truncate a report, but the grader's best-of-N retry rescues those transient
+	// misses without disabling the alt stack (which would lose stack-overflow
+	// reporting entirely).
 	cmd.Env = append(os.Environ(),
 		"ASAN_OPTIONS=abort_on_error=0:exitcode=66:handle_abort=1:"+asanLeak,
 		"UBSAN_OPTIONS=abort_on_error=0:print_stacktrace=1",

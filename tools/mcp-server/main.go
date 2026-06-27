@@ -102,6 +102,12 @@ func main() {
 		if len(os.Args) > 2 && os.Args[2] != "" && os.Args[2][0] == ':' {
 			addr = os.Args[2]
 		}
+		// Resolve to absolute: grading execs the harness with the per-request
+		// workspace as cwd, so a relative oracle-root would make the harness path
+		// relative-to-workspace and fork/exec would fail with ENOENT.
+		if abs, err := filepath.Abs(oracleRoot); err == nil {
+			oracleRoot = abs
+		}
 		runGradeServer(addr, oracleRoot)
 		return
 	}

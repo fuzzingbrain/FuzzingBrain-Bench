@@ -19,6 +19,8 @@ import argparse, json, os, subprocess, sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from fbbench.runner.mcp_client import _full_scan_alias  # noqa: E402
 
 def all_bugs():
     out = subprocess.run(["git", "ls-files", "bugs/*/*/bench.yaml"],
@@ -51,13 +53,15 @@ def main():
         bd = bug_dir(bug)
         if bd is None:
             report["no_dir"].append(bug); print(f"NO-DIR  {bug}", flush=True); continue
-        # 1. oracle bundle (private) — symlink the real bug dir
-        link = oracle_root / bug
+        alias = _full_scan_alias(str(bd.resolve()))
+        # 1. oracle bundle (private) — symlink the real bug dir, keyed by the public
+        #    ALIAS so the grade server resolves oracle-root/<alias> from BENCH_BUG_ID.
+        link = oracle_root / alias
         if link.exists() or link.is_symlink():
             link.unlink()
         os.symlink(bd.resolve(), link)
-        # 2. challenge image (public)
-        tag = f"{a.tag_prefix}/{bug}:latest"
+        # 2. challenge image (public) — tagged by alias inside build_challenge.py
+        tag = f"{a.tag_prefix}/{alias}:latest"
         if not a.force and not a.no_build and image_exists(tag):
             report["skipped"].append(bug); print(f"SKIP    {bug} (image exists)", flush=True); continue
         cmd = [sys.executable, str(ROOT / "tools" / "sealed" / "build_challenge.py"),
