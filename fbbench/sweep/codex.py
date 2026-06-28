@@ -180,8 +180,12 @@ def _best_caps(alias: str, blobs: list[str]) -> tuple[dict, str | None, int]:
 
 
 def _grade_calls(log_text: str) -> int:
-    """Count in-run grade() tool invocations from the codex log (best-effort)."""
-    return len(re.findall(r"mcp__bench__grade\b", log_text))
+    """Count in-run grade() tool invocations from the codex log (best-effort).
+
+    Codex renders bench MCP calls as `bench.grade(...)` (also `bench__grade` in
+    some event shapes), so match either.
+    """
+    return len(re.findall(r"bench[._]+grade\(", log_text))
 
 
 def cmd_one(args) -> int:
