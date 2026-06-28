@@ -38,7 +38,11 @@ def stage_codex_env(real_bug_dir: str, bug: str) -> tuple[str, str]:
     Returns (view, ws). The caller owns cleanup of both dirs.
     """
     from fbbench.runner.mcp_client import stage_bug_view
-    view = stage_bug_view(real_bug_dir)
+    # Discovery mode: withhold the description (which names the class + site),
+    # scrub bench.yaml of title/capability_set. Matches CODEX_TASK_PROMPT (a
+    # discovery task) and the main arm's full_scan; the sanitizer still reaches
+    # the agent via setup() (BENCH_ORACLE_DIR -> expected.yaml class.sanitizer).
+    view = stage_bug_view(real_bug_dir, full_scan=True)
     ws = tempfile.mkdtemp(prefix=f"codex-{bug}-")
     ch = os.path.join(ws, "codex_home")
     os.makedirs(ch, exist_ok=True)
