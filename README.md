@@ -35,6 +35,12 @@ Challenges are referenced by a neutral alias `<project>-NN` (e.g. `avro-03`):
 the project name is not a secret (the harness reveals it), but the specific bug
 is never named.
 
+**Browse all 68 challenges:** [`tools/sealed/CHALLENGES.md`](tools/sealed/CHALLENGES.md)
+— one row per challenge (project · language · harness). The seal architecture
+and the grading-server source live in [`tools/sealed/`](tools/sealed/) and
+[`tools/mcp-server/`](tools/mcp-server/); anyone can audit that no answer key
+ships with an image (`python tools/sealed/verify_sealed.py <image>`).
+
 ## The capability ladder
 
 A candidate input is graded on five nested rungs, weakest to strongest:
@@ -68,6 +74,8 @@ oracle. Set the relevant model API key in your environment first.
 bugs/<project>/<alias>/   one challenge: the fuzz harness + neutral metadata
                           (project, language, sanitizer, harness interface)
 fbbench/                  the runner / CLI engine
+tools/sealed/            challenge index, seal architecture, answer-free verifier
+tools/mcp-server/        the MCP + remote grading server (Go source, auditable)
 docs/                     the public site + the agent prompt
 ```
 
