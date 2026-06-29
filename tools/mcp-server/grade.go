@@ -502,6 +502,19 @@ func fixedRunAttempts() int {
 func crashFired(r harnessRun) bool {
 	switch r.signal {
 	case "SIGSEGV", "SIGABRT", "SIGBUS", "SIGILL", "SIGFPE":
+		// A real fault on a sanitizer/libFuzzer harness ALWAYS leaves evidence:
+		// a sanitizer report, a libFuzzer trailer, or — at the very least —
+		// libFuzzer's startup banner ("INFO: Running with entropic ...") which
+		// is printed to stderr BEFORE the input is ever executed. A terminating
+		// signal with NO stdout and NO stderr at all means the process died
+		// before it even ran the input: that is a pre-init HOST flake (observed
+		// on kernel 6.17 + ASan, where the signal frame can SIGSEGV the runtime
+		// during startup), not a vulnerability the input triggered. Crediting it
+		// would let an inert input steal crash/crash2 on a flaky round, so a
+		// bare, output-less signal is NOT a crash.
+		if strings.TrimSpace(r.stdout) == "" && strings.TrimSpace(r.stderr) == "" {
+			return false
+		}
 		return true
 	}
 	if r.exitCode == 137 {
