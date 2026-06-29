@@ -88,7 +88,12 @@ def stage_codex_env(real_bug_dir: str, bug: str) -> tuple[str, str, str]:
     """
     alias = _full_scan_alias(real_bug_dir)
     image = f"{IMAGE_PREFIX}{alias}"
-    root = tempfile.mkdtemp(prefix=f"codex-{bug}-")
+    # Name the temp dir by the NEUTRAL alias, never the descriptive bug_id: Codex's
+    # --cd is this host path, so a name like "codex-avro-neg-block-size-…" would
+    # leak the bug (the class + where to look) straight into its working directory.
+    # The alias (avro-02) reveals nothing — matches the main arm's neutral fullscan
+    # workspace prefix. (`bug` is still used for the result dir, which Codex never sees.)
+    root = tempfile.mkdtemp(prefix=f"codex-{alias}-")
     ch = os.path.join(root, "codex_home")
     os.makedirs(ch, exist_ok=True)
     work = os.path.join(root, "workspace")
