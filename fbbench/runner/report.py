@@ -20,9 +20,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fbbench.runner.traj import build_traj
+from fbbench.runner.traj import build_traj, _grade_out
 
 LADDER = ["reach", "crash", "differential", "class", "site"]
+
+_MAX_BLOCK = 6000  # cap each rendered tool arg/output block (raw transcript has full)
 _LADDER_LABEL = {"reach": "reach", "crash": "crash", "differential": "differential",
                  "class": "class", "site": "site"}
 
@@ -72,6 +74,154 @@ def _stat(n: str, label: str, cls: str = "") -> str:
     return f'<div class="stat"><div class="n {cls}">{n}</div><div class="l">{_esc(label)}</div></div>'
 
 
+def _block(s: str) -> str:
+    """Escape + cap a multi-line string for a <pre> block."""
+    s = "" if s is None else str(s)
+    clipped = len(s) > _MAX_BLOCK
+    if clipped:
+        s = s[:_MAX_BLOCK] + f"\n… [+{len(s) - _MAX_BLOCK:,} more chars — see transcript.jsonl]"
+    return _esc(s)
+
+
+def _result_text(tool: str, result, is_error: bool) -> tuple[str, bool]:
+    """Full-fidelity (capped) text for a tool result + whether it faulted."""
+    if is_error:
+        data = result.get("data") if isinstance(result, dict) else result
+        return "ERROR: " + (str(data) if data else ""), False
+    if not isinstance(result, dict):
+        return str(result), False
+    if tool == "grade":
+        crash = _grade_out(result)[1]
+        ho = result.get("harness_output") or {}
+        parts = []
+        if isinstance(ho, dict):
+            if ho.get("exit_code") is not None:
+                parts.append(f"exit_code: {ho.get('exit_code')}")
+            if ho.get("signal"):
+                parts.append(f"signal: {ho.get('signal')}")
+            if ho.get("stdout"):
+                parts.append("--- stdout ---\n" + str(ho.get("stdout")))
+            if ho.get("stderr"):
+                parts.append("--- stderr ---\n" + str(ho.get("stderr")))
+        verdict = {k: v for k, v in result.items() if k != "harness_output"}
+        if verdict:
+            parts.insert(0, json.dumps(verdict, indent=2))
+        return ("\n".join(parts) or json.dumps(result, indent=2)), crash
+    if tool == "exec":
+        out = [f"exit_code: {result.get('exit_code')}"]
+        if result.get("stdout"):
+            out.append("--- stdout ---\n" + str(result.get("stdout")))
+        if result.get("stderr"):
+            out.append("--- stderr ---\n" + str(result.get("stderr")))
+        return "\n".join(out), False
+    if tool == "read_file":
+        return str(result.get("content", "")), False
+    return json.dumps(result, indent=2), False
+
+
+def build_conversation(transcript_path: Path) -> tuple[list[dict], str, str]:
+    """Reconstruct the dialogue: per-turn assistant text + tool calls + results.
+
+    Returns (turns, system_prompt, initial_user_message). Each turn is
+    {turn, text, tokens, stop, calls:[{tool, input, result_text, crash, err}]}.
+    Pairs an assistant's tool_calls with the matching tool_result by id.
+    """
+    results_by_id: dict[str, dict] = {}
+    assistants: list[dict] = []
+    notes_by_turn: dict[int, list[str]] = {}
+    system_prompt = initial_user = ""
+    for line in transcript_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        ev = e.get("event")
+        if ev == "start":
+            system_prompt = e.get("system_prompt", "") or ""
+            initial_user = e.get("initial_user_message", "") or ""
+        elif ev == "tool_result":
+            tid = e.get("id")
+            if tid is not None:
+                results_by_id[tid] = e
+        elif ev == "assistant":
+            assistants.append(e)
+        elif ev == "budget_note":
+            notes_by_turn.setdefault(e.get("turn"), []).append(e.get("note", ""))
+
+    turns: list[dict] = []
+    for a in assistants:
+        calls = []
+        for tc in (a.get("tool_calls") or []):
+            tid = tc.get("id")
+            r = results_by_id.get(tid, {})
+            tool = tc.get("name") or r.get("tool") or "?"
+            rtext, crash = _result_text(tool, r.get("result"), r.get("is_error", False))
+            calls.append({
+                "tool": tool,
+                "input": tc.get("input") if tc.get("input") is not None else r.get("input"),
+                "result_text": rtext,
+                "crash": crash,
+                "err": bool(r.get("is_error", False)),
+            })
+        turns.append({
+            "turn": a.get("turn"),
+            "text": a.get("text") or "",
+            "stop": a.get("stop_reason") or "",
+            "in_tok": a.get("input_tokens", 0),
+            "out_tok": a.get("output_tokens", 0),
+            "notes": notes_by_turn.get(a.get("turn"), []),
+            "calls": calls,
+        })
+    return turns, system_prompt, initial_user
+
+
+def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str) -> str:
+    head = ""
+    if system_prompt:
+        head += (
+            '<details class="sys"><summary>system prompt — the task framing the agent '
+            'received (answer-free)</summary>'
+            f'<pre>{_block(system_prompt)}</pre></details>'
+        )
+    if initial_user:
+        head += (
+            '<details class="sys" open><summary>initial user message</summary>'
+            f'<pre>{_block(initial_user)}</pre></details>'
+        )
+
+    blocks = []
+    for t in turns:
+        inner = []
+        if t["text"].strip():
+            inner.append(f'<div class="think">{_block(t["text"])}</div>')
+        for note in t["notes"]:
+            inner.append(f'<div class="bnote">{_esc(note)}</div>')
+        for c in t["calls"]:
+            badge = ('<span class="b crash">crash</span>' if c["crash"]
+                     else ('<span class="b err">error</span>' if c["err"] else ""))
+            arg_json = json.dumps(c["input"], indent=2, ensure_ascii=False) if c["input"] is not None else ""
+            arg_det = (f'<details><summary>arguments</summary><pre>{_block(arg_json)}</pre></details>'
+                       if arg_json.strip() not in ("", "{}", "null") else "")
+            open_attr = " open" if (c["crash"] or c["err"]) else ""
+            res_det = (f'<details{open_attr}><summary>result {badge}</summary>'
+                       f'<pre>{_block(c["result_text"])}</pre></details>')
+            ccls = "crash" if c["crash"] else ("err" if c["err"] else "")
+            inner.append(
+                f'<div class="tcall {ccls}"><div class="tc-h"><code>{_esc(c["tool"])}</code>{badge}</div>'
+                f'{arg_det}{res_det}</div>'
+            )
+        meta = (f'turn {t["turn"]}'
+                + (f' · {t["in_tok"]:,} in / {t["out_tok"]:,} out tok' if (t["in_tok"] or t["out_tok"]) else "")
+                + (f' · stop: {_esc(t["stop"])}' if t["stop"] else ""))
+        blocks.append(
+            f'<div class="cturn"><div class="cturn-h">{meta}</div>{"".join(inner)}</div>'
+        )
+    body = "".join(blocks) or '<div class="muted">no conversation recorded</div>'
+    return head + '<div class="conv">' + body + "</div>"
+
+
 def build_report_html(run_dir: Path) -> str:
     score = _load(run_dir / "score.json")
     cost = _load(run_dir / "cost.json")
@@ -86,7 +236,7 @@ def build_report_html(run_dir: Path) -> str:
     reason = score.get("terminated_reason", "—")
     turns = score.get("turns_used", 0)
     dur = score.get("duration_s", 0.0)
-    usd = score.get("total_usd", cost.get("total_usd", 0.0))
+    usd = score.get("total_usd") or cost.get("total_usd") or 0.0
     err = score.get("error", "")
 
     # capability_set + sanitizer / language come from the transcript start event.
@@ -145,6 +295,11 @@ def build_report_html(run_dir: Path) -> str:
         if err else ""
     )
 
+    conv_html = ""
+    if tpath.is_file():
+        conv_turns, system_prompt_full, initial_user = build_conversation(tpath)
+        conv_html = _conversation_html(conv_turns, system_prompt_full, initial_user)
+
     return _TEMPLATE.format(
         bug=_esc(bug), model=_esc(model), tags=tag_html,
         tier=tier, verdict_cls=verdict_cls,
@@ -158,6 +313,7 @@ def build_report_html(run_dir: Path) -> str:
         ngrades=len(grades), nfaults=len(faults),
         tool_rows=tool_rows_html or '<tr><td colspan="3" class="muted">no tool calls</td></tr>',
         traj_rows="".join(traj_rows) or '<tr><td colspan="6" class="muted">no trajectory</td></tr>',
+        conversation=conv_html,
         err_card=err_card,
     )
 
@@ -216,6 +372,29 @@ code{{background:#0d1117;border:1px solid var(--line);border-radius:4px;padding:
 .traj tr.crash td{{background:#f8514915;}}.traj tr.crash td.mk{{color:var(--red);}}
 .traj tr.err td.out{{color:var(--amber);}}
 .note{{background:#f8514915;border:1px solid #f8514944;border-radius:10px;padding:11px 15px;color:#ffa198;font-size:.88rem;margin:16px 0;}}
+/* conversation */
+details.sys{{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:10px 0;padding:4px 14px;}}
+details.sys>summary{{cursor:pointer;color:var(--muted);font-size:.84rem;padding:8px 0;}}
+.conv{{display:flex;flex-direction:column;gap:16px;margin-top:18px;}}
+.cturn{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;}}
+.cturn-h{{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;
+margin-bottom:8px;font-variant-numeric:tabular-nums;}}
+.think{{white-space:pre-wrap;word-break:break-word;color:var(--txt);font-size:.92rem;
+background:var(--card2);border-left:3px solid var(--purple);border-radius:8px;padding:11px 14px;margin:6px 0 12px;}}
+.bnote{{color:var(--amber);font-size:.82rem;background:#d2992212;border:1px solid #d2992233;
+border-radius:8px;padding:7px 12px;margin:6px 0;}}
+.tcall{{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0;background:#11161f;}}
+.tcall.crash{{border-color:#f8514955;background:#f8514910;}}
+.tcall.err{{border-color:#d2992255;}}
+.tc-h{{font-size:.9rem;margin-bottom:4px;display:flex;align-items:center;gap:8px;}}
+.tc-h code{{background:#0d1117;color:var(--accent);border-color:#1f6feb44;}}
+.b{{font-size:.68rem;border-radius:20px;padding:2px 9px;font-weight:600;}}
+.b.crash{{background:#f8514922;color:var(--red);border:1px solid #f8514955;}}
+.b.err{{background:#d2992222;color:var(--amber);border:1px solid #d2992255;}}
+.tcall details{{margin:5px 0;}}.tcall summary{{cursor:pointer;color:var(--muted);font-size:.78rem;padding:3px 0;}}
+.tcall pre,details.sys pre{{white-space:pre-wrap;word-break:break-word;background:#0d1117;border:1px solid var(--line);
+border-radius:8px;padding:10px 12px;font-size:.78rem;line-height:1.5;max-height:480px;overflow:auto;
+color:#c9d1d9;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:4px 0 2px;}}
 .foot{{color:var(--muted);font-size:.8rem;margin-top:48px;border-top:1px solid var(--line);padding-top:16px;}}
 @media(max-width:760px){{.stats,.grid{{grid-template-columns:1fr 1fr}}}}
 </style></head><body><div class="wrap">
@@ -268,6 +447,12 @@ code{{background:#0d1117;border:1px solid var(--line);border-radius:4px;padding:
 <table class="traj"><thead><tr><th class="r">#</th><th class="r">turn</th><th>tool</th>
 <th>argument</th><th>result</th><th></th></tr></thead>
 <tbody>{traj_rows}</tbody></table>
+
+<h2>Conversation</h2>
+<div class="sub" style="margin-bottom:6px">The full dialogue — the agent's reasoning each turn,
+every tool call with its arguments, and the system's response. Long blocks are collapsed;
+faulting / errored calls are expanded.</div>
+{conversation}
 
 <div class="foot">Generated by FuzzingBrain&nbsp;Bench · the report records the agent's own
 actions only — no oracle PoC, expected fault, or crash location is ever included.</div>
