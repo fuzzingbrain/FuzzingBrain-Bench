@@ -319,7 +319,20 @@ def cmd_run(args) -> int:
     print(dim(f"  exp:       {exp_label}"))
     print(dim(f"  output:    {out_dir}"))
     print()
-    return subprocess.call(cmd, cwd=str(REPO), env=env_combined)
+    rc = subprocess.call(cmd, cwd=str(REPO), env=env_combined)
+
+    # Tell the user exactly where everything landed.
+    print()
+    print(bold("  results saved to:"))
+    print(cyan(f"    {out_dir}"))
+    for f, what in (("score.json", "the capability-ladder verdict + cost"),
+                    ("report.html", "human-readable run report (open in a browser)"),
+                    ("traj.md", "tool-call trajectory"),
+                    ("transcript.jsonl", "full per-turn transcript"),
+                    ("episode.jsonl", "raw episode events")):
+        if (out_dir / f).is_file():
+            print(dim(f"      {f:18s} {what}"))
+    return rc
 
 
 def cmd_report(args) -> int:

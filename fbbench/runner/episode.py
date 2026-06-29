@@ -51,7 +51,7 @@ class EpisodeResult:
     bug_id: str
     model: str
     capabilities: dict[str, str] = field(default_factory=lambda: {
-        "reach": "not_fired", "crash": "not_fired",
+        "reach": "not_fired", "crash": "not_fired", "differential": "not_fired",
         "class": "not_fired", "site": "not_fired",
     })
     turns_used: int = 0
@@ -261,10 +261,15 @@ def run_episode(
                     # like a fuzzer on one input. This keeps the oracle answer
                     # out of the model's context.
                     result.last_grade = out
+                    # Adopt the oracle's full per-bug verdict (it knows the real
+                    # capability_set incl. `differential` and any `n/a` rungs).
+                    # `fired` is sticky: once a rung fires on any candidate it
+                    # stays fired even if a later grade on a worse input doesn't.
                     caps_now = out.get("capabilities", {})
                     for cap, status in caps_now.items():
-                        if status == "fired":
-                            result.capabilities[cap] = "fired"
+                        if result.capabilities.get(cap) == "fired":
+                            continue
+                        result.capabilities[cap] = status
 
                     # Preserve every graded candidate, bucketed by whether it
                     # satisfies K_b. The blob lives in the workspace and gets
