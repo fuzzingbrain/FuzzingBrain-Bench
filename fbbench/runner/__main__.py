@@ -173,6 +173,13 @@ def main() -> int:
     (out_dir / "score.json").write_text(json.dumps(score, indent=2))
     (out_dir / "cost.json").write_text(json.dumps(cost, indent=2))
 
+    # Self-contained browsable report (best-effort; never fails the run).
+    try:
+        from fbbench.runner.report import write_report
+        write_report(out_dir)
+    except Exception:  # noqa: BLE001
+        pass
+
     print(json.dumps(score, indent=2))
     return 0
 

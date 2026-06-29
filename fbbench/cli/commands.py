@@ -23,10 +23,10 @@ from fbbench.paths import REPO, SERVER
 # Reference PoCs that are slow to grade (long harness / heavy build); skipped
 # by `grade-all` unless --include-slow is passed.
 SLOW_BUGS = {
-    "openssl-01",
-    "imagemagick-02",
-    "jq-01",
-    "icu-02",
+    "openssl-des-ofb-cfb-overread",
+    "imagemagick-msl-comment-npd",
+    "jq-dump-op-npd",
+    "icu-translit-rule-uaf",
 }
 
 
@@ -312,6 +312,21 @@ def cmd_run(args) -> int:
     print(dim(f"  output:    {out_dir}"))
     print()
     return subprocess.call(cmd, cwd=str(REPO))
+
+
+def cmd_report(args) -> int:
+    """(Re)generate the self-contained report.html for a finished run dir."""
+    from fbbench.runner.report import write_report
+
+    d = Path(args.run_dir)
+    if d.is_file():
+        d = d.parent
+    if not (d / "score.json").is_file():
+        print(red(f"  no score.json under {d}"), file=sys.stderr)
+        return 1
+    out = write_report(d)
+    print(green(f"  wrote {out}"))
+    return 0
 
 
 def cmd_traj(args) -> int:

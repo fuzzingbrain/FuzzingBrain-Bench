@@ -70,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
                          help="(re)write traj.jsonl + traj.md into the run dir")
     sp_traj.set_defaults(fn=commands.cmd_traj)
 
+    sp_report = sub.add_parser("report",
+                               help="(re)generate the browsable report.html for a finished run dir")
+    sp_report.add_argument("run_dir",
+                           help="a run/cell dir containing score.json + transcript.jsonl")
+    sp_report.set_defaults(fn=commands.cmd_report)
+
     sub.add_parser("models",
                    help="list supported models + show which provider keys are loaded"
                    ).set_defaults(fn=commands.cmd_models)
