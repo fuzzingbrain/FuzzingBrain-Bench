@@ -33,10 +33,17 @@ python3 -m venv .venv && source .venv/bin/activate   # recommended (and required
                                                      # Debian/Ubuntu, PEP 668)
 pip install -e .                              # needs Python ≥ 3.10 and Docker
 
-export ANTHROPIC_API_KEY=sk-ant-...           # and/or OPENAI_API_KEY / GEMINI_API_KEY
+# put your model key(s) in ./.env — auto-loaded on every run, no need to export
+cat > .env <<'EOF'
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+EOF
+
 fb-bench list                                 # the 68 challenges (by alias)
 fb-bench models                               # supported models + which keys are loaded
 ```
+
+(`./.env` is read automatically; a plain `export ANTHROPIC_API_KEY=...` also works.)
 
 > Re-`source .venv/bin/activate` in each new shell. Or skip the venv with
 > `pip install --break-system-packages -e .` (not recommended).
