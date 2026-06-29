@@ -1,51 +1,110 @@
 # FuzzingBrain Bench
 
-**A 4-tier capability-ladder benchmark for LLM-driven vulnerability
-reproduction on 68 real zero-day bugs across C / C++ / Java.**
+**A capability-ladder benchmark for LLM-driven vulnerability reproduction on
+68 real zero-day bugs across 40 open-source projects (C / C++ / Java).**
 
 Each challenge gives the agent only the **fuzz harness** (the target) and the
-project source at the vulnerable revision. The agent must discover an input
-that re-triggers a fault under the sanitizer — no bug description, no patch, no
-fix commit, no target line. Every grade is a **deterministic oracle** (no
-LLM-as-judge): the candidate input is run through the official
-sanitizer-instrumented harness on a private grading service, which returns only
-a verdict on the capability ladder.
+project source at the vulnerable revision — no patch, no fix commit, no target
+line. The agent must discover an input that re-triggers a fault under the
+sanitizer. Every grade is a **deterministic oracle** (no LLM-as-judge): the
+candidate input runs through the official sanitizer-instrumented harness on a
+private grading service, which returns only a verdict on the capability ladder.
 
-| Challenges | Languages | Grader |
-|---|---|---|
-| **68** end-to-end | C · C++ · Java | deterministic remote oracle |
+| Challenges | Projects | Languages | Grader |
+|---|---|---|---|
+| **68** end-to-end | **40** | C · C++ · Java | deterministic remote oracle |
 
-**Website:** https://owensanzas.github.io/FuzzingBrain-Bench/
+Nothing in the images or this repository reveals what a bug is — challenges are
+named by neutral alias (`<project>-NN`, e.g. `avro-03`), and the answer key
+(PoC, expected fault, fixed build) lives only behind the remote oracle.
+**Browse all 68:** [`tools/sealed/CHALLENGES.md`](tools/sealed/CHALLENGES.md).
 
 ---
 
-## How it works (sealed challenges)
+## Quick start
 
-Every challenge is a public, **answer-free** Docker image. The agent talks to
-it over an MCP server (`setup` / `read_file` / `list_directory` / `write_file` /
-`exec` / `grade`); `grade()` ships the candidate input to a remote oracle that
-holds the answer key (PoC, expected fault, fixed build) and returns only the
-verdict. Nothing in the image or this repository reveals what the bug is.
+### 1. Setup
 
+```bash
+git clone https://github.com/OwenSanzas/FuzzingBrain-Bench
+cd FuzzingBrain-Bench
+pip install -e .                              # needs Python ≥ 3.10 and Docker
+
+export ANTHROPIC_API_KEY=sk-ant-...           # and/or OPENAI_API_KEY / GEMINI_API_KEY
+fb-bench list                                 # the 68 challenges (by alias)
+fb-bench models                               # supported models + which keys are loaded
 ```
-docker.io/osanzas/fbbench-challenge-<alias>:latest     # 68 public images
+
+`fb-bench run` pulls the public challenge image, drives the agent loop on the
+host (calling your model API), and grades candidates against the remote oracle.
+Only Docker + your model key are required — no build, no answer key.
+
+### 2. Run one challenge with a model
+
+```bash
+# Claude family
+fb-bench run avro-03 --model claude-opus-4-7
+
+# GPT family
+fb-bench run avro-03 --model gpt-5.5
 ```
 
-Challenges are referenced by a neutral alias `<project>-NN` (e.g. `avro-03`):
-the project name is not a secret (the harness reveals it), but the specific bug
-is never named.
+Models: `claude-opus-4-7` · `claude-sonnet-4-6` · `claude-haiku-4-5` ·
+`gpt-5.5` · `gpt-5.4` · `gpt-5` · `gemini-3.1-pro-preview` · `gemini-2.5-pro`
+(any catalog id works via `--model`; see `fb-bench models`).
 
-**Browse all 68 challenges:** [`tools/sealed/CHALLENGES.md`](tools/sealed/CHALLENGES.md)
-— one row per challenge (project · language · harness). The seal architecture
-and the grading-server source live in [`tools/sealed/`](tools/sealed/) and
-[`tools/mcp-server/`](tools/mcp-server/); anyone can audit that no answer key
-ships with an image (`python tools/sealed/verify_sealed.py <image>`).
+### 3. Run the whole corpus with a model
+
+```bash
+# one model over all 68 challenges (resumable: rerun with the same --exp to skip done)
+python -m fbbench.sweep.orchestrator --models claude-opus-4-7 --bugs all --exp run1
+
+# default multi-model lineup, all challenges
+python -m fbbench.sweep.orchestrator --models sweep --bugs all --exp sweep1
+```
+
+Results land in `runs/<exp>/<bug>/<model>/run-N/` (`score.json`, `episode.jsonl`,
+`transcript.jsonl`, `cost.json`, distilled `traj.md`); a leaderboard is printed
+and re-aggregable with `--report-only --exp <name>`.
+
+### 4. Agent mode (Codex) — one challenge
+
+The Codex arm drives OpenAI's `codex exec` CLI over the same bench MCP server.
+Requires the `codex` CLI on `PATH` and `OPENAI_API_KEY`.
+
+```bash
+python -m fbbench.sweep.codex one avro-03
+```
+
+### 5. Agent mode (Codex) — whole corpus
+
+```bash
+python -m fbbench.sweep.codex sweep --bugs all          # batched, resumable
+```
+
+---
+
+## Scan modes: `full` and `delta-0…3`
+
+How much context the agent is handed defines the difficulty:
+
+| Mode | The agent sees | Runs against |
+|---|---|---|
+| **normal** | harness + source + a neutral description | public images |
+| **full** (`--full-scan`) | harness + source only — **no description**; find the crash cold | public images |
+| **delta-0 … delta-3** | additionally the crash-region file, mixed with **0/1/2/3** distractor files | private eval harness |
+
+`full` is the hardest public mode — add `--full-scan` to any `fb-bench run` or
+orchestrator command. The `delta-N` levels are the **research evaluation
+protocol**: they localize a hint down to the crash-region file, which is derived
+from the oracle answer key, so they run in the maintainer's private harness, not
+against the sealed public images.
 
 ## The capability ladder
 
 A candidate input is graded on five nested rungs, weakest to strongest:
 
-| Rung | Meaning |
+| Rung | Fires when |
 |---|---|
 | `reach` | execution reaches the buggy region |
 | `crash` | the sanitizer build faults on the input |
@@ -53,30 +112,56 @@ A candidate input is graded on five nested rungs, weakest to strongest:
 | `class` | the detected sanitizer fault class matches the bug |
 | `site` | the crash location matches the bug |
 
-## Quick start
+Not every rung applies to every bug — each challenge declares its required set.
+
+## Other parameters
 
 ```bash
-git clone https://github.com/OwenSanzas/FuzzingBrain-Bench
-cd FuzzingBrain-Bench
-pip install -e .
-
-fb-bench list                 # list the 68 challenges (by alias)
-fb-bench run avro-03          # drive an agent through one challenge
+fb-bench run <alias> \
+    --model gpt-5.5 \
+    --full-scan \             # withhold the description (hard mode)
+    --max-turns 300 \         # turn budget (default 300, matches ExploitBench)
+    --exp my-experiment \     # group runs under runs/my-experiment/...
+    --preserve-pocs \         # keep every graded blob (solved/failed buckets)
+    --force-full              # ignore early stops; spend the full budget
 ```
 
-`fb-bench run <alias>` pulls the public challenge image, runs the agent loop on
-the host (it calls your model API), and grades candidates against the remote
-oracle. Set the relevant model API key in your environment first.
+Grade a hand-crafted or external (AFL++ / libFuzzer / honggfuzz) PoC without any
+LLM — the oracle is vendor-neutral:
+
+```bash
+fb-bench grade <alias> my-input.bin        # -v for the evidence
+```
+
+---
+
+## How it works (sealed challenges)
+
+Every challenge is a public, **answer-free** Docker image. The agent talks to it
+over an MCP server (`setup` / `read_file` / `list_directory` / `write_file` /
+`exec` / `grade`); `grade()` ships the candidate input to a remote oracle that
+holds the answer key and returns only the verdict.
+
+```
+docker.io/osanzas/fbbench-challenge-<alias>:latest     # 68 public images
+```
+
+The seal architecture and the grading-server source live in
+[`tools/sealed/`](tools/sealed/) and [`tools/mcp-server/`](tools/mcp-server/);
+anyone can audit that no answer key ships with an image:
+
+```bash
+python tools/sealed/verify_sealed.py docker.io/osanzas/fbbench-challenge-avro-03:latest
+```
 
 ## What's in this repo
 
 ```
-bugs/<project>/<alias>/   one challenge: the fuzz harness + neutral metadata
+bugs/<project>/<alias>/   one challenge: fuzz harness + neutral metadata
                           (project, language, sanitizer, harness interface)
-fbbench/                  the runner / CLI engine
-tools/sealed/            challenge index, seal architecture, answer-free verifier
-tools/mcp-server/        the MCP + remote grading server (Go source, auditable)
-docs/                     the public site + the agent prompt
+fbbench/                  the runner / CLI engine + sweep + codex arm
+tools/sealed/             challenge index, seal architecture, answer-free verifier
+tools/mcp-server/         the MCP + remote grading server (Go source, auditable)
 ```
 
 The answer artifacts (PoC inputs, expected-fault keys, pre-built binaries) are

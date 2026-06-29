@@ -23,7 +23,6 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://owensanzas.github.io/FuzzingBrain-Bench/"
 Repository = "https://github.com/OwenSanzas/FuzzingBrain-Bench"
 
 [project.scripts]
