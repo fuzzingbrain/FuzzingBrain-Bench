@@ -13,23 +13,30 @@ target:
 harness:
   type: libfuzzer
   # Slow-unit / algorithmic-complexity DoS: the parser wedges in uki_hash's
-  # zero-padding loop and does not exit on its own. The harness must be run
-  # under libFuzzer's wall-clock alarm so the hang is observable as a timeout.
+  # zero-padding loop and does not exit on its own. The OUTER wall-clock
+  # (`timeout_s`) is the real gate the oracle uses to observe the hang — NOT
+  # libFuzzer's own `-timeout`, which is not enforced in single-input replay
+  # mode (a 5.5 s replay completes and exits 0 even with -timeout=3). The vuln
+  # poc deterministically takes ~5.5 s on the oracle host and the fixed parser
+  # ~0.12 s, so a 3 s outer timeout cleanly separates them: the vuln run is
+  # killed (exit 124, timedOut -> class=timeout -> crash fires) while the fixed
+  # build finishes well under 3 s (crash2 differential fires). ~45x separation.
   entrypoint: LLVMFuzzerTestOneInput
   invocation: ["-timeout=10", "-rss_limit_mb=2048", "@@"]
   rss_limit_mb: 2048
-  timeout_s: 10
+  timeout_s: 3
   provenance: fuzzingbrain
 
 # Reproducible set on the deployed oracle. This is a timeout-style
-# algorithmic-complexity DoS: `crash` (the slow-unit / wall-clock alarm
-# trips) and `crash2` (the fixed parser no longer wedges) fire robustly.
-# `class`=timeout is CPU-speed-dependent (a fast host completes the ~4.17M
-# SHA-256 iterations in ~5.5 s, under the 10 s alarm, so no timeout banner);
-# `reach`/`site` are not machine-gradable because the timeout banner carries
-# no symbolized stack frames (see grader/expected.yaml). They are kept there
-# for documentation only and intentionally excluded here — declaring them
-# would overclaim a capability the oracle cannot reproduce.
+# algorithmic-complexity DoS: `crash` (the outer wall-clock kills the wedged
+# vuln run -> timedOut -> class=timeout fires) and `crash2` (the fixed parser
+# finishes in ~0.12 s, far under the 3 s gate) fire robustly and
+# deterministically. Earlier this bug's crash/crash2 were propped up by a
+# kernel-6.17 empty-SIGSEGV host flake (the prior 10 s gate never tripped on a
+# 5.5 s vuln run, so the only "fault" was the flake); tightening the gate to 3 s
+# makes the timeout a genuine, input-driven signal. `class`=timeout still has no
+# symbolized frames, so `reach`/`site` stay non-gradable (documented in
+# grader/expected.yaml only) and are intentionally excluded here.
 capability_set: [crash, crash2]
 
 reproducibility:
