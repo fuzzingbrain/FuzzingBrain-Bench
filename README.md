@@ -83,7 +83,19 @@ and re-aggregable with `--report-only --exp <name>`.
 ### 4. Agent mode (Codex) — one challenge
 
 The Codex arm drives OpenAI's `codex exec` CLI over the same bench MCP server.
-Requires the `codex` CLI on `PATH` and `OPENAI_API_KEY`.
+
+**One-time codex setup** — the arm must authenticate with an **API key**, not a
+ChatGPT login (a ChatGPT account can't use the `gpt-5.*-codex` models and the run
+fails with `model is not supported when using Codex with a ChatGPT account`):
+
+```bash
+npm install -g @openai/codex          # install the codex CLI (needs Node)
+codex logout                          # drop any ChatGPT login
+codex login --api-key "$OPENAI_API_KEY"   # authenticate with your API key
+codex login status                    # should say "API key", not "ChatGPT account"
+```
+
+Then run a single challenge:
 
 ```bash
 python -m fbbench.sweep.codex one avro-03
