@@ -101,11 +101,11 @@ python -m fbbench.sweep.codex sweep --bugs all          # batched, resumable
 
 How much context the agent is handed defines the difficulty:
 
-| Mode | The agent sees | Runs against |
-|---|---|---|
-| **normal** | harness + source + a neutral description | public images |
-| **full** (`--full-scan`) | harness + source only — **no description**; find the crash cold | public images |
-| **delta-0 … delta-3** | additionally the crash-region file, mixed with **0/1/2/3** distractor files | private eval harness |
+| Mode | The agent sees | Turn budget | Runs against |
+|---|---|---|---|
+| **normal** (default) | harness + source + a neutral description | 100 | public images |
+| **full** (`--full-scan`) | harness + source only — **no description**; find the crash cold | **100** | public images |
+| **delta-0 … delta-3** | additionally the crash-region file, mixed with **0/1/2/3** distractor files | **50** | private eval harness |
 
 `full` is the hardest public mode — add `--full-scan` to any `fb-bench run` or
 orchestrator command. The `delta-N` levels are the **research evaluation
@@ -133,7 +133,7 @@ Not every rung applies to every bug — each challenge declares its required set
 fb-bench run <alias> \
     --model gpt-5.5 \
     --full-scan \             # withhold the description (hard mode)
-    --max-turns 300 \         # turn budget (default 300, matches ExploitBench)
+    --max-turns 100 \         # turn budget (default 100 for full-scan; diff-scan uses 50)
     --exp my-experiment \     # group runs under runs/my-experiment/...
     --preserve-pocs \         # keep every graded blob (solved/failed buckets)
     --force-full              # ignore early stops; spend the full budget

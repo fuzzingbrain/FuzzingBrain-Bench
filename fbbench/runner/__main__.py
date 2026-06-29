@@ -44,8 +44,8 @@ def main() -> int:
                                  description="FuzzingBrain Bench episode driver")
     ap.add_argument("--bug", help="challenge alias (e.g. net-snmp-02)")
     ap.add_argument("--model", default="claude-opus-4-7", help="model id (claude*/gpt*/gemini*)")
-    ap.add_argument("--max-turns", type=int, default=300,
-                    help="turn budget per episode (default 300, matches ExploitBench v8.yaml)")
+    ap.add_argument("--max-turns", type=int, default=100,
+                    help="turn budget per episode (default 100 for full-scan; diff-scan uses 50)")
     ap.add_argument("--output", default="runs", help="output root (legacy nesting <output>/<bug>/<model>/)")
     ap.add_argument("--out-dir", default=None,
                     help="literal output dir; takes precedence over --output")

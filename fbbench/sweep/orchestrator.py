@@ -148,8 +148,8 @@ def main() -> int:
     ap.add_argument("--full-scan", action="store_true",
                     help="harder mode: withhold bug descriptions; agents get only "
                          "the harness and must discover crashing inputs")
-    ap.add_argument("--max-turns", type=int, default=300,
-                    help="turn budget per episode (default 300, matches ExploitBench)")
+    ap.add_argument("--max-turns", type=int, default=100,
+                    help="turn budget per episode (default 100 for full-scan; diff-scan uses 50)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-episode seconds")
     ap.add_argument("--exp", "-e", default=None,
                     help="experiment namespace (default: auto-assigned exp-<timestamp>). "

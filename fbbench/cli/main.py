@@ -36,8 +36,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("bug_id")
     sp_run.add_argument("--model", default=None,
                         help="model id (default: auto-pick from provider key in .env)")
-    sp_run.add_argument("--max-turns", type=int, default=300,
-                        help="turn budget (default: 300, matches ExploitBench)")
+    sp_run.add_argument("--max-turns", type=int, default=100,
+                        help="turn budget (default: 100 for full-scan; diff-scan uses 50)")
     sp_run.add_argument("--exp", "-e", default=None,
                         help="experiment namespace (default: auto-assigned exp-<timestamp>); "
                              "groups runs into runs/<exp>/<bug>/<model>/run-N/")
