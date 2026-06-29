@@ -28,12 +28,18 @@ named by neutral alias (`<project>-NN`, e.g. `avro-03`), and the answer key
 ```bash
 git clone https://github.com/OwenSanzas/FuzzingBrain-Bench
 cd FuzzingBrain-Bench
+
+python3 -m venv .venv && source .venv/bin/activate   # recommended (and required on
+                                                     # Debian/Ubuntu, PEP 668)
 pip install -e .                              # needs Python ≥ 3.10 and Docker
 
 export ANTHROPIC_API_KEY=sk-ant-...           # and/or OPENAI_API_KEY / GEMINI_API_KEY
 fb-bench list                                 # the 68 challenges (by alias)
 fb-bench models                               # supported models + which keys are loaded
 ```
+
+> Re-`source .venv/bin/activate` in each new shell. Or skip the venv with
+> `pip install --break-system-packages -e .` (not recommended).
 
 `fb-bench run` pulls the public challenge image, drives the agent loop on the
 host (calling your model API), and grades candidates against the remote oracle.
