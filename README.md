@@ -42,14 +42,14 @@ Only Docker + your model key are required — no build, no answer key.
 ### 2. Run one challenge with a model
 
 ```bash
-# Claude family
-fb-bench run avro-03 --model claude-opus-4-7
+# Claude family  (haiku is cheapest/fastest; swap in opus/sonnet for harder runs)
+fb-bench run avro-03 --model claude-haiku-4-5
 
 # GPT family
 fb-bench run avro-03 --model gpt-5.5
 ```
 
-Models: `claude-opus-4-7` · `claude-sonnet-4-6` · `claude-haiku-4-5` ·
+Models: `claude-haiku-4-5` · `claude-sonnet-4-6` · `claude-opus-4-7` ·
 `gpt-5.5` · `gpt-5.4` · `gpt-5` · `gemini-3.1-pro-preview` · `gemini-2.5-pro`
 (any catalog id works via `--model`; see `fb-bench models`).
 
@@ -57,7 +57,7 @@ Models: `claude-opus-4-7` · `claude-sonnet-4-6` · `claude-haiku-4-5` ·
 
 ```bash
 # one model over all 68 challenges (resumable: rerun with the same --exp to skip done)
-python -m fbbench.sweep.orchestrator --models claude-opus-4-7 --bugs all --exp run1
+python -m fbbench.sweep.orchestrator --models claude-haiku-4-5 --bugs all --exp run1
 
 # default multi-model lineup, all challenges
 python -m fbbench.sweep.orchestrator --models sweep --bugs all --exp sweep1

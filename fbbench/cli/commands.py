@@ -262,11 +262,19 @@ def cmd_run(args) -> int:
         if subprocess.call(["make", "mcp-server"], cwd=str(REPO)) != 0:
             sys.exit(red("  build failed; run `make mcp-server` manually"))
 
+    # The runner runs in whatever interpreter already has the deps. A dev
+    # checkout keeps them in <repo>/.venv (provisioned by `make setup`); a
+    # `pip install -e .` user has them in the current interpreter — use that.
     venv_py = REPO / ".venv" / "bin" / "python"
-    if not venv_py.is_file():
+    if venv_py.is_file():
+        runner_py = str(venv_py)
+    elif (REPO / "Makefile").is_file():
         print(dim("  .venv missing — running `make setup` (one-time)…"))
         if subprocess.call(["make", "setup"], cwd=str(REPO)) != 0:
             sys.exit(red("  setup failed; run `make setup` manually"))
+        runner_py = str(venv_py)
+    else:
+        runner_py = sys.executable
 
     # ---- pick output dir --------------------------------------------------
     if args.output:
@@ -287,7 +295,7 @@ def cmd_run(args) -> int:
         out_dir = base / f"run-{n}"
 
     # ---- invoke runner ----------------------------------------------------
-    cmd = [str(venv_py), "-m", "fbbench.runner",
+    cmd = [runner_py, "-m", "fbbench.runner",
            "--bug", args.bug_id,
            "--model", model,
            "--max-turns", str(args.max_turns),
@@ -311,7 +319,7 @@ def cmd_run(args) -> int:
     print(dim(f"  exp:       {exp_label}"))
     print(dim(f"  output:    {out_dir}"))
     print()
-    return subprocess.call(cmd, cwd=str(REPO))
+    return subprocess.call(cmd, cwd=str(REPO), env=env_combined)
 
 
 def cmd_report(args) -> int:
