@@ -11,7 +11,7 @@ dataset; the runner itself has no --seed arg).
 Examples:
   # cost probe: opus on 5 bugs, 1 sample
   python -m fbbench.sweep.orchestrator --models claude-opus-4-7 \\
-      --bugs mongoose-01,net-snmp-02,json-java-01,simdutf-01,openldap-02
+      --bugs mongoose-mg-match-overflow,netsnmp-vacm-parse-npd,jsonjava-jsonml-classcast,simdutf-utf16-utf8-overflow,openldap-parse-whsp
 
   # full sweep, default lineup, 2 samples per (model, bug) for best-of-2 union
   python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0,1
@@ -158,6 +158,10 @@ def main() -> int:
                     help="runs root (default: ./runs). Cells land at <output>/<exp>/<bug>/<model>/seed-N/.")
     ap.add_argument("--report-only", action="store_true",
                     help="skip running; just re-aggregate from <output>/<exp>/")
+    ap.add_argument("--dashboard", dest="dashboard", action="store_true", default=None,
+                    help="force the live full-screen dashboard (default: on when stdout is a TTY)")
+    ap.add_argument("--no-dashboard", dest="dashboard", action="store_false",
+                    help="disable the live dashboard; fall back to line-by-line logs")
     args = ap.parse_args()
 
     if args.exp:
@@ -180,25 +184,46 @@ def main() -> int:
     print(f"  sweep: {len(models)} models x {len(bugs)} bugs x {len(samples)} samples "
           f"= {len(cells)} cells ({done} already done, {len(cells)-done} to run)")
 
-    total_cost = 0.0
-    t0 = time.time()
-    for i, (model, bug, sample) in enumerate(cells, 1):
-        if (cell_dir(out, bug, model, sample) / "score.json").is_file():
-            continue
-        tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
-        print(f"  {tag} ...", flush=True)
-        r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
-                     preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
-        if r and "error" not in r:
-            c = r.get("total_usd") or 0.0
-            total_cost += c
-            ts = r.get("tier_score", "?")
-            print(f"      -> {ts}/5  {r.get('terminated_reason','')}  "
-                  f"${c:.4f}  (running ${total_cost:.2f})", flush=True)
-        else:
-            print(f"      -> FAILED: {r.get('error') if r else 'unknown'}", flush=True)
+    from rich.console import Console
+    from fbbench.sweep.dashboard import STATUS, dashboard, run_cell_tailing
+    console = Console()
+    use_dash = args.dashboard if args.dashboard is not None else console.is_terminal
+    STATUS.configure(exp=exp, models=models, bugs=bugs, samples=samples,
+                     max_turns=args.max_turns, full_scan=args.full_scan,
+                     total=len(cells), already_done=done)
 
-    print(f"\n  done in {time.time()-t0:.0f}s, spent ~${total_cost:.2f} this run")
+    t0 = time.time()
+    with dashboard(console, enabled=use_dash):
+        for i, (model, bug, sample) in enumerate(cells, 1):
+            cd = cell_dir(out, bug, model, sample)
+            if (cd / "score.json").is_file():
+                STATUS.cell_skip(model, bug, sample)
+                continue
+            kb = bug_kb(bug)
+            tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
+            if use_dash:
+                STATUS.cell_start(model, bug, sample, kb)
+                cmd = RUNNER + ["--bug", bug, "--model", model,
+                                "--max-turns", str(args.max_turns), "--out-dir", str(cd)]
+                if args.preserve_pocs:
+                    cmd.append("--preserve-pocs")
+                if args.full_scan:
+                    cmd.append("--full-scan")
+                r = run_cell_tailing(cmd, str(REPO), args.timeout,
+                                     cd / "episode.jsonl", model, bug, sample)
+                STATUS.cell_finish(model, bug, sample, r)
+            else:
+                print(f"  {tag} ...", flush=True)
+                r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
+                             preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
+                if r and "error" not in r:
+                    ts = r.get("tier_score", "?")
+                    print(f"      -> {ts}/5  {r.get('terminated_reason','')}  "
+                          f"${r.get('total_usd') or 0.0:.4f}", flush=True)
+                else:
+                    print(f"      -> FAILED: {r.get('error') if r else 'unknown'}", flush=True)
+
+    print(f"\n  done in {time.time()-t0:.0f}s, spent ~${STATUS.total_cost:.2f} this run")
     aggregate(out, models, bugs, samples)
     return 0
 
