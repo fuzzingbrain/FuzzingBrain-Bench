@@ -1,0 +1,19 @@
+bug_id: ghidra-01
+project: Ghidra
+target:
+  language: c
+  build_system: handrolled
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation:
+  - -rss_limit_mb=256
+  - '@@'
+  rss_limit_mb: 256
+  timeout_s: 30
+  provenance: fuzzingbrain
+  sanitizer: libfuzzer
+reproducibility:
+  base_image_digest: ''
+  snapshot_debian_date: 20260101T000000Z
+  source_date_epoch: 1735689600

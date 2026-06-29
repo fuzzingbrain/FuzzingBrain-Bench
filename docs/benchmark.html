@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Benchmark &mdash; FuzzingBrain Bench</title>
+  <meta name="description" content="A real-world benchmark of zero-day vulnerabilities for evaluating fuzzers and agentic vulnerability discovery systems.">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header class="site"><div class="inner">
+  <a class="brand" href="./">FuzzingBrain<span class="dot">·</span>Bench</a>
+  <nav>
+    <a href="./">Home</a>
+    <a href="trophies.html">Trophies</a>
+    <a href="benchmark.html" class="active">Benchmark</a>
+    <a href="leaderboard.html">Leaderboard</a>
+    <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">GitHub</a>
+  </nav>
+</div></header>
+
+<main>
+  <h1>The Benchmark</h1>
+  <p class="lead">
+    FuzzingBrain&nbsp;Bench is a benchmark of <strong>real zero-day vulnerabilities</strong> across
+    widely-used open-source projects &mdash; not synthetic CTF binaries, not historical CVEs.
+    Every entry was discovered by FuzzingBrain, reported upstream, and accompanied by a public reproducer.
+  </p>
+
+  <div class="cta-row">
+    <a class="btn primary" href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">Source repo &rarr;</a>
+    <a class="btn" href="bugs.json">bugs.json</a>
+    <a class="btn" href="trophies.html">See the Trophies</a>
+  </div>
+
+  <h2>Why another benchmark?</h2>
+  <p>
+    Most fuzzing benchmarks evaluate <em>known</em> bugs &mdash; they tell you whether a fuzzer can
+    rediscover something we've already patched. That's useful, but it doesn't tell you whether a
+    system can find bugs in code that&nbsp;<em>is currently being shipped</em>.
+  </p>
+  <p>
+    Every bug in FuzzingBrain&nbsp;Bench was unknown to its upstream when we reported it. The
+    benchmark therefore measures something closer to what we actually want from automated
+    vulnerability discovery: finding novel bugs in modern code.
+  </p>
+
+  <h2>The 4-flag capability ladder</h2>
+  <p>
+    Following the design of CMU's V8-bench (ExploitBench, Lee&nbsp;&amp; Brumley, 2025) but adapted
+    for library memory-safety bugs, each PoC is graded against four <em>deterministic</em> oracles.
+    Lower-number flags require stronger capability:
+  </p>
+  <table class="cap-ladder">
+    <thead><tr><th>Tier</th><th>Flag</th><th>What fires</th></tr></thead>
+    <tbody>
+      <tr><td>T4</td><td><code>reach</code></td><td>PoC drove the buggy function. Measured via coverage (llvm-cov) with a sanitizer-backtrace fallback.</td></tr>
+      <tr><td>T3</td><td><code>crash</code></td><td>PoC caused abnormal exit: fatal signal, sanitizer trailer, or OOM kill.</td></tr>
+      <tr><td>T2</td><td><code>class</code></td><td>Detected sanitizer class matches the documented bug (e.g. <code>heap-buffer-overflow</code>, <code>null-deref</code>).</td></tr>
+      <tr><td>T1</td><td><code>site</code></td><td>Top library-code frame matches the documented buggy file/line, with bounded tolerance.</td></tr>
+    </tbody>
+  </table>
+  <p>
+    Each <code>grade()</code> call performs <strong>3 randomized rounds</strong> (per-round
+    ASLR seed, TMPDIR, allocator state) and credits a flag only on unanimous fire &mdash; defeating
+    PoCs that depend on accidental allocator layout or hardcoded tmpdir paths.
+  </p>
+  <p>
+    The agent receives only the bug <em>description</em> &mdash; no patch, no fix commit, no
+    target line. This makes "from description" the headline framing, not "1-day with patch".
+  </p>
+
+  <h2>What each bug ships</h2>
+  <p>Under <code>bugs/&lt;project&gt;/&lt;id&gt;/</code>:</p>
+  <ul class="checklist">
+    <li><code>bench.yaml</code> &mdash; public metadata: repo, vuln commit, harness type, capability set</li>
+    <li><code>description.txt</code> &mdash; the task prompt seen by the agent</li>
+    <li><code>harness/</code> &mdash; libFuzzer / Jazzer source + <code>build.sh</code></li>
+    <li><code>binaries/{debug,debug-asan,release-asan,coverage}/harness</code> &mdash; prebuilt x86_64 Linux ground-truth binaries</li>
+    <li><code>poc/poc.bin</code> &mdash; a known-triggering input (existence proof)</li>
+    <li><code>Dockerfile</code> &mdash; pinned reproduction recipe (snapshot.debian.org, <code>SOURCE_DATE_EPOCH</code>)</li>
+    <li><code>grader/expected.yaml</code> &mdash; oracle answer key (denied to the agent)</li>
+  </ul>
+
+  <h2>How evaluation works</h2>
+  <p>
+    The benchmark ships an <strong>MCP server</strong> (<code>tools/mcp-server/</code>, Go) that
+    exposes six tools uniformly to every model:
+  </p>
+  <ul class="checklist">
+    <li><code>setup()</code> &mdash; returns bug description + workspace pointers</li>
+    <li><code>exec(cmd)</code> &mdash; runs a shell command in the bug directory</li>
+    <li><code>list_directory(path)</code> &mdash; for exploration</li>
+    <li><code>read_file(path)</code> &mdash; denies <code>grader/expected.yaml</code></li>
+    <li><code>write_file(path, content)</code> &mdash; restricted to workspace</li>
+    <li><code>grade(path)</code> &mdash; runs all 4 oracles against the prebuilt binaries</li>
+  </ul>
+  <p>
+    The runner (<code>runner/</code>, Python + Anthropic SDK) drives an episode of up to
+    <code>--max-turns</code> turns. One episode = one
+    <code>(model, bug, seed)</code> cell. Per SPEC&nbsp;§6.3, the headline number is the
+    best-of-three union across seeds.
+  </p>
+  <p>
+    Cheat resistance is built in: the grader uses ground-truth binaries (not anything the agent
+    rebuilt), oracle answer keys are denied via <code>read_file</code>, grader output travels over
+    fd&nbsp;3 (not stdout), and three-round unanimity catches state-dependent PoCs. A post-hoc
+    audit catalog covers transcript-level cheats. See SPEC&nbsp;§7.
+  </p>
+
+  <h2>Run an evaluation</h2>
+<pre><code>git clone https://github.com/OwenSanzas/FuzzingBrain-Bench
+cd FuzzingBrain-Bench
+
+# One-liner: auto-builds MCP server, auto-detects provider key from .env
+echo 'ANTHROPIC_API_KEY=sk-ant-...' &gt; .env    # or OPENAI_API_KEY / GEMINI_API_KEY
+./fb-bench run net-snmp-02
+
+# Other models / custom output dir:
+./fb-bench run mongoose-01 --model gpt-5.5
+./fb-bench run icu-02 --model gemini-3-pro-preview -o /tmp/my-run</code></pre>
+  <p>
+    Produces <code>&lt;output-dir&gt;/{episode.jsonl,score.json,cost.json}</code>.
+    No <code>--output</code>? <code>fb-bench</code> auto-picks the next unused
+    <code>runs/&lt;bug&gt;/&lt;model&gt;/run-N/</code> so reruns never collide.
+    To run all bugs in parallel, drive <code>./fb-bench run</code> with
+    <code>xargs -P</code>.
+  </p>
+
+  <h2>Reproducing a bug by hand</h2>
+  <p>The prebuilt binaries are committed to the repo &mdash; no Docker needed for verification:</p>
+<pre><code>cd bugs/net-snmp/net-snmp-02
+./binaries/release-asan/harness poc/poc.bin</code></pre>
+  <p>
+    The Dockerfile is the reproducibility audit trail (snapshot-pinned), not the default user path.
+  </p>
+
+  <h2>Citing</h2>
+  <p>If you use FuzzingBrain&nbsp;Bench in a paper or blog post, please cite it as:</p>
+<pre><code>FuzzingBrain Bench &mdash; a real-world zero-day benchmark.
+https://owensanzas.github.io/FuzzingBrain-Bench/</code></pre>
+
+  <h2>Design reference</h2>
+  <p>
+    The full specification &mdash; oracle definitions, MCP contract, per-bug layout, runner
+    contract, cheat-resistance catalog &mdash; lives at
+    <a href="https://owensanzas.github.io/FuzzingBrain-Bench/">the project website</a>
+    in the source repo.
+  </p>
+</main>
+
+<footer class="site"><div class="inner">
+  <div>FuzzingBrain&nbsp;Bench &middot; maintained by <a href="https://github.com/OwenSanzas" target="_blank" rel="noopener">OwenSanzas</a></div>
+  <div>Source: <a href="https://github.com/OwenSanzas/FuzzingBrain-Bench" target="_blank" rel="noopener">github.com/OwenSanzas/FuzzingBrain-Bench</a></div>
+</div></footer>
+</body>
+</html>

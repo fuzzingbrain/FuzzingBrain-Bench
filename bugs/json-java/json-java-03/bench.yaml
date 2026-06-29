@@ -1,0 +1,18 @@
+bug_id: json-java-03
+project: json-java
+target:
+  language: jvm
+  build_system: maven
+harness:
+  type: java
+  entrypoint: XmlToJsonFuzzer.fuzzerTestOneInput
+  invocation:
+  - '@@'
+  rss_limit_mb: 1024
+  timeout_s: 30
+  provenance: oss-fuzz
+  sanitizer: jazzer
+reproducibility:
+  base_image_digest: ''
+  snapshot_debian_date: 20260101T000000Z
+  source_date_epoch: 1735689600

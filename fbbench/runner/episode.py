@@ -1,0 +1,336 @@
+"""Provider-neutral episode driver for FuzzingBrain Bench.
+
+One episode = one (backend, bug, seed). We bridge the 6 MCP tools onto the
+neutral Backend contract, drive the loop up to the turn budget, and write
+episode.jsonl / score.json / cost.json (the latter two by the caller).
+"""
+from __future__ import annotations
+
+import json
+import os
+import shutil
+import time
+from dataclasses import dataclass, field
+from pathlib import Path
+
+from fbbench.prompts import (
+    FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
+    budget_note, build_initial_user_message, system_prompt,
+)
+from fbbench.runner.backends.base import Backend, Completion, ToolResult
+from fbbench.runner.mcp_client import MCPClient, MCPToolError
+
+# Normalized refusal / safety-stop signals across providers.
+_REFUSAL_STOPS = {"refusal", "content_filter", "safety", "prohibited_content",
+                  "blocklist", "recitation", "image_safety"}
+
+
+def _is_refusal(comp: Completion) -> bool:
+    sr = (comp.stop_reason or "").lower()
+    return any(tok in sr for tok in _REFUSAL_STOPS)
+
+
+def _is_malformed(comp: Completion) -> bool:
+    # Gemini (esp. flash) often emits FinishReason.MALFORMED_FUNCTION_CALL: the
+    # model tried to call a tool but the call didn't parse, so no tool_calls
+    # come back. That is a transient formatting failure, not "no tool use" —
+    # retry the turn rather than ending the episode.
+    return "malformed" in (comp.stop_reason or "").lower()
+
+
+def _is_truncated(comp: Completion) -> bool:
+    # Output token cap hit mid-reply (OpenAI "length", Gemini MAX_TOKENS,
+    # Anthropic "max_tokens"). A chatty/thinking model can burn the budget
+    # before emitting its tool call; that is truncation, not "no tool use".
+    sr = (comp.stop_reason or "").lower()
+    return sr == "length" or "max_tokens" in sr or "max_token" in sr
+
+
+@dataclass
+class EpisodeResult:
+    bug_id: str
+    model: str
+    capabilities: dict[str, str] = field(default_factory=lambda: {
+        "reach": "not_fired", "crash": "not_fired",
+        "class": "not_fired", "site": "not_fired",
+    })
+    turns_used: int = 0
+    duration_s: float = 0.0
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cache_read_tokens: int = 0
+    cache_write_tokens: int = 0
+    terminated_reason: str = "max_turns"
+    refusal_retries: int = 0
+    malformed_retries: int = 0
+    last_grade: dict | None = None
+
+
+def neutral_tools(mcp: MCPClient) -> list[dict]:
+    """Tool schemas straight from the MCP server's tools/list — the single source
+    of truth for the tool surface (name + description + params).
+
+    Previously the runner hand-mirrored these, which silently drifted from the
+    server's own list (and from the Codex arm, which reads the server directly).
+    Querying the one canonical source keeps the schemas identical across BOTH
+    arms and every model. The server's tools/list is a static function over the
+    pinned bin/mcp-server, so this stays deterministic / reproducible. The only
+    transform is the inputSchema -> input_schema key the backends expect.
+    """
+    return [{"name": t["name"], "description": t["description"],
+             "input_schema": t["inputSchema"]} for t in mcp.list_tools()]
+
+
+def run_episode(
+    backend: Backend,
+    bug_id: str,
+    bug_dir: str,
+    workspace: str,
+    server_bin: str,
+    max_turns: int = 300,
+    episode_log: str | None = None,
+    oracle_dir: str | None = None,
+    capability_set: list[str] | None = None,
+    pocs_dir: str | None = None,
+    force_full: bool = False,
+    full_scan: bool = False,
+    require_preset: bool = False,
+    image: str | None = None,
+) -> EpisodeResult:
+    mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace,
+                    oracle_dir=oracle_dir, image=image)
+    mcp.initialize()
+    kb: set[str] = set(capability_set or ["reach", "crash", "class", "site"])
+    poc_root: Path | None = Path(pocs_dir) if pocs_dir else None
+    grade_idx = 0
+
+    setup_resp = mcp.call("setup", {})
+    bug_desc = setup_resp.get("bug_desc", "")
+    # full_scan: description.txt is not staged, so bug_desc is empty; the message
+    # builder switches to the no-description "find a crash" prompt.
+    user_text = build_initial_user_message(bug_desc, setup_resp, full_scan=full_scan)
+    sysp = system_prompt(full_scan=full_scan)
+
+    messages: list[dict] = [{"role": "user", "content": user_text}]
+    tools = neutral_tools(mcp)
+    result = EpisodeResult(bug_id=bug_id, model=backend.model)
+    log_fp = open(episode_log, "w") if episode_log else None
+    # Full-fidelity transcript alongside the compact episode.jsonl ledger:
+    # every prompt, model output, tool-call argument, and tool return verbatim.
+    # Kept in a separate file so episode.jsonl stays small for sweep/analysis,
+    # while the complete record is always available for paper artifacts/debug.
+    tlog_fp = (open(os.path.join(os.path.dirname(episode_log), "transcript.jsonl"), "w")
+               if episode_log else None)
+    start = time.time()
+
+    def log(record: dict) -> None:
+        if log_fp:
+            log_fp.write(json.dumps(record) + "\n")
+            log_fp.flush()
+
+    def tlog(record: dict) -> None:
+        if tlog_fp:
+            tlog_fp.write(json.dumps(record, ensure_ascii=False) + "\n")
+            tlog_fp.flush()
+
+    def _payload_obj(payload: str):
+        # Store tool returns as parsed objects when possible (readable), else raw.
+        try:
+            return json.loads(payload)
+        except (ValueError, TypeError):
+            return payload
+
+    log({"event": "start", "model": backend.model, "bug_id": bug_id,
+         "capability_set": sorted(kb),
+         "preserve_pocs": bool(poc_root),
+         "system_prompt_chars": len(sysp)})
+
+    tlog({"event": "start", "model": backend.model, "bug_id": bug_id,
+          "capability_set": sorted(kb), "max_turns": max_turns,
+          "preserve_pocs": bool(poc_root),
+          "system_prompt": sysp,
+          "initial_user_message": user_text,
+          "tools": tools})
+
+    def complete_once() -> Completion:
+        # Per-turn output cap. ExploitBench v8.yaml uses 65536; matches
+        # Anthropic's recommended starting point for xhigh thinking effort.
+        c = backend.complete(sysp, messages, tools, max_tokens=65536)
+        result.input_tokens += c.input_tokens
+        result.output_tokens += c.output_tokens
+        result.cache_read_tokens += c.cache_read_tokens
+        result.cache_write_tokens += c.cache_write_tokens
+        return c
+
+    consecutive_trunc = 0
+    try:
+        for turn in range(max_turns):
+            result.turns_used = turn + 1
+            comp = complete_once()
+            # A refusal / malformed-function-call means we got NO usable reply
+            # (an API-level safety refusal or a parse failure), not a task
+            # outcome — so re-draw up to 3 attempts to obtain a valid completion.
+            # (Task-level flaky knobs — truncation, grade rounds — stay at 1.)
+            for attempt in range(3):
+                if comp.tool_calls or not (_is_refusal(comp) or _is_malformed(comp)):
+                    break
+                kind = "refusal" if _is_refusal(comp) else "malformed_function_call"
+                if kind == "refusal":
+                    result.refusal_retries += 1
+                else:
+                    result.malformed_retries += 1
+                log({"event": "retry", "kind": kind, "turn": turn,
+                     "attempt": attempt + 1, "stop_reason": comp.stop_reason})
+                tlog({"event": "retry", "kind": kind, "turn": turn,
+                      "attempt": attempt + 1, "stop_reason": comp.stop_reason,
+                      "text": comp.text})
+                comp = complete_once()
+
+            messages.append({"role": "assistant", "text": comp.text,
+                             "tool_calls": comp.tool_calls})
+            log({"event": "assistant", "turn": turn, "text": comp.text,
+                 "stop_reason": comp.stop_reason, "tool_calls": len(comp.tool_calls)})
+            tlog({"event": "assistant", "turn": turn, "text": comp.text,
+                  "stop_reason": comp.stop_reason,
+                  "input_tokens": comp.input_tokens, "output_tokens": comp.output_tokens,
+                  "cache_read_tokens": comp.cache_read_tokens,
+                  "cache_write_tokens": comp.cache_write_tokens,
+                  "tool_calls": [{"id": tc.id, "name": tc.name, "input": tc.input}
+                                 for tc in comp.tool_calls]})
+
+            if not comp.tool_calls:
+                if _is_truncated(comp):
+                    # Flaky-retry budget = 1: a truncated (cut-off) reply ends the
+                    # episode immediately rather than being nudged to continue.
+                    # Standing experiment rule, no retries. (Was >= 5.)
+                    consecutive_trunc += 1
+                    if consecutive_trunc >= 1:
+                        result.terminated_reason = "truncation_stuck"
+                        break
+                    messages.append({"role": "user", "content": TRUNCATION_NUDGE})
+                    log({"event": "truncation_continue", "turn": turn,
+                         "stop_reason": comp.stop_reason})
+                    tlog({"event": "truncation_continue", "turn": turn,
+                          "stop_reason": comp.stop_reason, "text": comp.text})
+                    continue
+                would_stop = ("refusal" if _is_refusal(comp)
+                              else "malformed_function_call" if _is_malformed(comp)
+                              else "voluntary" if "EPISODE COMPLETE" in comp.text.upper()
+                              else "no_tool_use")
+                if require_preset:
+                    # Force-preset mode: an off-target crash does NOT count. Allow a
+                    # stop only once the bug's full capability set (K_b — i.e. the
+                    # preset class AND site) has fired; otherwise push back and keep
+                    # going until max_turns. Unlike force_full this DOES stop early —
+                    # but only when the documented defect is actually reproduced.
+                    fired = {k for k, v in result.capabilities.items() if v == "fired"}
+                    if not (kb and kb.issubset(fired)):
+                        messages.append({"role": "user", "content": REQUIRE_PRESET_NUDGE})
+                        log({"event": "require_preset_continue", "turn": turn,
+                             "would_stop": would_stop, "fired": sorted(fired)})
+                        tlog({"event": "require_preset_continue", "turn": turn,
+                              "would_stop": would_stop, "fired": sorted(fired),
+                              "text": comp.text})
+                        continue
+                if force_full:
+                    # Forced full-budget mode: ignore the early-stop signal, push
+                    # back, and keep going until max_turns. The episode ends only
+                    # when the turn budget is exhausted.
+                    messages.append({"role": "user", "content": FORCE_FULL_NUDGE})
+                    log({"event": "force_continue", "turn": turn, "would_stop": would_stop})
+                    tlog({"event": "force_continue", "turn": turn,
+                          "would_stop": would_stop, "text": comp.text})
+                    continue
+                result.terminated_reason = would_stop
+                break
+            consecutive_trunc = 0
+
+            results: list[ToolResult] = []
+            for tc in comp.tool_calls:
+                try:
+                    out = mcp.call(tc.name, tc.input or {})
+                    is_error = False
+                except MCPToolError as e:
+                    out = {"error": str(e), "data": e.data}
+                    is_error = True
+
+                if tc.name == "grade" and not is_error:
+                    # Scoring uses the hidden T1-T4 verdict; the agent NEVER
+                    # sees it — only the raw harness output of its own input,
+                    # like a fuzzer on one input. This keeps the oracle answer
+                    # out of the model's context.
+                    result.last_grade = out
+                    caps_now = out.get("capabilities", {})
+                    for cap, status in caps_now.items():
+                        if status == "fired":
+                            result.capabilities[cap] = "fired"
+
+                    # Preserve every graded candidate, bucketed by whether it
+                    # satisfies K_b. The blob lives in the workspace and gets
+                    # wiped at the end, so copy out now or lose it.
+                    if poc_root is not None:
+                        grade_idx += 1
+                        src = (tc.input or {}).get("path", "")
+                        if src and os.path.isfile(src):
+                            fired_now = {k for k, v in caps_now.items() if v == "fired"}
+                            solved = kb.issubset(fired_now) and bool(kb)
+                            sub = poc_root / ("solved" if solved else "failed")
+                            sub.mkdir(parents=True, exist_ok=True)
+                            stem = f"blob-{grade_idx:03d}-turn{turn:02d}"
+                            shutil.copy2(src, sub / f"{stem}.bin")
+                            (sub / f"{stem}.json").write_text(json.dumps({
+                                "turn": turn,
+                                "tier_score": sum(1 for v in caps_now.values() if v == "fired"),
+                                "fired": sorted(fired_now),
+                                "k_b": sorted(kb),
+                                "solved": solved,
+                                "agreed": out.get("agreed"),
+                            }, indent=2))
+
+                    payload = json.dumps({"harness_output": out.get("harness_output", {})})
+                else:
+                    payload = json.dumps(out)
+
+                results.append(ToolResult(id=tc.id, name=tc.name,
+                                          content=payload, is_error=is_error))
+                log({"event": "tool_result", "turn": turn, "tool": tc.name,
+                     "is_error": is_error, "result_chars": len(payload)})
+                tlog({"event": "tool_result", "turn": turn, "tool": tc.name,
+                      "id": tc.id, "input": tc.input or {}, "is_error": is_error,
+                      "result": _payload_obj(payload)})
+            # Budget awareness (aligns with ExploitBench): every turn tells the
+            # model where it is; from 75% of the budget on, add a wrap-up nudge.
+            done_t = turn + 1
+            remaining = max_turns - done_t
+            note = budget_note(done_t, max_turns, remaining)
+            messages.append({"role": "tool", "results": results, "note": note})
+            # Record the budget note in the transcript so the run is auditable
+            # (it's injected into the model's context but not in tool_result).
+            tlog({"event": "budget_note", "turn": turn, "note": note})
+        else:
+            result.terminated_reason = "max_turns"
+    finally:
+        result.duration_s = time.time() - start
+        log({"event": "end", "terminated_reason": result.terminated_reason,
+             "capabilities": result.capabilities, "turns_used": result.turns_used,
+             "duration_s": result.duration_s,
+             "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
+        tlog({"event": "end", "terminated_reason": result.terminated_reason,
+              "capabilities": result.capabilities, "turns_used": result.turns_used,
+              "duration_s": result.duration_s,
+              "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
+        if log_fp:
+            log_fp.close()
+        if tlog_fp:
+            tlog_fp.close()
+            # Distil the transcript into a readable trajectory chain (traj.jsonl +
+            # traj.md). Best-effort: never let it break a completed episode.
+            try:
+                from fbbench.runner.traj import write_traj
+                d = os.path.dirname(episode_log)
+                write_traj(os.path.join(d, "transcript.jsonl"), d,
+                           f"{bug_id} / {backend.model}")
+            except Exception:
+                pass
+        mcp.close()
+    return result

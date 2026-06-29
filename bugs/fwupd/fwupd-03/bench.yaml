@@ -1,0 +1,19 @@
+bug_id: fwupd-03
+project: fwupd
+target:
+  language: c
+  build_system: meson
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation:
+  - -rss_limit_mb=1024
+  - '@@'
+  rss_limit_mb: 1024
+  timeout_s: 60
+  provenance: fuzzingbrain
+  sanitizer: ubsan
+reproducibility:
+  base_image_digest: ''
+  snapshot_debian_date: 20260101T000000Z
+  source_date_epoch: 1735689600

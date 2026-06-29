@@ -1,0 +1,20 @@
+bug_id: systemd-02
+project: systemd
+target:
+  language: c
+  build_system: meson
+harness:
+  type: libfuzzer
+  entrypoint: LLVMFuzzerTestOneInput
+  invocation:
+  - -timeout=10
+  - -rss_limit_mb=2048
+  - '@@'
+  rss_limit_mb: 2048
+  timeout_s: 3
+  provenance: fuzzingbrain
+  sanitizer: libfuzzer
+reproducibility:
+  base_image_digest: ''
+  snapshot_debian_date: 20260101T000000Z
+  source_date_epoch: 1735689600

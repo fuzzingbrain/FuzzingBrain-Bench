@@ -1,0 +1,18 @@
+bug_id: pdfbox-02
+project: pdfbox
+target:
+  language: jvm
+  build_system: maven
+harness:
+  type: java
+  entrypoint: InlineImageFuzzer.fuzzerTestOneInput
+  invocation:
+  - '@@'
+  rss_limit_mb: 256
+  timeout_s: 30
+  provenance: fuzzingbrain
+  sanitizer: jazzer
+reproducibility:
+  base_image_digest: ''
+  snapshot_debian_date: 20260101T000000Z
+  source_date_epoch: 1735689600
