@@ -91,7 +91,7 @@ fails with `model is not supported when using Codex with a ChatGPT account`):
 ```bash
 npm install -g @openai/codex          # install the codex CLI (needs Node)
 codex logout                          # drop any ChatGPT login
-codex login --api-key "$OPENAI_API_KEY"   # authenticate with your API key
+printenv OPENAI_API_KEY | codex login --with-api-key   # authenticate with your API key
 codex login status                    # should say "API key", not "ChatGPT account"
 ```
 
