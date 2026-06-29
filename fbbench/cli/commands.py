@@ -23,10 +23,10 @@ from fbbench.paths import REPO, SERVER
 # Reference PoCs that are slow to grade (long harness / heavy build); skipped
 # by `grade-all` unless --include-slow is passed.
 SLOW_BUGS = {
-    "openssl-des-ofb-cfb-overread",
-    "imagemagick-msl-comment-npd",
-    "jq-dump-op-npd",
-    "icu-translit-rule-uaf",
+    "openssl-01",
+    "imagemagick-02",
+    "jq-01",
+    "icu-02",
 }
 
 
