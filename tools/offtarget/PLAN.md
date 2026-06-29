@@ -9,10 +9,10 @@ experiment's independent variable — not cleanup.
 
 ## Two binary sets (both kept; current binaries = Arm A, never deleted)
 - **Old V1** = current vuln binary: preset bug + off-target interference present (Arm A).
-- **Old V2** = current `fixed-asan`: preset also patched (crash2 oracle for old V1).
+- **Old V2** = current `fixed-asan`: preset also patched (differential oracle for old V1).
 - **New V1** = vuln binary with the off-target(s) suppressed (interference-free, Arm B).
   Built ONLY for bugs that have a catalogued off-target.
-- **New V2** = new V1 + `fix_commit`/`fix_patch` (preset also patched) = crash2 oracle for new V1.
+- **New V2** = new V1 + `fix_commit`/`fix_patch` (preset also patched) = differential oracle for new V1.
 
 Build mechanism: `delta-bisect/bin/build_at.py <bug> <commit> --patch <p> --config release-asan`
 (supports applying a unified diff to the source at a pinned commit). New V1 = vuln_commit+patch,
@@ -80,7 +80,7 @@ spirv-orderblocks-segv · spirv-tools-friendlynamemapper-overflow · upx-elf32-p
   `-fsanitize=fuzzer,address` — **no UBSan**. These off-targets fire ONLY under `-fsanitize=undefined
   -fno-sanitize-recover` (a separate 06-02 experiment build), so they physically cannot fault on this
   benchmark binary nor for the agent (same binary). Empirically confirmed no-crash.
-- **systemd-pe-binary-dos**: PoC solves the preset (class+crash+crash2+reach) → misfiled, dropped.
+- **systemd-pe-binary-dos**: PoC solves the preset (class+crash+differential+reach) → misfiled, dropped.
 - **OOM artifacts pending agent-env check** (graaljs, jq, ndpi escaped grade env as no-crash; fwupd &
   spirv-friendlyname fired): OOM = libFuzzer rss_limit / Java -Xmx resource exhaustion, not a distinct
   defect. Handled in a separate tier — kept only if they genuinely fire for the agent.

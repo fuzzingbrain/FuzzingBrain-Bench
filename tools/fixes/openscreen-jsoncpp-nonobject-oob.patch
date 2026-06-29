@@ -7,7 +7,7 @@
 -                      "in Json::Value::find(begin, end): requires "
 -                      "objectValue or nullValue");
 -  if (type() == nullValue)
-+  // strict fix (FB-Bench crash2): a non-object (array/number/string/bool) key
++  // strict fix (FB-Bench differential): a non-object (array/number/string/bool) key
 +  // lookup previously reached JSON_FAIL_MESSAGE->abort() under -DNDEBUG; treat
 +  // any non-object as "not found" so operator[] yields the null value and the
 +  // process never aborts.

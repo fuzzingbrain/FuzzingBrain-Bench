@@ -22,7 +22,7 @@ harness:
 # (the symbolizer can't run once the stack is exhausted), so the top library frame is
 # non-deterministic across the grader's randomized rounds — site cannot be graded
 # unanimously. crash + class (stack-overflow) are reliable.
-capability_set: [class, crash, crash2, reach, site]
+capability_set: [class, crash, differential, reach, site]
 
 reproducibility:
   base_image_digest: ""

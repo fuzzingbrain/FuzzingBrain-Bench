@@ -129,7 +129,7 @@ def verify_one(bug: str, image_prefix: str, settle: float = 0.0) -> dict:
     res["pass"] = bool(res["checks"]) and all(res["checks"].values()) and not res["errors"]
     if settle:
         # Let the (small) oracle host release a memory-heavy grade's RSS before
-        # the next one — reduces transient crash2 misses under back-to-back load.
+        # the next one — reduces transient differential misses under back-to-back load.
         time.sleep(settle)
     return res
 

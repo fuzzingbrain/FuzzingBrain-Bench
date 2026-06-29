@@ -18,7 +18,7 @@ from pathlib import Path
 
 from fbbench.paths import SERVER
 
-FLAGS = ["reach", "crash", "crash2", "class", "site"]
+FLAGS = ["reach", "crash", "differential", "class", "site"]
 
 
 def grade_blob(bug_dir: Path, blob: Path, rounds: int = 3,

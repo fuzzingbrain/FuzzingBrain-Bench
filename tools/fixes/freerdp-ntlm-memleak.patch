@@ -8,7 +8,7 @@
  			if (status != SEC_I_CONTINUE_NEEDED)
 -				return status;
 +			{
-+				/* strict fix (FB-Bench crash2): free the freshly allocated NTLM
++				/* strict fix (FB-Bench differential): free the freshly allocated NTLM
 +				 * context on this NEGOTIATE error early-return so the ~1KB
 +				 * NTLM_CONTEXT does not leak. */
 +				ntlm_ContextFree(context);

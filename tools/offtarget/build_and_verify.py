@@ -3,11 +3,11 @@
 
 Given a bug_id and a suppression patch, this:
   1. builds NEW V1  = vuln_commit + patch   (interference-free vuln binary)
-  2. builds NEW V2  = fix_commit  + patch   (crash2 oracle for new V1)
+  2. builds NEW V2  = fix_commit  + patch   (differential oracle for new V1)
   3. verifies the three ablation properties on the benchmark sanitizer env:
        (P1) new V1 does NOT fault on each off-target PoC      (interference removed)
        (P2) new V1 STILL faults on the preset PoC             (preset intact)
-       (P3) new V2 does NOT fault on the preset PoC           (valid crash2 oracle)
+       (P3) new V2 does NOT fault on the preset PoC           (valid differential oracle)
   4. as controls, confirms OLD V1 faults on both off-target and preset PoCs.
 
 Writes tools/offtarget/results/<bug_id>.json. Idempotent: reuses an existing
@@ -120,7 +120,7 @@ def main():
     # verdict
     p1 = all(not r["fault"] for r in res["checks"]["new_v1_offtarget"]) if ot_pocs else None  # off-target removed
     p2 = (res["checks"]["new_v1_preset"] or {}).get("fault")                                   # preset intact
-    p3 = (not (res["checks"]["new_v2_preset"] or {}).get("fault")) if new_v2 else None          # crash2 oracle ok
+    p3 = (not (res["checks"]["new_v2_preset"] or {}).get("fault")) if new_v2 else None          # differential oracle ok
     ctrl = all(r["fault"] for r in res["checks"]["old_v1_offtarget"]) if ot_pocs else None
     res["properties"] = {"P1_offtarget_removed": p1, "P2_preset_intact": p2,
                          "P3_v2_no_preset_fault": p3, "CTRL_old_v1_faults_offtarget": ctrl}

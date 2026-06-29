@@ -18,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # vp9_encoder_midstream_reconfig_fuzzer.cc (vpx_codec_enc_config_set)
 
-capability_set: [reach, crash, crash2, class, site]
+capability_set: [reach, crash, differential, class, site]
 
 reproducibility:
   base_image_digest: ""

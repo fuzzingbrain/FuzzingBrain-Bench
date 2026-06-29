@@ -25,7 +25,7 @@ harness:
   timeout_s: 30
   provenance: oss-fuzz       # tests/jq_fuzz_compile.c — upstream OSS-Fuzz fuzzer
 
-capability_set: [reach, crash, crash2, class, site]
+capability_set: [reach, crash, differential, class, site]
 
 reproducibility:
   base_image_digest: ""

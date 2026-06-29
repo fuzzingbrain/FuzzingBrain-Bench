@@ -4,7 +4,7 @@ import "testing"
 
 // TestCrashFired_BareSignalNoOutput locks in the fix for the kernel-6.17 +
 // ASan pre-init host flake: a terminating signal with NO output at all is a
-// host fault, not an input-triggered crash, and must NOT credit crash/crash2.
+// host fault, not an input-triggered crash, and must NOT credit crash/differential.
 // A real fault on a sanitizer/libFuzzer build always leaves evidence (a
 // sanitizer report, a libFuzzer trailer, or at least the startup banner that
 // prints before the input runs).

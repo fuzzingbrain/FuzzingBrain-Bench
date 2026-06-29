@@ -8,7 +8,7 @@ public class PfbFuzzer {
         // Jazzer-style harness: IOException is PfbParser's DECLARED "malformed font"
         // rejection, so it is a clean parse failure, not a finding. Only an undeclared
         // RuntimeException (the bug, e.g. NegativeArraySizeException) is a real crash.
-        // This makes the crash2 patch-differential well-defined: the vuln throws the
+        // This makes the patch-differential well-defined: the vuln throws the
         // RuntimeException (crash), a correct fix throws IOException (caught, clean exit).
         try {
             new PfbParser(data);

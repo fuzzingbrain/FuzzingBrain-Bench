@@ -132,7 +132,7 @@
         "solved_preset": false,
         "fired": [
           "crash",
-          "crash2",
+          "differential",
           "reach",
           "site"
         ],
@@ -233,7 +233,7 @@
         "solved_preset": false,
         "fired": [
           "crash",
-          "crash2"
+          "differential"
         ],
         "actual_class": "segv",
         "actual_frame": " @ :"
@@ -253,7 +253,7 @@
         "solved_preset": false,
         "fired": [
           "crash",
-          "crash2",
+          "differential",
           "reach",
           "site"
         ],
@@ -422,7 +422,7 @@
         "fired": [
           "class",
           "crash",
-          "crash2",
+          "differential",
           "reach"
         ],
         "actual_class": "",

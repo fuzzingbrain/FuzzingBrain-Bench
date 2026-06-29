@@ -20,7 +20,7 @@ harness:
   # poc deterministically takes ~5.5 s on the oracle host and the fixed parser
   # ~0.12 s, so a 3 s outer timeout cleanly separates them: the vuln run is
   # killed (exit 124, timedOut -> class=timeout -> crash fires) while the fixed
-  # build finishes well under 3 s (crash2 differential fires). ~45x separation.
+  # build finishes well under 3 s (differential fires). ~45x separation.
   entrypoint: LLVMFuzzerTestOneInput
   invocation: ["-timeout=10", "-rss_limit_mb=2048", "@@"]
   rss_limit_mb: 2048
@@ -29,15 +29,15 @@ harness:
 
 # Reproducible set on the deployed oracle. This is a timeout-style
 # algorithmic-complexity DoS: `crash` (the outer wall-clock kills the wedged
-# vuln run -> timedOut -> class=timeout fires) and `crash2` (the fixed parser
+# vuln run -> timedOut -> class=timeout fires) and `differential` (the fixed parser
 # finishes in ~0.12 s, far under the 3 s gate) fire robustly and
-# deterministically. Earlier this bug's crash/crash2 were propped up by a
+# deterministically. Earlier this bug's crash/differential were propped up by a
 # kernel-6.17 empty-SIGSEGV host flake (the prior 10 s gate never tripped on a
 # 5.5 s vuln run, so the only "fault" was the flake); tightening the gate to 3 s
 # makes the timeout a genuine, input-driven signal. `class`=timeout still has no
 # symbolized frames, so `reach`/`site` stay non-gradable (documented in
 # grader/expected.yaml only) and are intentionally excluded here.
-capability_set: [crash, crash2]
+capability_set: [crash, differential]
 
 reproducibility:
   base_image_digest: ""
@@ -55,7 +55,7 @@ notes: |
   (src/shared/pe-binary.c) into ~4.17 million 1024-byte SHA-256 update
   iterations, wedging the parser for >10 s with no termination. Graded with
   a timeout-style oracle (sanitizer: libfuzzer) on the reproducible
-  [crash, crash2] set: the observable signature is a wall-clock timeout
+  [crash, differential] set: the observable signature is a wall-clock timeout
   banner that carries no symbolized stack frames, and the hot loop is fast
   enough that `class`=timeout is CPU-speed-dependent, so the true hot-loop
   location is recorded in grader/expected.yaml for documentation only. Maintainer classified the underlying issue Severity

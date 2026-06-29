@@ -6,7 +6,7 @@ index 294c89fd0..a8eea9eb9 100644
    const int step = (rgb_bit_depth > 8) ? rgb_step / 2 : rgb_step;
    int i = 0;
    const int w = (pic_width + 1) & ~1;
-+  /* strict fix (FB-Bench crash2): clamp each raw input sample to the
++  /* strict fix (FB-Bench differential): clamp each raw input sample to the
 +     rgb_bit_depth range; an out-of-range word would index past the gamma
 +     lookup table kGammaToLinearTabS (OOB read in FixedPointInterpolation). */
 +  const int rgb_max = (1 << rgb_bit_depth) - 1;

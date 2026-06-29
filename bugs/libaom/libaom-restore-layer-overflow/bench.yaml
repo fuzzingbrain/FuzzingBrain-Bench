@@ -18,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # libaom_ratectrl_rtc_interface_fuzzer.cc (AV1RateControlRTC public iface)
 
-capability_set: [reach, crash, crash2, class, site]
+capability_set: [reach, crash, differential, class, site]
 
 reproducibility:
   base_image_digest: ""

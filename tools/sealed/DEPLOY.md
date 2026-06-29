@@ -60,7 +60,7 @@ build environment. On a fresh Ubuntu 24.04 these were missing and had to be adde
 - **crash needs evidence** (the guard that makes best-of-N safe): the kernel-6.17
   flake can also SIGSEGV the runtime DURING STARTUP, before the input runs,
   yielding a terminating signal with empty stdout AND stderr. Counting that as a
-  crash would let best-of-N FABRICATE crash/crash2 for an inert input (~60% over 5
+  crash would let best-of-N FABRICATE crash/differential for an inert input (~60% over 5
   attempts) — the "no flake fabricates a crash" assumption only ever held for the
   fixed run, not the vuln run. `crashFired()` now rejects a signal with no output
   at all: a real fault on a sanitizer/libFuzzer harness always leaves a report, a
@@ -69,14 +69,14 @@ build environment. On a fresh Ubuntu 24.04 these were missing and had to be adde
   one. (`grade_crashfired_test.go` locks the behavior.)
 - Keep ASan's default alt stack ON (stack-overflow bugs need it); best-of-N
   covers the occasional alt-stack-overflow truncation under load.
-- **crash2 fixed-run retry** (`BENCH_FIXED_RUN_ATTEMPTS`, default 5): the patched
+- **differential fixed-run retry** (`BENCH_FIXED_RUN_ATTEMPTS`, default 5): the patched
   binary is deterministically clean on kernel 6.8 but SEGVs ~27% on the grading
   host's kernel 6.17 (ASan signal-handling regression), which sporadically dropped
-  crash2 for memory-class bugs. The differential re-runs the fixed binary up to N
+  differential for memory-class bugs. The differential re-runs the fixed binary up to N
   and fires as soon as ANY run is clean — a genuinely-unfixed binary faults every
   time, so this rescues host flakes without ever passing a real post-patch crash.
   NOTE: do NOT raise `BENCH_GRADE_ATTEMPTS` to compensate — more whole-round
-  retries heat the small (7 GB / 2 CPU) host and make crash2 flakier, not better;
+  retries heat the small (7 GB / 2 CPU) host and make differential flakier, not better;
   the targeted fixed-run retry is the right knob.
 
 ## Status
@@ -84,7 +84,7 @@ build environment. On a fresh Ubuntu 24.04 these were missing and had to be adde
 68/68 images public + answer-free. End-to-end (fresh anonymous pull -> craft
 input -> grade() over the public tunnel) verified. All 68 grade to their full
 declared K_b. `systemd-pe-binary-dos` is a `timeout` DoS graded on `[crash,
-crash2]`: its real signal is the oracle's OUTER wall-clock (`harness.timeout_s`,
+differential]`: its real signal is the oracle's OUTER wall-clock (`harness.timeout_s`,
 tightened 10 -> 3 s) — the vuln poc deterministically wedges ~5.5 s while the
 fixed parser finishes ~0.12 s, so the 3 s gate cleanly separates them (~45x).
 libFuzzer's own `-timeout` is NOT enforced in single-input replay mode, so it

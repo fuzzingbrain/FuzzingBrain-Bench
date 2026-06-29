@@ -5,7 +5,7 @@
          else
            kernel->width = GetOptimalKernelWidth2D(args->rho,sigma2);
          kernel->height = kernel->width;
-+        /* strict fix (FB-Bench crash2): reject an unbounded attacker-supplied */
++        /* strict fix (FB-Bench differential): reject an unbounded attacker-supplied */
 +        /* radius whose derived kernel dimensions would force an absurd */
 +        /* values-array allocation in AcquireAlignedMemory below */
 +        if ((kernel->width == 0) || (kernel->width > 4096))

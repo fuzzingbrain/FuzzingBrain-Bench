@@ -18,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # sharpyuv_convert_fuzzer.cc (public SharpYuvConvert API)
 
-capability_set: [reach, crash, crash2, class, site]
+capability_set: [reach, crash, differential, class, site]
 
 reproducibility:
   base_image_digest: ""

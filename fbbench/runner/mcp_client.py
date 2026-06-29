@@ -53,7 +53,7 @@ SANDBOX_IGNORE = ("PROVENANCE.md",)
 # Everything the oracle needs at runtime (harness.*, capability_set) is kept.
 _BENCH_SCRUB_TOP = ("upstream_report", "cve")
 # repo/vuln_commit identify the upstream so the agent can't look up the fix;
-# fix_commit/fix_patch (the crash2 patch-differential provenance) point AT the
+# fix_commit/fix_patch (the patch-differential provenance) point AT the
 # fix directly and must never reach the agent's view either.
 _BENCH_SCRUB_TARGET = ("repo", "vuln_commit", "fix_commit", "fix_patch")
 

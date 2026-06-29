@@ -53,7 +53,7 @@ docker run -it docker.io/osanzas/fbbench-challenge-dtc-01:latest
 # inside /challenge: read src/ + harness/, craft an input, and your agent drives
 # the mcp-server over stdio (setup/read/list/write/exec/grade). grade() POSTs the
 # candidate to BENCH_GRADE_URL (the remote oracle) and returns ONLY the capability
-# verdict {reach,crash,crash2,class,site} — no answer key is ever on this host.
+# verdict {reach,crash,differential,class,site} — no answer key is ever on this host.
 ```
 
 The image names use neutral `<project>-NN` aliases on purpose: the registry name

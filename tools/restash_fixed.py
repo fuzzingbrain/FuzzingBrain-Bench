@@ -12,7 +12,7 @@ Self-contained layout produced at bugs/<proj>/<id>/binaries/fixed-asan/:
   *.so               (any sibling shared libs from the build out-dir; stripped)
   lib/               (JVM only: the fixed classpath; launcher repointed to ./lib)
 
-Then re-grades each bug's golden PoC to confirm crash2 fires.
+Then re-grades each bug's golden PoC to confirm differential fires.
 Usage: .venv/bin/python tools/restash_fixed.py [--only a,b] [--no-grade]
 """
 from __future__ import annotations
@@ -86,7 +86,7 @@ def grade(bug_id: str) -> tuple[str, dict]:
     caps = sc["capabilities"]
     kb = capability_set(d)
     solved = all(caps.get(k) == "fired" for k in kb)
-    return ("PASS" if (caps.get("crash2") == "fired" and solved) else "FAIL"), caps
+    return ("PASS" if (caps.get("differential") == "fired" and solved) else "FAIL"), caps
 
 
 def main():
@@ -107,9 +107,9 @@ def main():
         verdict, caps = grade(b)
         if verdict == "PASS":
             npass += 1
-        print(f"  [{verdict}] {b:<44} {note:<22} crash2={caps.get('crash2')}")
+        print(f"  [{verdict}] {b:<44} {note:<22} differential={caps.get('differential')}")
     if not a.no_grade:
-        print(f"\ncrash2 PASS: {npass}/{len(bugs)}")
+        print(f"\ndifferential PASS: {npass}/{len(bugs)}")
 
 
 if __name__ == "__main__":

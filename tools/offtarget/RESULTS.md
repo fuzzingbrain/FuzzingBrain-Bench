@@ -42,17 +42,17 @@ since fixed:**
 1. **JVM lib not swapped (stage_armB):** for pdfbox (the only JVM bug) Arm-B initially ran the
    UNPATCHED `fontbox.jar` (only the launcher was swapped). Caught by md5; fixed to copy the build
    out-dir `lib/`.
-2. **Corrupted crash2 oracle (new V2):** Arm-B used a "new V2" = fix_commit + off-target patch as the
-   crash2 fixed-binary. For pdfbox the off-target patch (authored against VULN-commit line numbers)
-   landed wrong on the FIX tree and **re-introduced the preset crash**, so crash2 could NEVER fire in
+2. **Corrupted differential oracle (new V2):** Arm-B used a "new V2" = fix_commit + off-target patch as the
+   differential fixed-binary. For pdfbox the off-target patch (authored against VULN-commit line numbers)
+   landed wrong on the FIX tree and **re-introduced the preset crash**, so differential could NEVER fire in
    Arm-B → the agent could never be credited a solve even when it found the preset input → a forced
-   0/5. Fixed by keeping the ORIGINAL validated fixed binary (old V2) as the crash2 oracle; off-target
+   0/5. Fixed by keeping the ORIGINAL validated fixed binary (old V2) as the differential oracle; off-target
    suppression is a V1-only concern, so the fixed side must not be touched.
 
 Both bugs **spuriously suppressed Arm-B**, manufacturing a fake "interference helps" signal concentrated
 in pdfbox. With the oracle audited clean, **pdfbox is 5/5 vs 5/5** and the aggregate is a tie.
 
-**Lesson:** a capability-set solve requires the WHOLE oracle (incl. crash2's fixed binary) to be valid
+**Lesson:** a capability-set solve requires the WHOLE oracle (incl. differential's fixed binary) to be valid
 in BOTH arms. An ablation that only swaps the vuln binary must keep everything else byte-faithful and
 verify each arm end-to-end through grade(), not just by md5 of the swapped file.
 

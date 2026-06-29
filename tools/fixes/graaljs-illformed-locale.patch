@@ -5,7 +5,7 @@
              String result = maybeAppendMissingLanguageSubTag(builder.build().toLanguageTag());
              return result.replaceAll("-" + YES_PLACEHOLDER, "-yes").replaceAll("-" + TRUE_PLACEHOLDER, "-true");
 -        } catch (IllformedLocaleException e) {
-+        } catch (IllformedLocaleException | org.graalvm.shadowed.com.ibm.icu.util.IllformedLocaleException e) {  // strict fix (FB-Bench crash2): ICU's shadowed IllformedLocaleException was uncaught -> wrapped as internal error; catch it too -> proper RangeError
++        } catch (IllformedLocaleException | org.graalvm.shadowed.com.ibm.icu.util.IllformedLocaleException e) {  // strict fix (FB-Bench differential): ICU's shadowed IllformedLocaleException was uncaught -> wrapped as internal error; catch it too -> proper RangeError
              throw Errors.createRangeError(e.getMessage());
          }
      }

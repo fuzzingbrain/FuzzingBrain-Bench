@@ -13,7 +13,7 @@ import sys
 from fbbench.grading import capability_set, grade_blob, list_bugs
 from fbbench.paths import SERVER
 
-FLAGS = ["reach", "crash", "crash2", "class", "site"]
+FLAGS = ["reach", "crash", "differential", "class", "site"]
 
 
 def main() -> int:

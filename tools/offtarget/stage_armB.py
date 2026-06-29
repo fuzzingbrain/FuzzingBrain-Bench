@@ -5,7 +5,7 @@ For each bug that has a PASSing new-V1 build (tools/offtarget/results/<bug>.json
 create bugs-armB/<proj>/<bug>/ whose source/grader/poc are SYMLINKS to the real
 bundle (identical agent-facing view) but whose binaries/ is a real copy with
 release-asan/harness REPLACED by the new V1 (off-target suppressed). fixed-asan
-(crash2 oracle) is kept from the real bundle (old V2) unless a new V2 exists.
+(differential oracle) is kept from the real bundle (old V2) unless a new V2 exists.
 
 Result: running the runner with repo_root=bugs-armB swaps ONLY the oracle binary
 the agent probes via grade() — a clean independent variable, invisible to the agent.
@@ -74,13 +74,13 @@ def stage_one(bug_id):
     # release-asan launcher via ../lib = binaries/lib), NOT in the harness launcher
     # itself. Swap that lib too, else Arm B silently runs the UNPATCHED jar.
     jvm_v1 = _swap_lib(nv1, dst / "binaries" / "lib")
-    # crash2 oracle: KEEP the original fixed-asan (old V2), do NOT swap in a
+    # differential oracle: KEEP the original fixed-asan (old V2), do NOT swap in a
     # "new V2" (fix_commit + off-target patch). Off-target suppression is a
-    # V1-ONLY concern; crash2 only needs the fixed binary to not-fault on the
+    # V1-ONLY concern; differential only needs the fixed binary to not-fault on the
     # input, which the original validated fixed binary already does. Building a
     # new V2 risks the off-target patch (authored against the VULN commit's line
     # numbers) landing wrong on the FIX tree and breaking the preset fix — which
-    # is exactly what corrupted pdfbox's crash2. So we leave fixed-asan untouched.
+    # is exactly what corrupted pdfbox's differential. So we leave fixed-asan untouched.
     v2 = "old-V2(kept)" + (" +patched-lib" if jvm_v1 else "")
     return (bug_id, f"STAGED ({v2})")
 

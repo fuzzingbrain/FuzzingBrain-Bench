@@ -18,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # vpx_image_format_matrix_fuzzer.cc (public vpx_image API)
 
-capability_set: [class, crash, crash2, reach, site]   # UBSan: grader detects crash+reach; class/site not machine-detected for ubsan
+capability_set: [class, crash, differential, reach, site]   # UBSan: grader detects crash+reach; class/site not machine-detected for ubsan
 
 reproducibility:
   base_image_digest: ""

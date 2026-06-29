@@ -18,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain
 
-capability_set: [class, crash, crash2, reach, site]   # heap-use-after-free (idl.h:242), freed by Deserialize
+capability_set: [class, crash, differential, reach, site]   # heap-use-after-free (idl.h:242), freed by Deserialize
 
 reproducibility:
   base_image_digest: ""

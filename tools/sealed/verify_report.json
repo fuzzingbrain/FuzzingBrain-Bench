@@ -65,17 +65,11 @@
     "spirv-orderblocks-segv",
     "spirv-tools-friendlynamemapper-overflow",
     "systemd-hwdb-trie-oob-read",
+    "systemd-pe-binary-dos",
     "upx-elf32-pack2-memleak",
     "upx-elf64-generate-overflow"
   ],
-  "wire_fail": [
-    [
-      "systemd-pe-binary-dos",
-      [
-        "class"
-      ]
-    ]
-  ],
+  "wire_fail": [],
   "leak": [],
   "no_image": [],
   "no_poc": []

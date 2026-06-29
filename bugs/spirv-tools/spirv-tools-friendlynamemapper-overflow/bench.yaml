@@ -18,7 +18,7 @@ harness:
   timeout_s: 30
   provenance: fuzzingbrain   # spirv_dis_extended_options_fuzzer.cc (public spvBinaryToText API)
 
-capability_set: [reach, crash, crash2, class, site]
+capability_set: [reach, crash, differential, class, site]
 
 reproducibility:
   base_image_digest: ""

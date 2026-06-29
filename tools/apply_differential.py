@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-"""Stamp crash2 + fix_commit into bench.yaml for every bug whose patch-differential
+"""Stamp differential + fix_commit into bench.yaml for every bug whose patch-differential
 build PASSed (tools/fixed_build_results.json, status == PASS).
 
-- capability_set: insert `crash2` immediately after `crash` (idempotent).
+- capability_set: insert `differential` immediately after `crash` (idempotent).
 - target.fix_commit: record the verified fix SHA next to vuln_commit (idempotent).
 
 Edits are textual to preserve the file's formatting/comments. Dry-run by default;
 pass --write to apply.
 
-Usage: .venv/bin/python tools/apply_crash2.py [--write]
+Usage: .venv/bin/python tools/apply_differential.py [--write]
 """
 from __future__ import annotations
 import argparse, json, re
@@ -29,18 +29,18 @@ def edit_bench(path: Path, sha: str, patch: str | None = None) -> tuple[bool, st
     orig = text
     notes = []
 
-    # 1) capability_set: [..] — insert crash2 after crash.
+    # 1) capability_set: [..] — insert differential after crash.
     m = re.search(r"^capability_set:\s*\[([^\]]*)\]", text, re.M)
     if m:
         items = [s.strip() for s in m.group(1).split(",") if s.strip()]
-        if "crash2" not in items:
+        if "differential" not in items:
             if "crash" in items:
-                items.insert(items.index("crash") + 1, "crash2")
+                items.insert(items.index("crash") + 1, "differential")
             else:
-                items.append("crash2")
+                items.append("differential")
             new_line = "capability_set: [" + ", ".join(items) + "]"
             text = text[:m.start()] + new_line + text[m.end():]
-            notes.append("cap+crash2")
+            notes.append("cap+differential")
         else:
             notes.append("cap=ok")
     else:
@@ -92,7 +92,7 @@ def main():
                 (d / "bench.yaml").write_text(text)
         kind = "strict" if patch else "upstr "
         print(f"  {'WRITE' if (changed and a.write) else ('would' if changed else 'skip ')}  {kind} {bug:<44s} {notes}")
-    print(f"\ncrash2 bugs: {npass}  |  bench.yaml changed: {nchanged}  |  {'WRITTEN' if a.write else 'DRY-RUN (use --write)'}")
+    print(f"\ndifferential bugs: {npass}  |  bench.yaml changed: {nchanged}  |  {'WRITTEN' if a.write else 'DRY-RUN (use --write)'}")
 
 
 if __name__ == "__main__":

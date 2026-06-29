@@ -6,7 +6,7 @@
                  // The next character MUST be a segment open
                  if (single == nullptr ||
                      !ICU_Utility::parseChar(rule, iref, SEGMENT_OPEN)) {
-+                    // strict fix (FB-Bench crash2): free the SingleID parsed above
++                    // strict fix (FB-Bench differential): free the SingleID parsed above
 +                    // before bailing on this error path so it does not leak.
 +                    delete single;
                      return syntaxError(U_INVALID_FUNCTION, rule, start, status);

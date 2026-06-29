@@ -4,7 +4,7 @@
  
  avifResult avifDecoderSetIOMemory(avifDecoder * decoder, const uint8_t * data, size_t size)
  {
-+    // strict fix (FB-Bench crash2): reject an implausibly large buffer size (e.g. a Java
++    // strict fix (FB-Bench differential): reject an implausibly large buffer size (e.g. a Java
 +    // int length of -1 sign-extended to (size_t)-1 == SIZE_MAX) before it becomes the
 +    // memory reader's trusted bound. Otherwise avifROStream's size guard can never shrink
 +    // a request and avifDecoderParse() reads past the real allocation (heap-buffer-overflow).

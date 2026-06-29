@@ -37,7 +37,7 @@ from fbbench.runner.mcp_client import _full_scan_alias
 
 MODEL = "codex-gpt-5.5"
 RUNS = REPO / "runs"
-FLAGS = ["reach", "crash", "crash2", "class", "site"]
+FLAGS = ["reach", "crash", "differential", "class", "site"]
 # The canonical challenge images + the remote oracle — the SAME ones the API arm
 # uses. Overridable via env for private/staging registries or oracles.
 IMAGE_PREFIX = os.environ.get("FBBENCH_IMAGE_PREFIX", "docker.io/osanzas/fbbench-challenge-")

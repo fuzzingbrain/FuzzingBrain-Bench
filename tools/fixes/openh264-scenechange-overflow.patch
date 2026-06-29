@@ -6,7 +6,7 @@ index f076851..6c68f50 100644
      m_sLocalParam.iCurStride = pSrcPixMap->iStride[0];
      m_sLocalParam.pStaticBlockIdc = m_sSceneChangeParam.pStaticBlockIdc;
  
-+    /* strict fix (FB-Bench crash2): the 8x8 SAD scan reads its reference
++    /* strict fix (FB-Bench differential): the 8x8 SAD scan reads its reference
 +     * samples from pRefPixMap, but the block grid above is derived from the
 +     * (possibly larger) source dimensions.  Clamp the grid to the reference
 +     * pixmap so pRefTmp can never walk past the reference plane

@@ -10,7 +10,7 @@
 +	{
 +		guint32 payload_length =
 +		    fu_struct_logitech_bulkcontroller_send_sync_res_get_payload_length(st);
-+		/* strict fix (FB-Bench crash2): bound attacker payload_length against the receive
++		/* strict fix (FB-Bench differential): bound attacker payload_length against the receive
 +		   buffer (buf is transfer_bufsz, header consumed st->buf->len) so the append cannot
 +		   read past buf -> heap-buffer-overflow at the original site. */
 +		if (payload_length > self->transfer_bufsz - st->buf->len) {
