@@ -53,3 +53,9 @@ bugs/*/*/binaries/
 
 # Off-target ablation arm binaries (answer-bearing) — local only.
 bugs-armB/*/*/binaries/
+
+# Large local-only working trees — NOT for the repo (git add -A would scan 36 GB
+# and hang). delta-bisect = behavioral-bisect infra; related_paper = related-work
+# survey corpus (PDFs).
+delta-bisect/
+related_paper/
