@@ -56,8 +56,17 @@ build environment. On a fresh Ubuntu 24.04 these were missing and had to be adde
   single round can be suppressed by a transient host flake (kernel-6.17 signal
   frame overflowing ASan's alt stack and truncating the report; a borderline OOM
   that SIGSEGVs instead of printing a clean report). Retry up to N, keep the best
-  attempt, stop early on full fire. Can only RESCUE a real trigger from a flake —
-  no flake fabricates a crash — so it never creates a false positive.
+  attempt, stop early on full fire.
+- **crash needs evidence** (the guard that makes best-of-N safe): the kernel-6.17
+  flake can also SIGSEGV the runtime DURING STARTUP, before the input runs,
+  yielding a terminating signal with empty stdout AND stderr. Counting that as a
+  crash would let best-of-N FABRICATE crash/crash2 for an inert input (~60% over 5
+  attempts) — the "no flake fabricates a crash" assumption only ever held for the
+  fixed run, not the vuln run. `crashFired()` now rejects a signal with no output
+  at all: a real fault on a sanitizer/libFuzzer harness always leaves a report, a
+  libFuzzer trailer, or at minimum the startup banner (printed before the input
+  runs). With this guard best-of-N can only RESCUE a real trigger, never invent
+  one. (`grade_crashfired_test.go` locks the behavior.)
 - Keep ASan's default alt stack ON (stack-overflow bugs need it); best-of-N
   covers the occasional alt-stack-overflow truncation under load.
 - **crash2 fixed-run retry** (`BENCH_FIXED_RUN_ATTEMPTS`, default 5): the patched
@@ -73,10 +82,14 @@ build environment. On a fresh Ubuntu 24.04 these were missing and had to be adde
 ## Status
 
 68/68 images public + answer-free. End-to-end (fresh anonymous pull -> craft
-input -> grade() over the public tunnel) verified. 67/68 grade to full K_b;
-`systemd-pe-binary-dos` misses only `class` (a `timeout` DoS that crashes rather
-than hangs on this host's CPU — an inherent environment-behavior difference; it
-still scores crash/crash2/reach).
+input -> grade() over the public tunnel) verified. All 68 grade to their full
+declared K_b. `systemd-pe-binary-dos` is a `timeout` DoS graded on `[crash,
+crash2]`: its real signal is the oracle's OUTER wall-clock (`harness.timeout_s`,
+tightened 10 -> 3 s) — the vuln poc deterministically wedges ~5.5 s while the
+fixed parser finishes ~0.12 s, so the 3 s gate cleanly separates them (~45x).
+libFuzzer's own `-timeout` is NOT enforced in single-input replay mode, so it
+plays no part. (Its `class`/`reach`/`site` remain non-gradable — the timeout
+carries no symbolized frames — and are excluded from its K_b by design.)
 
 ## Operate
 
