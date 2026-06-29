@@ -11,7 +11,7 @@ dataset; the runner itself has no --seed arg).
 Examples:
   # cost probe: opus on 5 bugs, 1 sample
   python -m fbbench.sweep.orchestrator --models claude-opus-4-7 \\
-      --bugs mongoose-mg-match-overflow,netsnmp-vacm-parse-npd,jsonjava-jsonml-classcast,simdutf-utf16-utf8-overflow,openldap-parse-whsp
+      --bugs mongoose-01,net-snmp-02,json-java-01,simdutf-01,openldap-02
 
   # full sweep, default lineup, 2 samples per (model, bug) for best-of-2 union
   python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0,1
