@@ -63,7 +63,7 @@ fb-bench run avro-03 --model gpt-5.5
 ```
 
 Models: `claude-haiku-4-5` · `claude-sonnet-4-6` · `claude-opus-4-7` ·
-`gpt-5.5` · `gpt-5.4` · `gpt-5` · `gemini-3.1-pro-preview` · `gemini-2.5-pro`
+`gpt-5.5` · `gpt-5.4` · `gpt-5`
 (any catalog id works via `--model`; see `fb-bench models`).
 
 ### 3. Run the whole corpus with a model
