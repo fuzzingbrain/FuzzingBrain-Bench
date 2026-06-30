@@ -157,6 +157,19 @@ def main() -> int:
     score = {
         "bug_id": result.bug_id,
         "model": result.model,
+        # Every run knob that shaped this episode — surfaced verbatim in the
+        # report so a result is fully reproducible from its own score.json.
+        "config": {
+            "mode": "full-scan" if args.full_scan else "normal",
+            "max_turns": args.max_turns,
+            "full_scan": bool(args.full_scan),
+            "force_full": bool(args.force_full),
+            "require_preset": bool(args.require_preset),
+            "preserve_pocs": bool(args.preserve_pocs),
+            "grading": "local-oracle" if args.local else "remote-oracle",
+            "image": image or "(host mcp-server, --local)",
+            "capability_set": sorted(capability_set(bug_dir) or []),
+        },
         "capabilities": result.capabilities,
         "tier_score": sum(1 for v in result.capabilities.values() if v == "fired"),
         "terminated_reason": result.terminated_reason,

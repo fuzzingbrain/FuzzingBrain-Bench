@@ -74,6 +74,59 @@ def _stat(n: str, label: str, cls: str = "") -> str:
     return f'<div class="stat"><div class="n {cls}">{n}</div><div class="l">{_esc(label)}</div></div>'
 
 
+def _yn(v) -> str:
+    return "yes" if v else "no"
+
+
+def _config_rows(score: dict, kb: list[str], max_turns_fallback) -> list[tuple[str, str]]:
+    """Every run knob that shaped this episode, as (label, value) pairs.
+
+    Reads the `config` block written by the runner, and also falls back to the
+    richer top-level score.json fields (mode / diff_level / distractors / …) so
+    the same report renders for both the public and the research score shapes.
+    """
+    cfg = score.get("config") or {}
+    rows: list[tuple[str, str]] = []
+
+    mode = cfg.get("mode") or score.get("mode") or ("full-scan" if score.get("full_scan") else "normal")
+    rows.append(("mode", mode))
+
+    diff_level = cfg.get("diff_level", score.get("diff_level"))
+    if diff_level is not None:
+        rows.append(("diff level", str(diff_level)))
+    distractors = cfg.get("distractors", score.get("distractors"))
+    if distractors is not None:
+        n = len(distractors) if isinstance(distractors, (list, tuple)) else distractors
+        rows.append(("distractor files", str(n)))
+    for fld, label in (("changed_files", "changed files"), ("crash_files", "crash-region files")):
+        v = cfg.get(fld, score.get(fld))
+        if v:
+            rows.append((label, ", ".join(v) if isinstance(v, (list, tuple)) else str(v)))
+
+    mt = cfg.get("max_turns", score.get("max_turns", max_turns_fallback))
+    if mt is not None:
+        rows.append(("turn budget", str(mt)))
+
+    if kb:
+        rows.append(("required ladder (K_b)", " → ".join(kb)))
+
+    rows.append(("force-full", _yn(cfg.get("force_full", score.get("force_full")))))
+    rows.append(("require-preset", _yn(cfg.get("require_preset", score.get("require_preset")))))
+    rows.append(("preserve PoCs", _yn(cfg.get("preserve_pocs", score.get("preserve_pocs", True)))))
+    rows.append(("grading", cfg.get("grading", "remote-oracle")))
+    img = cfg.get("image")
+    if img:
+        rows.append(("challenge image", img))
+    return rows
+
+
+def _config_html(rows: list[tuple[str, str]]) -> str:
+    body = "".join(
+        f'<tr><td>{_esc(k)}</td><td class="r">{_esc(v)}</td></tr>' for k, v in rows
+    )
+    return ('<table class="mini cfg"><tbody>' + body + "</tbody></table>")
+
+
 def _block(s: str) -> str:
     """Escape + cap a multi-line string for a <pre> block."""
     s = "" if s is None else str(s)
@@ -260,12 +313,14 @@ def build_report_html(run_dir: Path) -> str:
     out_tok = cost.get("output_tokens", 0)
     cache_r = cost.get("cache_read_tokens", 0)
 
+    cfg = score.get("config") or {}
+    mode = cfg.get("mode") or score.get("mode") or ("full-scan" if score.get("full_scan") else "normal")
     tags = []
     if language:
         tags.append(language)
     if sanitizer:
         tags.append(sanitizer)
-    tags.append("full-scan" if score.get("full_scan") else "described")
+    tags.append(mode)
     tag_html = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags)
 
     solved = bool(caps) and all(caps.get(k) == "fired" for k in (kb or LADDER))
@@ -300,10 +355,13 @@ def build_report_html(run_dir: Path) -> str:
         conv_turns, system_prompt_full, initial_user = build_conversation(tpath)
         conv_html = _conversation_html(conv_turns, system_prompt_full, initial_user)
 
+    config_html = _config_html(_config_rows(score, kb, None))
+
     return _TEMPLATE.format(
         bug=_esc(bug), model=_esc(model), tags=tag_html,
         tier=tier, verdict_cls=verdict_cls,
         turns=turns, ncalls=len(nodes), usd=f"{usd:.4f}",
+        config=config_html,
         ladder=_ladder_html(caps, kb),
         reason=_esc(reason), dur=f"{dur:.1f}",
         refus=score.get("refusal_retries", 0), malf=score.get("malformed_retries", 0),
@@ -367,6 +425,8 @@ td.r{{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);whit
 td.mk{{text-align:center;}}td.muted,.muted{{color:var(--muted);}}
 code{{background:#0d1117;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:.9em;color:#ff7b72;}}
 .mini td{{padding:5px 8px;}}.mini td:first-child{{font-weight:600;}}
+table.cfg{{max-width:560px;}}table.cfg td:first-child{{color:var(--muted);font-weight:500;}}
+table.cfg td.r{{color:var(--txt);font-weight:600;text-align:right;word-break:break-all;}}
 .traj td.arg{{color:var(--muted);font-family:ui-monospace,monospace;font-size:.82rem;word-break:break-all;}}
 .traj td.out{{font-family:ui-monospace,monospace;font-size:.82rem;color:#9da7b3;word-break:break-all;}}
 .traj tr.crash td{{background:#f8514915;}}.traj tr.crash td.mk{{color:var(--red);}}
@@ -413,6 +473,11 @@ color:#c9d1d9;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:4px
   <div class="stat"><div class="n a">{ncalls}</div><div class="l">tool calls</div></div>
   <div class="stat"><div class="n p">${usd}</div><div class="l">total cost</div></div>
 </div>
+
+<h2>Run configuration</h2>
+<div class="sub" style="margin-bottom:10px">Every knob that shaped this episode — the run is
+reproducible from these parameters alone.</div>
+{config}
 
 <h2>Capability ladder</h2>
 {ladder}
