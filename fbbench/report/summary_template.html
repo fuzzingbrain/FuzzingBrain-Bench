@@ -38,6 +38,11 @@ padding:7px 10px;font-size:.86rem;outline:none;min-width:220px;}
 table{width:100%;border-collapse:collapse;font-size:.86rem;}
 th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center;}
 th{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--bg);}
+table.cfg{max-width:480px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+table.cfg td{text-align:left;padding:7px 12px;}
+table.cfg td:first-child{color:var(--muted);font-weight:500;width:48%;}
+table.cfg td.r{text-align:right;font-weight:600;color:var(--txt);}
+.muted{color:var(--muted);}
 td.bug{text-align:left;font-weight:600;white-space:nowrap;}
 td.bug .meta{color:var(--muted);font-weight:400;font-size:.74rem;}
 a.cell{display:block;border-radius:7px;padding:6px 0;text-decoration:none;color:var(--txt);font-weight:700;font-variant-numeric:tabular-nums;}
@@ -60,6 +65,11 @@ a.cell.none{color:#454d57;font-weight:400;}
 </header>
 
 <div class="stats" id="stats"></div>
+
+<h2>Run configuration</h2>
+<div class="sub" style="margin-bottom:10px">The parameters this sweep ran with
+(<span class="muted">"mixed" = cells in this sweep used different values</span>).</div>
+<table class="cfg" id="config"></table>
 
 <h2>Matrix</h2>
 <div class="bar">
@@ -104,6 +114,23 @@ document.getElementById("stats").innerHTML =
   stat(`${done}`,"cells graded") + stat(`${solved}`,"solved","g") +
   stat(`${errs}`,"errors", errs?"":"") + stat(`$${(D.total_cost||0).toFixed(2)}`,"total cost","p") +
   stat(elapsed,"elapsed","a");
+
+// --- run configuration panel ---
+const C = D.config || {};
+const yn = v => v === null || v === undefined ? "—" : (v === "mixed" ? "mixed" : (v ? "yes" : "no"));
+const cfgRows = [
+  ["mode", C.mode ?? (D.full_scan ? "full-scan" : "normal")],
+  ["models", D.models.join(", ")],
+  ["challenges", `${D.bugs.length} bugs`],
+  ["samples / cell", D.samples.length],
+  ["turn budget", C.max_turns ?? D.max_turns],
+  ["force-full", yn(C.force_full)],
+  ["require-preset", yn(C.require_preset)],
+  ["preserve PoCs", yn(C.preserve_pocs)],
+  ["grading", C.grading ?? "remote-oracle"],
+];
+document.getElementById("config").innerHTML =
+  cfgRows.map(([k,v]) => `<tr><td>${esc(k)}</td><td class="r">${esc(v)}</td></tr>`).join("");
 
 // --- matrix: rows = bugs, cols = models; cell = best tier across samples ---
 const models = D.models;

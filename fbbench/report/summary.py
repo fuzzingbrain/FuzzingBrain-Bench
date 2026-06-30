@@ -63,6 +63,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
 
     cells = []
     cost_sum = 0.0
+    cfg_seen: dict[str, set] = {}     # config key -> set of values seen across cells
     for bug in bugs:
         for model in models:
             for sample in samples:
@@ -74,6 +75,11 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
                 caps = sc.get("capabilities", {})
                 cost = float(sc.get("total_usd") or 0.0)
                 cost_sum += cost
+                cfg = sc.get("config") or {}
+                for k, v in cfg.items():
+                    if isinstance(v, (list, dict)):
+                        continue
+                    cfg_seen.setdefault(k, set()).add(v)
                 report = cd / "report.html"
                 cells.append({
                     "bug": bug, "model": model, "sample": sample,
@@ -81,9 +87,29 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
                     "caps": caps,
                     "solved": _solved(caps),
                     "cost": cost,
+                    "mode": cfg.get("mode") or sc.get("mode")
+                            or ("full-scan" if sc.get("full_scan") else "normal"),
                     "reason": sc.get("terminated_reason", ""),
                     "report": (str(report.relative_to(exp_dir)) if report.is_file() else ""),
                 })
+
+    # Sweep-level run config: a value if every cell agrees, else "mixed".
+    def _agree(key, default=None):
+        vals = cfg_seen.get(key)
+        if not vals:
+            return default
+        return next(iter(vals)) if len(vals) == 1 else "mixed"
+
+    config = {
+        "mode": _agree("mode", "full-scan" if full_scan else "normal"),
+        "max_turns": _agree("max_turns", max_turns),
+        "full_scan": _agree("full_scan", full_scan),
+        "force_full": _agree("force_full"),
+        "require_preset": _agree("require_preset"),
+        "preserve_pocs": _agree("preserve_pocs"),
+        "grading": _agree("grading", "remote-oracle"),
+    }
+
     return {
         "exp": exp or exp_dir.name,
         "models": models,
@@ -91,6 +117,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
         "samples": samples,
         "max_turns": max_turns,
         "full_scan": full_scan,
+        "config": config,
         "total_cost": total_cost if total_cost is not None else cost_sum,
         "elapsed_s": elapsed_s,
         "cells": cells,
