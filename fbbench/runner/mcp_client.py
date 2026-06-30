@@ -351,8 +351,15 @@ class MCPClient:
             # container is ephemeral and answer-free, so this relaxation leaks
             # nothing. (--security-opt is a `docker run` flag — must precede the
             # image name.)
+            # BENCH_GRADE_REVEAL=1 marks this as the TRUSTED runner: the in-image
+            # mcp-server returns the verdict (capabilities/evidence) so the runner
+            # can SCORE the run; episode.py then strips it to harness_output before
+            # the model sees the grade result, so the agent still gets no verdict.
+            # Sealed-image / codex arms do NOT set it, so grade() returns only
+            # harness_output there.
             cmd = ["docker", "run", "-i", "--rm",
                    "--security-opt", "seccomp=unconfined",
+                   "-e", "BENCH_GRADE_REVEAL=1",
                    image, "mcp-server"]
             bug_dir, workspace = "/challenge", "/workspace"
         else:
@@ -362,6 +369,7 @@ class MCPClient:
             # Grader reads expected.yaml + binaries from the oracle dir; the agent
             # never sees it. Defaults to bug_dir for back-compat when unset.
             env["BENCH_ORACLE_DIR"] = oracle_dir or bug_dir
+            env["BENCH_GRADE_REVEAL"] = "1"  # trusted runner: see note above
             cmd = [server_bin]
         self._proc = subprocess.Popen(
             cmd,
