@@ -501,7 +501,7 @@ def cmd_one(args) -> int:
     print(f"\n=== {len(blobs)} candidate blob(s) in workspace ===", flush=True)
     for b in blobs:
         print(f"  {os.path.basename(b):30s} ({os.path.getsize(b)}b)")
-    caps, best_blob, _ts = _best_caps(alias, blobs)
+    caps, best_blob, ts = _best_caps(alias, blobs)
     if best_blob:
         fired = [f for f in FLAGS if caps[f] == "fired"]
         print(f"\nBEST: {os.path.basename(best_blob)}  fired {fired}", flush=True)
