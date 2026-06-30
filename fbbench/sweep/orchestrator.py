@@ -161,6 +161,12 @@ def main() -> int:
                     help="force the live full-screen dashboard (default: on when stdout is a TTY)")
     ap.add_argument("--no-dashboard", dest="dashboard", action="store_false",
                     help="disable the live dashboard; fall back to line-by-line logs")
+    ap.add_argument("--jobs", "-j", type=int, default=1,
+                    help="run N cells concurrently (default 1). Parallel runs use "
+                         "line-by-line logs, not the live dashboard. Each cell is its "
+                         "own subprocess + Docker container, graded independently — "
+                         "but a high N can trip model rate limits (→ SDK backoff), so "
+                         "4–6 is usually the sweet spot.")
     args = ap.parse_args()
 
     if args.exp:
@@ -191,38 +197,82 @@ def main() -> int:
                      max_turns=args.max_turns, full_scan=args.full_scan,
                      total=len(cells), already_done=done)
 
+    jobs = max(1, args.jobs)
     t0 = time.time()
-    with dashboard(console, enabled=use_dash):
-        for i, (model, bug, sample) in enumerate(cells, 1):
-            cd = cell_dir(out, bug, model, sample)
-            if (cd / "score.json").is_file():
-                STATUS.cell_skip(model, bug, sample)
-                continue
-            kb = bug_kb(bug)
-            tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
-            if use_dash:
-                STATUS.cell_start(model, bug, sample, kb)
-                cmd = RUNNER + ["--bug", bug, "--model", model,
-                                "--max-turns", str(args.max_turns), "--out-dir", str(cd)]
-                cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
-                if args.full_scan:
-                    cmd.append("--full-scan")
-                r = run_cell_tailing(cmd, str(REPO), args.timeout,
-                                     cd / "episode.jsonl", model, bug, sample)
-                STATUS.cell_finish(model, bug, sample, r)
+
+    if jobs > 1:
+        # Parallel: each cell is an independent subprocess + Docker container,
+        # graded independently by the remote oracle, so concurrency is safe.
+        # subprocess.run releases the GIL → threads are enough. No live
+        # dashboard in this mode (interleaved cells would scramble it).
+        from concurrent.futures import ThreadPoolExecutor
+
+        todo = [(i, m, b, s) for i, (m, b, s) in enumerate(cells, 1)
+                if not (cell_dir(out, b, m, s) / "score.json").is_file()]
+        print(f"  running {len(todo)} cells with {jobs} parallel workers "
+              f"(line-by-line logs; {done} skipped as already done)", flush=True)
+
+        def _run_one(item):
+            i, model, bug, sample = item
+            print(f"  [{i}/{len(cells)}] start {model} / {bug} / sample-{sample}", flush=True)
+            r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
+                         preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
+            if r and "error" not in r:
+                print(f"      -> [{bug}] {r.get('tier_score','?')}/5  "
+                      f"{r.get('terminated_reason','')}  ${r.get('total_usd') or 0.0:.4f}",
+                      flush=True)
             else:
-                print(f"  {tag} ...", flush=True)
-                r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
-                             preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
-                if r and "error" not in r:
-                    ts = r.get("tier_score", "?")
-                    print(f"      -> {ts}/5  {r.get('terminated_reason','')}  "
-                          f"${r.get('total_usd') or 0.0:.4f}", flush=True)
+                print(f"      -> [{bug}] FAILED: {r.get('error') if r else 'unknown'}", flush=True)
+            return r
+
+        with ThreadPoolExecutor(max_workers=jobs) as ex:
+            list(ex.map(_run_one, todo))
+    else:
+        with dashboard(console, enabled=use_dash):
+            for i, (model, bug, sample) in enumerate(cells, 1):
+                cd = cell_dir(out, bug, model, sample)
+                if (cd / "score.json").is_file():
+                    STATUS.cell_skip(model, bug, sample)
+                    continue
+                kb = bug_kb(bug)
+                tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
+                if use_dash:
+                    STATUS.cell_start(model, bug, sample, kb)
+                    cmd = RUNNER + ["--bug", bug, "--model", model,
+                                    "--max-turns", str(args.max_turns), "--out-dir", str(cd)]
+                    cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
+                    if args.full_scan:
+                        cmd.append("--full-scan")
+                    r = run_cell_tailing(cmd, str(REPO), args.timeout,
+                                         cd / "episode.jsonl", model, bug, sample)
+                    STATUS.cell_finish(model, bug, sample, r)
                 else:
-                    print(f"      -> FAILED: {r.get('error') if r else 'unknown'}", flush=True)
+                    print(f"  {tag} ...", flush=True)
+                    r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
+                                 preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
+                    if r and "error" not in r:
+                        ts = r.get("tier_score", "?")
+                        print(f"      -> {ts}/5  {r.get('terminated_reason','')}  "
+                              f"${r.get('total_usd') or 0.0:.4f}", flush=True)
+                    else:
+                        print(f"      -> FAILED: {r.get('error') if r else 'unknown'}", flush=True)
 
     elapsed = time.time() - t0
-    print(f"\n  done in {elapsed:.0f}s, spent ~${STATUS.total_cost:.2f} this run")
+    # STATUS.total_cost is only fed by the dashboard path; in parallel/line mode
+    # sum straight from the cells on disk so the figure is always right.
+    spent = STATUS.total_cost
+    if jobs > 1 or not spent:
+        spent = 0.0
+        for m in models:
+            for b in bugs:
+                for s in samples:
+                    sj = cell_dir(out, b, m, s) / "score.json"
+                    if sj.is_file():
+                        try:
+                            spent += float(json.loads(sj.read_text()).get("total_usd") or 0.0)
+                        except (OSError, ValueError):
+                            pass
+    print(f"\n  done in {elapsed:.0f}s, spent ~${spent:.2f} total (all cells on disk)")
     aggregate(out, models, bugs, samples)
 
     # Self-contained, answer-free summary page for the whole sweep.
