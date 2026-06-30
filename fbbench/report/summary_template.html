@@ -54,6 +54,21 @@ a.cell.solved{outline:1.5px solid var(--green);}
 a.cell.err{background:#f8514922;color:var(--red);}
 a.cell.none{color:#454d57;font-weight:400;}
 .mtally{font-size:.78rem;color:var(--muted);font-weight:400;}
+/* single-model ladder table */
+table.ladder th{text-align:center;}
+table.ladder th.bug{text-align:left;}
+table.ladder td.rung{font-size:1.05rem;font-weight:700;width:62px;}
+table.ladder td.rung.fired{color:var(--green);}
+table.ladder td.rung.miss{color:#6e7681;}
+table.ladder td.rung.na{color:#39414b;}
+table.ladder td.tier{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
+table.ladder td.tier.solved{color:var(--green);}
+table.ladder td.tier.t0{color:var(--muted);}
+table.ladder td.cost{color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap;}
+table.ladder tr.solved td.bug{color:var(--green);}
+table.ladder tr.solved{background:#23863610;}
+a.rep{color:var(--accent);text-decoration:none;font-size:.8rem;white-space:nowrap;}
+a.rep:hover{text-decoration:underline;}
 .foot{color:var(--muted);font-size:.8rem;margin-top:48px;border-top:1px solid var(--line);padding-top:16px;}
 @media(max-width:760px){.stats{grid-template-columns:repeat(2,1fr)}}
 </style></head><body><div class="wrap">
@@ -75,13 +90,7 @@ a.cell.none{color:#454d57;font-weight:400;}
 <div class="bar">
   <input id="search" type="search" placeholder="Filter by bug, project, or model…" autocomplete="off">
   <span class="count" id="count"></span>
-  <span class="legend">tier
-    <b style="background:#6e7681"></b>0
-    <b style="background:#d29922"></b>1–2
-    <b style="background:#58a6ff"></b>3–4
-    <b style="background:#3fb950"></b>5
-    <span style="margin-left:9px;outline:1.5px solid #3fb950;border-radius:3px;padding:0 4px;">solved</span>
-  </span>
+  <span class="legend" id="legend"></span>
 </div>
 <div id="matrix"></div>
 
@@ -147,6 +156,49 @@ for (const m of models){
   tally[m] = { solved: cs.filter(c=>c.solved).length, cost: cs.reduce((a,c)=>a+(c.cost||0),0) };
 }
 
+const LADDER_LABEL = {reach:"reach", crash:"crash", differential:"diff", "class":"class", site:"site"};
+
+function rungCell(state){
+  // fired ● / not-fired ○ / n/a · (n/a = rung not required for this bug)
+  if (state === "fired")           return `<td class="rung fired">●</td>`;
+  if (state === "n/a" || state == null) return `<td class="rung na">·</td>`;
+  return `<td class="rung miss">○</td>`;
+}
+
+// Single-model sweep → a readable ladder table (one row per bug, a column per
+// rung). This is the common case and makes the per-rung result legible.
+function renderLadder(filter){
+  const m = models[0];
+  const f = filter.trim().toLowerCase();
+  let bugs = D.bugs.filter(b => !f || b.toLowerCase().includes(f) ||
+                                (f === m.toLowerCase()));
+  bugs = bugs.slice().sort((a,b)=>{                 // solved/high tier first
+    const ca=(byKey[a]||{})[m], cb=(byKey[b]||{})[m];
+    return (cb?cb.tier:-1)-(ca?ca.tier:-1) || a.localeCompare(b);
+  });
+  let head = `<tr><th class="bug">bug (${bugs.length})</th>`;
+  for (const k of LADDER) head += `<th>${LADDER_LABEL[k]}</th>`;
+  head += `<th>tier</th><th>cost</th><th>report</th></tr>`;
+  let rows = "";
+  for (const b of bugs){
+    const c = (byKey[b]||{})[m];
+    const solved = !!(c && c.solved);
+    rows += `<tr class="${solved?'solved':''}"><td class="bug">${esc(b)}</td>`;
+    for (const k of LADDER) rows += rungCell(c ? (c.caps||{})[k] : null);
+    const tier = c ? c.tier : 0;
+    const tcls = solved ? "solved" : (tier===0 ? "t0" : "");
+    rows += `<td class="tier ${tcls}">${c ? tier+"/5" : "—"}${solved?" ★":""}</td>`;
+    rows += `<td class="cost">${c ? "$"+(c.cost||0).toFixed(3) : "—"}</td>`;
+    rows += `<td>${c && c.report ? `<a class="rep" href="${esc(c.report)}">view ›</a>` : "—"}</td>`;
+    rows += `</tr>`;
+  }
+  document.getElementById("matrix").innerHTML =
+    `<table class="ladder"><thead>${head}</thead><tbody>${rows}</tbody></table>`;
+  document.getElementById("count").textContent = `${bugs.length}/${D.bugs.length} bugs`;
+}
+
+// Multi-model sweep → compact tier-per-(bug×model) matrix (ladder columns per
+// model would be too wide). Click a cell for that episode's report.
 function cellHtml(c){
   if (!c) return `<a class="cell none">·</a>`;
   const cls = c.reason === "error" ? "err" : `t${c.tier}` + (c.solved ? " solved" : "");
@@ -155,11 +207,10 @@ function cellHtml(c){
   const title = `${esc(c.bug)} · ${esc(c.model)} — tier ${c.tier}/5 · ${esc(c.reason||"")} · $${(c.cost||0).toFixed(4)}`;
   return `<a class="cell ${cls}"${href} title="${title}">${label}</a>`;
 }
-
-function render(filter=""){
+function renderMatrix(filter){
   const f = filter.trim().toLowerCase();
   const bugs = D.bugs.filter(b => !f || b.toLowerCase().includes(f) ||
-                                  models.some(m => m.toLowerCase().includes(f) && f === m.toLowerCase()));
+                                  models.some(mm => mm.toLowerCase().includes(f) && f === mm.toLowerCase()));
   let head = `<tr><th class="bug" style="text-align:left">bug (${bugs.length})</th>`;
   for (const m of models)
     head += `<th>${esc(m)}<div class="mtally">${tally[m].solved} solved · $${tally[m].cost.toFixed(1)}</div></th>`;
@@ -173,7 +224,13 @@ function render(filter=""){
   document.getElementById("matrix").innerHTML = `<table><thead>${head}</thead><tbody>${rows}</tbody></table>`;
   document.getElementById("count").textContent = `${bugs.length}/${D.bugs.length} bugs`;
 }
-render();
+
+const single = models.length === 1;
+document.getElementById("legend").innerHTML = single
+  ? `<span style="color:var(--green)">●</span> fired&nbsp;&nbsp;<span style="color:#6e7681">○</span> not fired&nbsp;&nbsp;<span style="color:#39414b">·</span> n/a&nbsp;&nbsp;<span style="color:var(--green)">★</span> solved`
+  : `tier <b style="background:#6e7681"></b>0 <b style="background:#d29922"></b>1–2 <b style="background:#58a6ff"></b>3–4 <b style="background:#3fb950"></b>5 <span style="margin-left:9px;outline:1.5px solid #3fb950;border-radius:3px;padding:0 4px;">solved</span>`;
+const render = single ? renderLadder : renderMatrix;
+render("");
 document.getElementById("search").addEventListener("input", e => render(e.target.value));
 </script>
 </div></body></html>
