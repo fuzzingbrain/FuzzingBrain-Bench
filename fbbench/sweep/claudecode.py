@@ -377,7 +377,7 @@ def _stream_to_transcript(log_path: str, out_path: Path, *, model: str,
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
 
 
-def _persist(cell_dir: Path, *, bug: str, model: str, real: str, work: str,
+def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
              r: dict, blobs: list[str], alias: str) -> dict:
     """Re-grade blobs through the remote oracle, write score.json + report."""
     cell_dir.mkdir(parents=True, exist_ok=True)
@@ -412,7 +412,7 @@ def cmd_one(args) -> int:
     if not real:
         sys.exit(f"bug not found: {args.bug_id}")
     alias = _full_scan_alias(str(real))
-    image, root, work, mcp_cfg = stage_claude_env(str(real), args.model)
+    image, _root, work, mcp_cfg = stage_claude_env(str(real), args.model)
     print(f"IMAGE={image}\nWORK={work}\nLOG={os.path.join(work, 'claude.log')}", flush=True)
     r = run_claude(work, mcp_cfg, args.model, args.timeout, args.max_turns)
     r["max_turns"] = args.max_turns
@@ -427,7 +427,7 @@ def cmd_one(args) -> int:
 
     cell_dir = RUNS / args.bug_id / model_label(args.model) / "one"
     score = _persist(cell_dir, bug=args.bug_id, model=args.model, real=str(real),
-                     work=work, r=r, blobs=blobs, alias=alias)
+                     r=r, blobs=blobs, alias=alias)
     fired = [f for f in FLAGS if score["capabilities"][f] == "fired"]
     print(f"\nBEST fired {fired}  (tier {score['tier_score']}/5, "
           f"solved={score['solved']})")
@@ -446,13 +446,13 @@ def run_sweep_cell(bug: str, model: str, timeout_s: int,
         print(f"  [skip] bug not found: {bug}")
         return None
     alias = _full_scan_alias(str(real))
-    image, root, work, mcp_cfg = stage_claude_env(str(real), model)
+    _image, root, work, mcp_cfg = stage_claude_env(str(real), model)
     try:
         r = run_claude(work, mcp_cfg, model, timeout_s, max_turns)
         r["max_turns"] = max_turns
         blobs = _candidate_blobs(work)
         score = _persist(cell_dir, bug=bug, model=model, real=str(real),
-                         work=work, r=r, blobs=blobs, alias=alias)
+                         r=r, blobs=blobs, alias=alias)
     finally:
         shutil.rmtree(root, ignore_errors=True)
     return score
