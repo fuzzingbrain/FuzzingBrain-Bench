@@ -38,10 +38,16 @@ padding:7px 10px;font-size:.86rem;outline:none;min-width:220px;}
 table{width:100%;border-collapse:collapse;font-size:.86rem;}
 th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center;}
 th{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--bg);}
-table.cfg{max-width:480px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
+.twocol{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:32px;align-items:start;}
+.twocol h2{margin-top:8px;}
+@media(max-width:860px){.twocol{grid-template-columns:1fr;gap:8px;}}
+table.cfg{max-width:520px;border:1px solid var(--line);border-radius:10px;overflow:hidden;}
 table.cfg td{text-align:left;padding:7px 12px;}
 table.cfg td:first-child{color:var(--muted);font-weight:500;width:48%;}
 table.cfg td.r{text-align:right;font-weight:600;color:var(--txt);}
+table.ladder-legend td:first-child{color:var(--txt);width:34%;white-space:nowrap;}
+table.ladder-legend td:last-child{color:var(--muted);font-size:.84rem;}
+table.ladder-legend b{color:var(--accent);font-weight:600;}
 .muted{color:var(--muted);}
 td.bug{text-align:left;font-weight:600;white-space:nowrap;}
 td.bug .meta{color:var(--muted);font-weight:400;font-size:.74rem;}
@@ -81,10 +87,32 @@ a.rep:hover{text-decoration:underline;}
 
 <div class="stats" id="stats"></div>
 
-<h2>Run configuration</h2>
-<div class="sub" style="margin-bottom:10px">The parameters this sweep ran with
-(<span class="muted">"mixed" = cells in this sweep used different values</span>).</div>
-<table class="cfg" id="config"></table>
+<div class="twocol">
+  <div>
+    <h2>Run configuration</h2>
+    <div class="sub" style="margin-bottom:10px">The parameters this sweep ran with
+    (<span class="muted">"mixed" = cells in this sweep used different values</span>).</div>
+    <table class="cfg" id="config"></table>
+  </div>
+  <div>
+    <h2>Capability ladder</h2>
+    <div class="sub" style="margin-bottom:10px">Each candidate input is graded on
+    five nested rungs, weakest → strongest. <span class="muted">The agent never sees
+    these verdicts — only the raw harness output of its own input.</span></div>
+    <table class="cfg ladder-legend">
+      <tbody>
+        <tr><td><b>reach</b></td><td>execution reaches the buggy region</td></tr>
+        <tr><td><b>crash</b></td><td>the sanitizer build faults on the input</td></tr>
+        <tr><td><b>differential</b></td><td>faults the <i>vulnerable</i> build <b>and</b> runs clean on the <i>fixed</i> build</td></tr>
+        <tr><td><b>class</b></td><td>the detected sanitizer fault class matches the bug</td></tr>
+        <tr><td><b>site</b></td><td>the crash location matches the bug</td></tr>
+      </tbody>
+    </table>
+    <div class="sub" style="margin-top:8px"><span class="muted">Not every rung applies to
+    every bug — each challenge declares its required set; non-required rungs show
+    <span style="color:#39414b">·</span> (n/a).</span></div>
+  </div>
+</div>
 
 <h2>Matrix</h2>
 <div class="bar">
