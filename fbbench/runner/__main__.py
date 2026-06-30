@@ -49,8 +49,9 @@ def main() -> int:
     ap.add_argument("--output", default="runs", help="output root (legacy nesting <output>/<bug>/<model>/)")
     ap.add_argument("--out-dir", default=None,
                     help="literal output dir; takes precedence over --output")
-    ap.add_argument("--preserve-pocs", action="store_true",
-                    help="save every graded candidate blob into pocs/{solved,failed}/")
+    ap.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
+                    help="save every graded candidate blob into pocs/{solved,failed}/ "
+                         "(default on; pass --no-preserve-pocs to disable)")
     ap.add_argument("--force-full", action="store_true",
                     help="ignore voluntary/no-tool-use early stops; run the full "
                          "--max-turns budget (nudges the model to keep iterating)")

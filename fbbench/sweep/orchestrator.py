@@ -16,8 +16,8 @@ Examples:
   # full sweep, default lineup, 2 samples per (model, bug) for best-of-2 union
   python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0,1
 
-  # keep every graded blob (bucketed by solved/failed)
-  python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0 --preserve-pocs
+  # graded blobs (bucketed solved/failed) are kept by default; opt out with --no-preserve-pocs
+  python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0 --no-preserve-pocs
 
   # just re-aggregate the leaderboard from existing runs/
   python -m fbbench.sweep.orchestrator --report-only
@@ -77,14 +77,13 @@ def bug_kb(bug: str) -> list[str]:
 
 
 def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
-             timeout: int, preserve_pocs: bool = False,
+             timeout: int, preserve_pocs: bool = True,
              full_scan: bool = False) -> dict | None:
     cd = cell_dir(out, bug, model, sample)
     cmd = RUNNER + ["--bug", bug, "--model", model,
                     "--max-turns", str(max_turns),
                     "--out-dir", str(cd)]
-    if preserve_pocs:
-        cmd.append("--preserve-pocs")
+    cmd.append("--preserve-pocs" if preserve_pocs else "--no-preserve-pocs")
     if full_scan:
         cmd.append("--full-scan")
     try:
@@ -143,8 +142,8 @@ def main() -> int:
     ap.add_argument("--bugs", default="all", help="'all' | comma list of bug ids")
     ap.add_argument("--samples", "--seeds", dest="samples", default="0",
                     help="comma list of repeat indices, e.g. 0,1,2 — each sample is one independent run")
-    ap.add_argument("--preserve-pocs", action="store_true",
-                    help="forward --preserve-pocs to runner (save every graded blob)")
+    ap.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
+                    help="save every graded blob (default on; --no-preserve-pocs to disable)")
     ap.add_argument("--full-scan", action="store_true",
                     help="harder mode: withhold bug descriptions; agents get only "
                          "the harness and must discover crashing inputs")
@@ -205,8 +204,7 @@ def main() -> int:
                 STATUS.cell_start(model, bug, sample, kb)
                 cmd = RUNNER + ["--bug", bug, "--model", model,
                                 "--max-turns", str(args.max_turns), "--out-dir", str(cd)]
-                if args.preserve_pocs:
-                    cmd.append("--preserve-pocs")
+                cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
                 if args.full_scan:
                     cmd.append("--full-scan")
                 r = run_cell_tailing(cmd, str(REPO), args.timeout,

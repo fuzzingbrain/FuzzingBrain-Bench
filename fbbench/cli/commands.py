@@ -302,8 +302,7 @@ def cmd_run(args) -> int:
            "--out-dir", str(out_dir)]
     if args.api_key:
         cmd += ["--api-key", args.api_key]
-    if args.preserve_pocs:
-        cmd.append("--preserve-pocs")
+    cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
     if getattr(args, "force_full", False):
         cmd.append("--force-full")
     if getattr(args, "full_scan", False):

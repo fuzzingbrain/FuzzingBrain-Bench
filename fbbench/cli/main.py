@@ -43,8 +43,9 @@ def build_parser() -> argparse.ArgumentParser:
                              "groups runs into runs/<exp>/<bug>/<model>/run-N/")
     sp_run.add_argument("--output", "-o", default=None,
                         help="literal output dir; overrides --exp")
-    sp_run.add_argument("--preserve-pocs", action="store_true",
-                        help="save every graded blob into <out>/pocs/{solved,failed}/")
+    sp_run.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
+                        help="save every graded blob into <out>/pocs/{solved,failed}/ "
+                             "(default on; --no-preserve-pocs to disable)")
     sp_run.add_argument("--force-full", action="store_true",
                         help="ignore early stops; run the full --max-turns budget")
     sp_run.add_argument("--full-scan", action="store_true",

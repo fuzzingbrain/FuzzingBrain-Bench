@@ -39,8 +39,8 @@ Each run produces:
 - `score.json` — final capability bitmap + tier score (0..4)
 - `cost.json` — input/output token usage + USD estimate
 
-Pass `--preserve-pocs` to keep every blob the model graded, bucketed by
-whether it satisfied `K_b`:
+Every blob the model graded is kept by default, bucketed by whether it
+satisfied `K_b` (pass `--no-preserve-pocs` to drop them):
 
 ```
 <out-dir>/pocs/

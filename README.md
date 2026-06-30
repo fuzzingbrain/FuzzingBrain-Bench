@@ -147,7 +147,7 @@ fb-bench run <alias> \
     --full-scan \             # withhold the description (hard mode)
     --max-turns 100 \         # turn budget (default 100 for full-scan; diff-scan uses 50)
     --exp my-experiment \     # group runs under runs/my-experiment/...
-    --preserve-pocs \         # keep every graded blob (solved/failed buckets)
+    --no-preserve-pocs \      # graded blobs are KEPT by default; pass this to drop them
     --force-full              # ignore early stops; spend the full budget
 ```
 
