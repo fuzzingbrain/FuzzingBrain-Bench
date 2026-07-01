@@ -58,7 +58,7 @@ if [ "${cmd}" = "harness" ]; then
         debug-asan)   CFH="-g -O0"; BUILD=/src/im-asan; SAN="-fsanitize=fuzzer" ;;
         release-asan) CFH="-O2 -g"; BUILD=/src/im-asan; SAN="-fsanitize=fuzzer" ;;
         fixed-asan)   CFH="-O2 -g"; BUILD=/src/im-fixed-asan; SAN="-fsanitize=fuzzer" ;;
-        coverage)     CFH="-g -O0 -fprofile-instr-generate -fcoverage-mapping"; BUILD=/src/im-cov; SAN="-fsanitize=fuzzer" ;;
+        coverage)     CFH="-g -O0 -DNDEBUG -fprofile-instr-generate -fcoverage-mapping"; BUILD=/src/im-cov; SAN="-fsanitize=fuzzer" ;;
         *) echo "unknown config: ${CONFIG}" >&2; exit 2 ;;
     esac
 
