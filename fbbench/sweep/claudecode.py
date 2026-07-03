@@ -146,12 +146,34 @@ def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
     return cmd
 
 
-def _clean_env() -> dict:
-    """PATH+HOME only — mirrors Codex's `inherit = none` (+ include PATH). HOME is
-    kept so `claude` finds its OAuth credentials; the user's settings are excluded
-    via --setting-sources, and an empty cwd means no project settings load."""
+def _anthropic_key() -> str | None:
+    """The pay-as-you-go API key for --auth api, from ./.env then the environment."""
+    from fbbench.env import read_dotenv
+    return read_dotenv().get("ANTHROPIC_API_KEY") or os.environ.get("ANTHROPIC_API_KEY")
+
+
+def _clean_env(auth: str = "sub", api_key: str | None = None,
+               home: str | None = None) -> dict:
+    """Env for the `claude` PARENT process (host-side). PATH+HOME only, mirroring
+    Codex's `inherit = none`. The bench MCP `docker run` forwards no `-e`, so
+    whatever is here NEVER reaches the container — the model key stays with the
+    agent, exactly like the API arm (env key) and the Codex arm (auth.json).
+
+    Two auth entries:
+      - 'sub' (default, backward compatible): OAuth subscription. Real HOME holds
+        ~/.claude creds and NO API key is set, so `claude` uses the claude.ai (Max)
+        login. Subject to that plan's session limit.
+      - 'api': API key. ANTHROPIC_API_KEY is set (it takes precedence over OAuth)
+        and HOME points at an isolated dir with NO ~/.claude creds, so there is no
+        OAuth/key conflict — pay-as-you-go, no session-limit throttle.
+    """
     env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-           "HOME": os.environ.get("HOME", "")}
+           "HOME": home or os.environ.get("HOME", "")}
+    if auth == "api":
+        if not api_key:
+            raise SystemExit("claudecode --auth api: no ANTHROPIC_API_KEY in "
+                             "./.env or environment")
+        env["ANTHROPIC_API_KEY"] = api_key
     return env
 
 
@@ -165,18 +187,20 @@ def _kill_pg(proc: subprocess.Popen) -> None:
             pass
 
 
-def _run_claude_once(argv: list[str], lf, deadline: float) -> dict:
+def _run_claude_once(argv: list[str], lf, deadline: float,
+                     env: dict | None = None) -> dict:
     """Run ONE `claude -p` process, streaming stream-json lines to `lf` and
     parsing them live. A watchdog hard-kills on the wall-clock backstop.
 
-    Returns {turns, grade_calls, tokens, usd, session_id, ended} for THIS
-    invocation, where a turn == one assistant MESSAGE (one model API call). NB:
-    stream-json splits a multi-block message into several `assistant` events that
-    SHARE a message.id, so we dedupe by id — this matches `--max-turns` exactly.
+    `env` selects the auth entry (PATH+HOME[+ANTHROPIC_API_KEY]); None inherits
+    the parent env. Returns {turns, grade_calls, tokens, usd, session_id, ended}
+    for THIS invocation, where a turn == one assistant MESSAGE (one model API
+    call). NB: stream-json splits a multi-block message into several `assistant`
+    events that SHARE a message.id, so we dedupe by id — matching `--max-turns`.
     """
     proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-                            text=True, bufsize=1, start_new_session=True)
+                            text=True, bufsize=1, start_new_session=True, env=env)
     st = {"turns": 0, "grade_calls": 0, "tokens": 0, "usd": 0.0,
           "session_id": None, "ended": "exited"}
     msg_ids: set = set()
@@ -229,7 +253,8 @@ def _run_claude_once(argv: list[str], lf, deadline: float) -> dict:
 
 
 def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
-               max_turns: int = MAX_TURNS_DEFAULT) -> dict:
+               max_turns: int = MAX_TURNS_DEFAULT, *,
+               auth: str = "sub", api_key: str | None = None) -> dict:
     """Drive `claude -p` to a fixed TURN budget, EB-style (like the Codex arm).
 
     A turn = one model API call (one `assistant` event). Claude satisfices before
@@ -238,7 +263,18 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     hit. Each resume's per-invocation `--max-turns` is the REMAINING budget so a
     single process can never overshoot. Wall-clock `timeout_s` is an anti-hang
     backstop only.
+
+    `auth` picks the auth entry ('sub' = OAuth Max, 'api' = ANTHROPIC_API_KEY).
+    For 'api' we stage an isolated HOME (no ~/.claude creds) so the key is used
+    cleanly with no OAuth conflict; both entries keep the key out of the container.
     """
+    if auth == "api":
+        home = os.path.join(os.path.dirname(work), "claude_home")
+        os.makedirs(home, exist_ok=True)
+    else:
+        home = None
+    env = _clean_env(auth, api_key, home)
+
     log_path = os.path.join(work, "claude.log")
     t0 = time.time()
     deadline = t0 + timeout_s
@@ -257,7 +293,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
                 terminated = "turn_budget"
                 break
             argv = claude_cmd(prompt, mcp_cfg, model, remaining, resume_session=resume)
-            st = _run_claude_once(argv, lf, deadline)
+            st = _run_claude_once(argv, lf, deadline, env)
             turns += st["turns"]
             grade_calls += st["grade_calls"]
             tokens += st["tokens"]
@@ -414,7 +450,9 @@ def cmd_one(args) -> int:
     alias = _full_scan_alias(str(real))
     image, _root, work, mcp_cfg = stage_claude_env(str(real), args.model)
     print(f"IMAGE={image}\nWORK={work}\nLOG={os.path.join(work, 'claude.log')}", flush=True)
-    r = run_claude(work, mcp_cfg, args.model, args.timeout, args.max_turns)
+    api_key = _anthropic_key() if args.auth == "api" else None
+    r = run_claude(work, mcp_cfg, args.model, args.timeout, args.max_turns,
+                   auth=args.auth, api_key=api_key)
     r["max_turns"] = args.max_turns
     print(f"\nclaude {r['terminated']} after {r['duration_s']:.0f}s  "
           f"turns={r['turns']}/{args.max_turns}  grades={r['grade_calls']}  "
@@ -437,7 +475,8 @@ def cmd_one(args) -> int:
 
 
 def run_sweep_cell(bug: str, model: str, timeout_s: int,
-                   max_turns: int = MAX_TURNS_DEFAULT) -> dict | None:
+                   max_turns: int = MAX_TURNS_DEFAULT, *,
+                   auth: str = "sub", api_key: str | None = None) -> dict | None:
     cell_dir = RUNS / bug / model_label(model) / "seed-0"
     if (cell_dir / "score.json").is_file():
         return None  # already done
@@ -448,7 +487,8 @@ def run_sweep_cell(bug: str, model: str, timeout_s: int,
     alias = _full_scan_alias(str(real))
     _image, root, work, mcp_cfg = stage_claude_env(str(real), model)
     try:
-        r = run_claude(work, mcp_cfg, model, timeout_s, max_turns)
+        r = run_claude(work, mcp_cfg, model, timeout_s, max_turns,
+                       auth=auth, api_key=api_key)
         r["max_turns"] = max_turns
         blobs = _candidate_blobs(work)
         score = _persist(cell_dir, bug=bug, model=model, real=str(real),
@@ -460,10 +500,13 @@ def run_sweep_cell(bug: str, model: str, timeout_s: int,
 
 def cmd_sweep(args) -> int:
     label = model_label(args.model)
+    api_key = _anthropic_key() if args.auth == "api" else None
+    if args.auth == "api" and not api_key:
+        sys.exit("  --auth api: no ANTHROPIC_API_KEY in ./.env or environment")
     bugs = ([n for n, _ in list_bugs()] if args.bugs == "all"
             else [b.strip() for b in args.bugs.split(",") if b.strip()])
     done = sum(1 for b in bugs if (RUNS / b / label / "seed-0" / "score.json").is_file())
-    print(f"  claude-code sweep ({label}): {len(bugs)} bugs "
+    print(f"  claude-code sweep ({label}, auth={args.auth}): {len(bugs)} bugs "
           f"({done} done, {len(bugs)-done} to run)")
     t0 = time.time()
     solved_total = 0
@@ -473,7 +516,8 @@ def cmd_sweep(args) -> int:
             s = json.loads(cell.read_text())
         else:
             print(f"  [{i}/{len(bugs)}] run  {bug} ...", flush=True)
-            s = run_sweep_cell(bug, args.model, args.timeout, args.max_turns)
+            s = run_sweep_cell(bug, args.model, args.timeout, args.max_turns,
+                               auth=args.auth, api_key=api_key)
             if not s:
                 continue
         mark = "✓" if s["solved"] else "✗"
@@ -504,6 +548,9 @@ def main(argv=None) -> int:
                         help="turn budget (one assistant message = one turn)")
     sp_one.add_argument("--timeout", type=int, default=1800,
                         help="wall-clock backstop seconds (anti-hang, not the cap)")
+    sp_one.add_argument("--auth", choices=("sub", "api"), default="sub",
+                        help="auth entry: 'sub' = claude.ai OAuth (Max, session-limited), "
+                             "'api' = ANTHROPIC_API_KEY from ./.env (pay-as-you-go, no throttle)")
     sp_one.set_defaults(fn=cmd_one)
 
     sp_sweep = sub.add_parser("sweep", help="batch all bugs, persist score.json (resumable)")
@@ -514,6 +561,9 @@ def main(argv=None) -> int:
                           help="turn budget per bug (one assistant message = one turn)")
     sp_sweep.add_argument("--timeout", type=int, default=1800,
                           help="per-bug wall-clock backstop seconds (anti-hang)")
+    sp_sweep.add_argument("--auth", choices=("sub", "api"), default="sub",
+                          help="auth entry: 'sub' = claude.ai OAuth (Max, session-limited), "
+                               "'api' = ANTHROPIC_API_KEY from ./.env (pay-as-you-go, no throttle)")
     sp_sweep.set_defaults(fn=cmd_sweep)
 
     args = ap.parse_args(argv)

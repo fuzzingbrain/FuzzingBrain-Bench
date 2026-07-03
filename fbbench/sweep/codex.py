@@ -59,6 +59,9 @@ _CODEX_CONFIG = """\
 # and the host environment (incl. OPENAI_API_KEY) is NOT leaked into subprocesses.
 # The only way to touch the target is the bench MCP tools, which run inside the
 # challenge container below. Mirrors ExploitBench's codex hardening.
+# Pin the model so the run matches the MODEL label ("codex-gpt-5.5"); without
+# this line codex falls back to its compiled-in default (gpt-5.x-codex).
+model = "gpt-5.5"
 web_search = "disabled"
 
 [features]
