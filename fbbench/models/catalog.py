@@ -25,16 +25,21 @@ CATALOG: list[tuple[str, str, str]] = [
     ("gemini-2.5-pro",           "gemini",    "mid"),
     ("gemini-2.5-flash",         "gemini",    "fast"),
     ("gemini-2.5-flash-lite",    "gemini",    "fast"),
+    # DeepSeek (OpenAI-compatible endpoint at https://api.deepseek.com).
+    # V4 hybrid-reasoning lineup; both emit reasoning_content (billed as output).
+    ("deepseek-v4-pro",          "deepseek",  "flagship"),
+    ("deepseek-v4-flash",        "deepseek",  "fast"),
 ]
 
 SUPPORTED_MODELS = [m for m, _, _ in CATALOG]
-PROVIDERS = ("anthropic", "openai", "gemini")
+PROVIDERS = ("anthropic", "openai", "gemini", "deepseek")
 
 # Env var holding each provider's API key.
 PROVIDER_KEY_ENV = {
     "anthropic": "ANTHROPIC_API_KEY",
     "openai":    "OPENAI_API_KEY",
     "gemini":    "GEMINI_API_KEY",
+    "deepseek":  "DEEPSEEK_API_KEY",
 }
 
 # Default model per provider, chosen when the user did not pass --model:
@@ -43,6 +48,7 @@ PROVIDER_DEFAULT = {
     "anthropic": "claude-opus-4-7",
     "openai":    "gpt-5.5",
     "gemini":    "gemini-3-pro-preview",
+    "deepseek":  "deepseek-v4-flash",
 }
 
 
@@ -55,6 +61,11 @@ def provider_for(model_id: str) -> str:
         return "openai"
     if m.startswith(("gemini", "gemma")):
         return "gemini"
+    # DeepSeek: served via its own OpenAI-compatible endpoint
+    # (https://api.deepseek.com). Routed through the OpenAI backend with a
+    # base_url + DEEPSEEK_API_KEY override (see runner/backends/__init__.py).
+    if m.startswith("deepseek"):
+        return "deepseek"
     # Open models served via an OpenAI-compatible endpoint (e.g. a local Ollama
     # at http://localhost:11434/v1). The OpenAI backend detects these by prefix
     # and points the client at OLLAMA_BASE_URL instead of api.openai.com.
@@ -62,7 +73,7 @@ def provider_for(model_id: str) -> str:
         return "openai"
     raise ValueError(
         f"cannot route model id {model_id!r} to a provider "
-        "(expected claude*/gpt*/o3*/o4*/gemini*/gemma*/llama*)"
+        "(expected claude*/gpt*/o3*/o4*/gemini*/gemma*/deepseek*/llama*)"
     )
 
 

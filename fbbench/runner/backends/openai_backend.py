@@ -24,8 +24,17 @@ def _is_local(model: str) -> bool:
 
 
 class OpenAIBackend:
-    def __init__(self, model: str, api_key: str | None = None):
+    def __init__(self, model: str, api_key: str | None = None,
+                 base_url: str | None = None, key_env: str = "OPENAI_API_KEY"):
+        # base_url/key_env let this backend serve any OpenAI-compatible provider
+        # (e.g. DeepSeek at https://api.deepseek.com with DEEPSEEK_API_KEY).
         self.model = model
+        if base_url:
+            self.local = False
+            self._client = openai.OpenAI(
+                base_url=base_url, api_key=api_key or os.environ.get(key_env),
+                max_retries=8)
+            return
         self.local = _is_local(model) or bool(os.environ.get("OLLAMA_BASE_URL"))
         if self.local:
             base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
@@ -34,7 +43,7 @@ class OpenAIBackend:
         else:
             # max_retries above the SDK default (2) for rate-limit resilience.
             self._client = openai.OpenAI(
-                api_key=api_key or os.environ.get("OPENAI_API_KEY"), max_retries=8)
+                api_key=api_key or os.environ.get(key_env), max_retries=8)
 
     def _to_messages(self, system: str, messages: list[dict]) -> list[dict]:
         out: list[dict] = [{"role": "system", "content": system}]
@@ -98,6 +107,9 @@ class OpenAIBackend:
             prompt = resp.usage.prompt_tokens or 0
             details = getattr(resp.usage, "prompt_tokens_details", None)
             cached = (getattr(details, "cached_tokens", 0) or 0) if details else 0
+            # DeepSeek reports cache hits under a different field name.
+            if not cached:
+                cached = getattr(resp.usage, "prompt_cache_hit_tokens", 0) or 0
             c.input_tokens = max(0, prompt - cached)
             c.cache_read_tokens = cached
             c.output_tokens = resp.usage.completion_tokens or 0

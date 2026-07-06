@@ -37,6 +37,8 @@ pip install -e .                              # needs Python ≥ 3.10 and Docker
 cat > .env <<'EOF'
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=...
+DEEPSEEK_API_KEY=sk-...
 EOF
 
 fb-bench list                                 # the 68 challenges (by alias)
@@ -60,10 +62,17 @@ fb-bench run avro-03 --model claude-haiku-4-5
 
 # GPT family
 fb-bench run avro-03 --model gpt-5.5
+
+# Gemini family
+fb-bench run avro-03 --model gemini-3-pro-preview
+
+# DeepSeek family  (OpenAI-compatible endpoint; needs DEEPSEEK_API_KEY)
+fb-bench run avro-03 --model deepseek-v4-flash
 ```
 
 Models: `claude-haiku-4-5` · `claude-sonnet-4-6` · `claude-opus-4-7` ·
-`gpt-5.5` · `gpt-5.4` · `gpt-5`
+`gpt-5.5` · `gpt-5.4` · `gpt-5` · `gemini-3-pro-preview` · `gemini-2.5-flash` ·
+`deepseek-v4-pro` · `deepseek-v4-flash`
 (any catalog id works via `--model`; see `fb-bench models`).
 
 ### 3. Run the whole corpus with a model
