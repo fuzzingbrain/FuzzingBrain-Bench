@@ -235,6 +235,7 @@ def cmd_run(args) -> int:
                 "    ANTHROPIC_API_KEY=sk-ant-...   # claude-* models\n"
                 "    OPENAI_API_KEY=sk-...          # gpt-* models\n"
                 "    GEMINI_API_KEY=...             # gemini-* models\n"
+                "    DEEPSEEK_API_KEY=sk-...        # deepseek-* models\n"
                 "  see `./fb-bench models` for the full list."))
         model = PROVIDER_DEFAULT[provider]
         print(dim(f"  no --model given; using {model} "

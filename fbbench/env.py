@@ -32,7 +32,7 @@ def detect_provider() -> tuple[str | None, list[str]]:
     """Return (preferred_provider, providers_with_a_key_loaded)."""
     env = {**read_dotenv(), **os.environ}
     have = [p for p, key in PROVIDER_KEY_ENV.items() if env.get(key)]
-    for p in ("anthropic", "openai", "gemini"):
+    for p in ("anthropic", "openai", "gemini", "deepseek"):
         if p in have:
             return p, have
     return None, have

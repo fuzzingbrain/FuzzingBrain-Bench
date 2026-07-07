@@ -21,8 +21,11 @@ from fbbench.models.catalog import provider_for
 # Anthropic: documented 0.1x read / 1.25x write. OpenAI auto-caches with a ~0.1x
 # read and no write surcharge. Gemini implicit cache ~0.25x read. EDIT to match
 # the provider's current published cache pricing.
-CACHE_READ_MULT = {"anthropic": 0.10, "openai": 0.10, "gemini": 0.25}
-CACHE_WRITE_MULT = {"anthropic": 1.25, "openai": 1.0, "gemini": 1.0}
+# DeepSeek auto-caches on disk: cache-hit input is ~0.25x the miss rate, no
+# write surcharge. It reports hits under usage.prompt_cache_hit_tokens (the
+# OpenAI backend maps that into the cache_read bucket).
+CACHE_READ_MULT = {"anthropic": 0.10, "openai": 0.10, "gemini": 0.25, "deepseek": 0.25}
+CACHE_WRITE_MULT = {"anthropic": 1.25, "openai": 1.0, "gemini": 1.0, "deepseek": 1.0}
 
 # model_id -> (input_usd_per_mtok, output_usd_per_mtok)
 PRICES: dict[str, tuple[float, float]] = {
@@ -43,6 +46,11 @@ PRICES: dict[str, tuple[float, float]] = {
     "gemini-2.5-pro":         (1.25, 10.0),
     "gemini-2.5-flash":       (0.30, 2.5),
     "gemini-2.5-flash-lite":  (0.10, 0.40),
+    # DeepSeek V4 (cache-MISS input rate; hits priced via CACHE_READ_MULT).
+    # ESTIMATE — V4 list prices not yet pinned; verify against
+    # api-docs.deepseek.com/quick_start/pricing before quoting.
+    "deepseek-v4-pro":   (0.55, 2.19),
+    "deepseek-v4-flash": (0.27, 1.10),
 }
 
 
