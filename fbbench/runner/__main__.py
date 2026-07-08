@@ -55,10 +55,12 @@ def main() -> int:
     ap.add_argument("--force-full", action="store_true",
                     help="ignore voluntary/no-tool-use early stops; run the full "
                          "--max-turns budget (nudges the model to keep iterating)")
-    ap.add_argument("--full-scan", action="store_true",
-                    help="harder mode: withhold the bug description (and bench.yaml "
-                         "title). The agent gets only the harness and must discover "
-                         "a crashing input. Grading/oracle are unchanged.")
+    # The public benchmark is ALWAYS blind (full-scan): the bug description is
+    # withheld and the agent must discover a crashing input. Normal (hinted) mode
+    # is removed from the public repo — it exists only in the private answers repo.
+    # `--full-scan` is kept as an accepted no-op (callers/orchestrator pass it).
+    ap.add_argument("--full-scan", action="store_true", default=True,
+                    help=argparse.SUPPRESS)
     ap.add_argument("--require-preset", action="store_true",
                     help="force-preset mode: an off-target crash (different "
                          "stack/site/class than the documented bug) does NOT end the "

@@ -75,16 +75,14 @@ def main():
     ap.add_argument("--grade-url", default="http://host.docker.internal:8077")
     ap.add_argument("--tag-prefix", default="fbbench-challenge")
     ap.add_argument("--no-build", action="store_true")
-    # The PUBLIC image must be the NEUTRAL (discovery) view: no description naming
-    # the bug, scrubbed bench.yaml, neutralized harness. The rich normal-mode
-    # description / hints are answer-adjacent and live oracle-side, served only at
-    # runtime — never baked into a crawlable image. Default ON; pass --normal only
-    # to bake the (leaky) hinted view for private/internal use.
-    g = ap.add_mutually_exclusive_group()
-    g.add_argument("--full-scan", dest="full_scan", action="store_true", default=True,
-                   help="bake the neutral discovery view (default)")
-    g.add_argument("--normal", dest="full_scan", action="store_false",
-                   help="bake the hinted normal view (leaks the description; internal only)")
+    # The PUBLIC image is ALWAYS the NEUTRAL (discovery) view: no description
+    # naming the bug, scrubbed bench.yaml, neutralized harness. The rich normal
+    # (hinted) view leaks the description, so it is intentionally NOT available in
+    # this public repo — it exists only in the private answers repo, for internal
+    # use. full_scan is therefore forced on here; `--full-scan` is kept as an
+    # accepted no-op for backward compatibility.
+    ap.add_argument("--full-scan", dest="full_scan", action="store_true", default=True,
+                    help=argparse.SUPPRESS)
     a = ap.parse_args()
 
     bug_dir = find_bug(a.bug_id, ROOT)

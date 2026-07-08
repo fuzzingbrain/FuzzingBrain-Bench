@@ -144,9 +144,10 @@ def main() -> int:
                     help="comma list of repeat indices, e.g. 0,1,2 — each sample is one independent run")
     ap.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                     help="save every graded blob (default on; --no-preserve-pocs to disable)")
-    ap.add_argument("--full-scan", action="store_true",
-                    help="harder mode: withhold bug descriptions; agents get only "
-                         "the harness and must discover crashing inputs")
+    # Public benchmark is always blind; normal (hinted) mode is removed from the
+    # public repo (it exists only in the private answers repo). Kept as a no-op.
+    ap.add_argument("--full-scan", action="store_true", default=True,
+                    help=argparse.SUPPRESS)
     ap.add_argument("--max-turns", type=int, default=100,
                     help="turn budget per episode (default 100 for full-scan; diff-scan uses 50)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-episode seconds")
