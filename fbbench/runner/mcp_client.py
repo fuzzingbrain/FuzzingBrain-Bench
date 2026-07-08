@@ -184,6 +184,13 @@ def _full_scan_alias(real_bug_dir: str) -> str:
 # FORMAT are kept — the agent legitimately needs them to craft an input.
 _SRC_EXTS = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".java")
 _ENTRYPOINT_MARKERS = ("LLVMFuzzerTestOneInput", "fuzzerTestOneInput")
+# Neutral class name that a JVM entrypoint class is renamed to in full-scan. The
+# original name can describe the fault (e.g. `DecompressionBombFuzzer` names a
+# decompression-bomb / memory-exhaustion bug); the file rename alone doesn't hide
+# it because the `public class <Name>` decl, build.sh `-DtargetClass=<Name>`, and
+# bench.yaml `entrypoint: <Name>.method` all still spell it out. _stage_bench_yaml
+# rewrites the entrypoint field to the same constant so the two stay consistent.
+_JAVA_NEUTRAL_CLASS = "Harness"
 
 # Neutral description.txt staged in full-scan so setup() returns this (and not the
 # server's "re-trigger the documented crash" synthDescription fallback). The text
@@ -212,13 +219,58 @@ def _strip_leading_comment(text: str) -> str:
     return "\n".join(lines[i:]).lstrip("\n")
 
 
-def _neutralize_harness(harness_dir: str) -> None:
+def _neutralize_java_entry_class(harness_dir: str, old_class: str) -> None:
+    """full-scan: rename the JVM entrypoint class `old_class` (from bench.yaml's
+    `entrypoint: <Class>.method`) to the neutral `_JAVA_NEUTRAL_CLASS`, so a
+    descriptive class name (e.g. `DecompressionBombFuzzer`) can't name the fault.
+
+    `old_class` is the AUTHORITATIVE entrypoint class — do NOT guess it from the
+    `fuzzerTestOneInput` marker, which also matches a reflective runner
+    (PocRunner's `getMethod("fuzzerTestOneInput")`) and would rename the wrong
+    file. Whole-word replaces the identifier across every staged harness file (the
+    class source, build.sh's `-DtargetClass=`/compile path, any file naming it) and
+    renames the declaring file to `<Neutral>.java` so `public class` still matches
+    the filename. Helpers that reach the target reflectively via the `targetClass`
+    property follow the replaced value. Edits only the staged copy; the oracle's own
+    binary/bench.yaml are untouched, so grading is unaffected."""
+    if not old_class or old_class == _JAVA_NEUTRAL_CLASS:
+        return
+    decl = re.compile(r'\bclass\s+' + re.escape(old_class) + r'\b')
+    word = re.compile(r'\b' + re.escape(old_class) + r'\b')
+    entry_file = None
+    for root, _, files in os.walk(harness_dir):
+        for fn in files:
+            p = os.path.join(root, fn)
+            try:
+                data = open(p, encoding="utf-8", errors="replace").read()
+            except OSError:
+                continue
+            if decl.search(data):
+                entry_file = p          # the file that declares the class
+            new = word.sub(_JAVA_NEUTRAL_CLASS, data)
+            if new != data:
+                with open(p, "w") as fp:
+                    fp.write(new)
+    if entry_file:                      # rename declaring file to <Neutral>.java
+        new_path = os.path.join(os.path.dirname(entry_file),
+                                _JAVA_NEUTRAL_CLASS + ".java")
+        if os.path.abspath(new_path) != os.path.abspath(entry_file) \
+                and not os.path.exists(new_path):
+            os.rename(entry_file, new_path)
+
+
+def _neutralize_harness(harness_dir: str, entry_class: str | None = None) -> None:
     """full-scan: strip leading header comments from staged harness sources and
     rename the entrypoint file to a neutral `harness.<ext>` (e.g.
     `vp9_encoder_midstream_reconfig_fuzzer.cc` -> `harness.cc`). The filename and
     header are pure hints; the code itself (the fuzzed API) is left intact because
     the agent needs it to know the input shape. build.sh and helper files keep
-    their names; only their header comment is stripped."""
+    their names; only their header comment is stripped.
+
+    `entry_class` (set for JVM harnesses, from bench.yaml `entrypoint`) additionally
+    neutralizes a descriptive entrypoint CLASS name (see
+    _neutralize_java_entry_class) — for JVM the class, not the filename, is the leak,
+    and it's referenced from build.sh + bench.yaml too."""
     if not os.path.isdir(harness_dir):
         return
     for root, _, files in os.walk(harness_dir):
@@ -234,11 +286,17 @@ def _neutralize_harness(harness_dir: str) -> None:
             if stripped != txt:
                 with open(p, "w") as fp:
                     fp.write(stripped)
-    # Rename the single entrypoint source to harness.<ext>.
+    if entry_class:
+        # JVM: rename the authoritative entrypoint class everywhere it's named.
+        _neutralize_java_entry_class(harness_dir, entry_class)
+        return
+    # C/C++: rename the single entrypoint source file to harness.<ext>. (The C
+    # entrypoint symbol LLVMFuzzerTestOneInput is fixed/non-descriptive; only the
+    # filename hints, so a rename suffices.)
     for root, _, files in os.walk(harness_dir):
         for fn in sorted(files):
             ext = os.path.splitext(fn)[1]
-            if ext not in (".c", ".cc", ".cpp", ".cxx", ".java"):
+            if ext not in (".c", ".cc", ".cpp", ".cxx"):
                 continue
             p = os.path.join(root, fn)
             try:
@@ -269,6 +327,18 @@ def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
     if full_scan:
         for k in ("title", "disclosed", "capability_set", "notes"):
             data.pop(k, None)
+        # A JVM entrypoint `<Class>.method` can name the fault via the class
+        # (e.g. `DecompressionBombFuzzer`). _neutralize_java_entry_class renames
+        # the class to _JAVA_NEUTRAL_CLASS in the staged harness; rewrite the
+        # entrypoint here to match so the two views stay consistent. Only the
+        # (unpackaged, single-dot) java case is touched; C/C++ entrypoints
+        # (LLVMFuzzerTestOneInput) are not descriptive and are left as-is.
+        h = data.get("harness")
+        if isinstance(h, dict):
+            ep = h.get("entrypoint")
+            if (isinstance(ep, str) and h.get("type") in ("java", "jvm")
+                    and ep.count(".") == 1):
+                h["entrypoint"] = f"{_JAVA_NEUTRAL_CLASS}.{ep.split('.', 1)[1]}"
     # Neutral bug_id alias in ALL modes (the descriptive id would otherwise name
     # the bug; the real id is kept in the run records, not the agent's view).
     if alias:
@@ -281,6 +351,24 @@ def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
             tgt.pop(k, None)
     with open(dst, "w") as fp:
         yaml.safe_dump(data, fp, sort_keys=False)
+
+
+def _jvm_entry_class(real_bug_dir: str) -> str | None:
+    """The JVM entrypoint CLASS name from bench.yaml `entrypoint: <Class>.method`
+    (only for java/jvm harnesses with an unpackaged, single-dot entrypoint), else
+    None. This is the authoritative name _neutralize_harness renames — and it must
+    match the class rewrite done in _stage_bench_yaml's entrypoint field."""
+    try:
+        data = yaml.safe_load(open(os.path.join(real_bug_dir, "bench.yaml"))) or {}
+    except OSError:
+        return None
+    h = data.get("harness")
+    if not isinstance(h, dict) or h.get("type") not in ("java", "jvm"):
+        return None
+    ep = h.get("entrypoint")
+    if isinstance(ep, str) and ep.count(".") == 1:
+        return ep.split(".", 1)[0]
+    return None
 
 
 def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
@@ -300,6 +388,7 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
     # (Tier 2 privsep), so make the view traversable/readable.
     os.chmod(sandbox, 0o755)
     alias = _full_scan_alias(real_bug_dir)   # neutral bug_id in all modes
+    entry_class = _jvm_entry_class(real_bug_dir) if full_scan else None
     entries = SANDBOX_ENTRIES
     if full_scan:
         entries = tuple(e for e in entries if e != "description.txt")
@@ -314,7 +403,7 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
             shutil.copytree(src, dst, ignore=_ignore_leaky)
             _redact_urls_in_tree(dst)
             if full_scan and name == "harness":
-                _neutralize_harness(dst)
+                _neutralize_harness(dst, entry_class=entry_class)
         else:
             shutil.copy2(src, dst)
     if full_scan:
