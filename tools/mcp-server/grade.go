@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,10 +65,10 @@ func (s *server) toolGrade(args []byte) (any, error) {
 		return nil, err
 	}
 	if !under(abs, s.workspace) {
-		return nil, fmt.Errorf("grade target must live under BENCH_WORKSPACE")
+		return nil, fmt.Errorf("input path must be inside the workspace directory (%s)", s.workspace)
 	}
 	if st, err := os.Stat(abs); err != nil || st.IsDir() {
-		return nil, fmt.Errorf("grade target not found or is a directory: %s", p.Path)
+		return nil, fmt.Errorf("input not found or is a directory: %s", p.Path)
 	}
 
 	// Sealed-challenge path: no local oracle on this host. Ship the candidate
@@ -183,9 +184,13 @@ func (s *server) toolGrade(args []byte) (any, error) {
 	// fuzzer on one input. It does NOT contain the flag verdict. Sanitizer
 	// reports land at the END of stderr, so we keep the tail.
 	last := roundResults[len(roundResults)-1]
+	// Grading logic above parsed the RAW stderr/stdout; the agent-facing copy is
+	// scrubbed of benchmark tells (oracle binary path, grader temp names) here.
+	// This is a pure display transform — the harness ran on the real paths, so no
+	// verdict/layout is affected.
 	harnessOut := map[string]any{
-		"stdout":    tailTrunc(last.stdout, 2000),
-		"stderr":    tailTrunc(last.stderr, 8000),
+		"stdout":    sanitizeDisplay(tailTrunc(last.stdout, 2000), s.oracleDir, bench.Project),
+		"stderr":    sanitizeDisplay(tailTrunc(last.stderr, 8000), s.oracleDir, bench.Project),
 		"exit_code": last.exitCode,
 		"signal":    last.signal,
 	}
@@ -216,6 +221,32 @@ func tailTrunc(s string, n int) string {
 		return s
 	}
 	return "...[truncated]...\n" + s[len(s)-n:]
+}
+
+// sanitizeDisplay rewrites benchmark-revealing paths in the harness output the
+// agent sees, WITHOUT touching what actually ran (the real paths are kept so
+// allocator-layout-sensitive bugs still reproduce). It maps the oracle binary
+// dir to an OSS-Fuzz-style /out and strips the grader's temp-path names.
+//   /opt/fbbench/oracle-root/<alias>/binaries/release-asan/harness -> /out/harness
+//   /opt/fbbench/oracle-root/<alias>/...                           -> /src/...
+//   /tmp/fbgrade-NNNN/grader-run/... , candidate.bin               -> /tmp/run-NNNN/work/... , testcase
+func sanitizeDisplay(s, oracleDir, project string) string {
+	if oracleDir != "" {
+		s = regexp.MustCompile(regexp.QuoteMeta(oracleDir)+`/binaries/[^/ )]+`).ReplaceAllString(s, "/out")
+		s = strings.ReplaceAll(s, oracleDir, "/src")
+	}
+	// The oracle binaries were built in a per-sanitizer source tree named
+	// /src/<project>-asan (or -cov/-ubsan/...), which debug info bakes into every
+	// stack frame. Map it back to /src/src — where the identical source actually
+	// lives in the container — so frames point at readable source AND carry no
+	// per-sanitizer-build ("-asan") benchmark tell.
+	if project != "" {
+		s = regexp.MustCompile(`/src/`+regexp.QuoteMeta(project)+`-[a-z0-9]+/`).ReplaceAllString(s, "/src/src/")
+	}
+	s = strings.ReplaceAll(s, "fbgrade-", "run-")
+	s = strings.ReplaceAll(s, "grader-run", "work")
+	s = strings.ReplaceAll(s, "candidate.bin", "testcase")
+	return s
 }
 
 func (s *server) loadExpected() (*expectedYAML, error) {
@@ -250,6 +281,8 @@ func firedCount(r roundOutcome, caps []string) int {
 
 func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYAML) (roundOutcome, error) {
 	roundID := newRoundID()
+	// Real path kept as "grader-run" (pristine layout — see gradeserver.go); the
+	// "grader" tell is scrubbed from agent-facing output by sanitizeDisplay.
 	runDir := filepath.Join(s.workspace, "grader-run", roundID)
 	if err := os.MkdirAll(runDir, 0o755); err != nil {
 		return roundOutcome{}, err
@@ -361,6 +394,30 @@ func isLeakClass(expectedClass string) bool {
 	return strings.Contains(strings.ToLower(expectedClass), "leak")
 }
 
+// copyExecutable copies src to dst (0755) so the harness can be run from a
+// neutral, non-revealing path. Best-effort: a hardlink first (instant, same fs),
+// falling back to a byte copy across filesystems.
+func copyExecutable(src, dst string) error {
+	_ = os.Remove(dst)
+	if err := os.Link(src, dst); err == nil {
+		return nil
+	}
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
+}
+
 func runHarness(bin string, invocation []string, pocPath, runDir string, timeoutS int, detectLeaks bool) harnessRun {
 	if timeoutS <= 0 {
 		timeoutS = 30
@@ -373,6 +430,11 @@ func runHarness(bin string, invocation []string, pocPath, runDir string, timeout
 			args = append(args, a)
 		}
 	}
+	// Run the harness IN PLACE from its bundle dir. (An earlier attempt to copy it
+	// to a neutral path for path-hiding broke JVM/wrapper harnesses whose launcher
+	// resolves siblings — e.g. PocRunner.class — relative to its own location, so
+	// the copied binary could not find them. Path neutralization must not move the
+	// binary out of its bundle; done safely elsewhere.)
 	cmd := exec.Command(bin, args...)
 	cmd.Dir = runDir
 	// LeakSanitizer ships inside ASan and runs at exit by default. For a bug

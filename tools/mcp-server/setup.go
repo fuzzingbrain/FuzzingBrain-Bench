@@ -40,14 +40,30 @@ type benchYAML struct {
 }
 
 func (s *server) loadBench() (*benchYAML, error) {
-	path := filepath.Join(s.bugDir, "bench.yaml")
-	data, err := os.ReadFile(path)
+	// The blind (full-scan) challenge ships a slim manifest named target.yaml;
+	// the internal/oracle bundles keep the richer bench.yaml. Prefer target.yaml
+	// so the agent-facing view never depends on a file literally named "bench".
+	// metaDir holds the manifest in the sealed challenge; grade-server mode never
+	// sets it, so fall back to bugDir (which there == the oracle bundle carrying
+	// bench.yaml). Without this fallback every grade fails to load the manifest.
+	dir := s.metaDir
+	if dir == "" {
+		dir = s.bugDir
+	}
+	var data []byte
+	var err error
+	for _, name := range []string{"target.yaml", "bench.yaml"} {
+		data, err = os.ReadFile(filepath.Join(dir, name))
+		if err == nil {
+			break
+		}
+	}
 	if err != nil {
-		return nil, fmt.Errorf("read bench.yaml: %w", err)
+		return nil, fmt.Errorf("read target manifest: %w", err)
 	}
 	var b benchYAML
 	if err := yaml.Unmarshal(data, &b); err != nil {
-		return nil, fmt.Errorf("parse bench.yaml: %w", err)
+		return nil, fmt.Errorf("parse target manifest: %w", err)
 	}
 	return &b, nil
 }
@@ -75,7 +91,7 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	descPath := filepath.Join(s.bugDir, "description.txt")
+	descPath := filepath.Join(s.metaDir, "description.txt")
 	desc, err := os.ReadFile(descPath)
 	if err != nil {
 		// Fallback for bugs that ship no description.txt: synthesize a task
@@ -83,8 +99,10 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 		desc = []byte(synthDescription(bench))
 	}
 	out := map[string]any{
-		"bug_id":   bench.BugID,
-		"bug_desc": string(desc),
+		// Neutral, non-benchmark framing: "task" (not "bug_desc") + "source_dir"
+		// (not "bug_dir"), and no case alias ("bug_id") — a real audit target
+		// hands you source + a harness, not a catalogued bug identifier.
+		"task": string(desc),
 		// project + language are public build facts (the harness source reveals
 		// the project anyway; the language is obvious) — surfaced in every mode.
 		"project":  bench.Project,
@@ -94,11 +112,17 @@ func (s *server) toolSetup(_ []byte) (any, error) {
 			"entrypoint": bench.Harness.Entrypoint,
 			"invocation": bench.Harness.Invocation,
 		},
-		"build_configs":  []string{"debug", "debug-asan", "release-asan", "coverage"},
 		"workspace_path": s.workspace,
-		"bug_dir":        s.bugDir,
-		"capability_set": bench.CapabilitySet,
-		"notes":          bench.Notes,
+		"source_dir":     s.bugDir,
+	}
+	// capability_set (the scoring ladder) and notes are internal grading metadata
+	// — they must NOT surface in the blind (full-scan) view, where bench.yaml is
+	// stripped so both are empty. Emit them only when populated (diff-scan/normal).
+	if len(bench.CapabilitySet) > 0 {
+		out["capability_set"] = bench.CapabilitySet
+	}
+	if bench.Notes != "" {
+		out["notes"] = bench.Notes
 	}
 	// The sanitizer the build is judged under is part of the fuzzing setup — a
 	// real auditor always knows it — so it is surfaced in EVERY mode (full-scan

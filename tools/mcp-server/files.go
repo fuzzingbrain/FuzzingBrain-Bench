@@ -61,7 +61,7 @@ func under(p, root string) bool {
 
 // isDeniedRead returns true when p (already resolved under bugDir/workspace)
 // matches a deny-listed path: oracle answer keys, the reference PoC, and
-// grader-run state. The whole grader/ and poc/ subtrees are denied (not just
+// work state. The whole grader/ and poc/ subtrees are denied (not just
 // named files) so a renamed or future oracle artifact can't slip through.
 func (s *server) isDeniedRead(abs string) bool {
 	rel, err := filepath.Rel(s.bugDir, abs)
@@ -76,7 +76,7 @@ func (s *server) isDeniedRead(abs string) bool {
 	}
 	relW, err := filepath.Rel(s.workspace, abs)
 	if err == nil && !strings.HasPrefix(relW, "..") {
-		if strings.HasPrefix(relW, "grader-run"+string(os.PathSeparator)) || relW == "grader-run" {
+		if strings.HasPrefix(relW, "work"+string(os.PathSeparator)) || relW == "work" {
 			return true
 		}
 	}
@@ -129,7 +129,7 @@ func (s *server) toolReadFile(args []byte) (any, error) {
 		return nil, err
 	}
 	if s.isDeniedRead(abs) {
-		return nil, fmt.Errorf("permission denied: %s is on the oracle deny list (see SPEC §4.4)", p.Path)
+		return nil, fmt.Errorf("permission denied: %s is outside the readable project tree", p.Path)
 	}
 	st, err := os.Stat(abs)
 	if err != nil {
@@ -171,7 +171,7 @@ func (s *server) toolWriteFile(args []byte) (any, error) {
 		return nil, err
 	}
 	if !under(abs, s.workspace) {
-		return nil, fmt.Errorf("write_file restricted to BENCH_WORKSPACE")
+		return nil, fmt.Errorf("write_file: path must be inside the workspace directory (%s)", s.workspace)
 	}
 	if err := os.MkdirAll(filepath.Dir(abs), 0o755); err != nil {
 		return nil, err

@@ -117,6 +117,14 @@ func runGradeServer(addr, oracleRoot string) {
 			http.Error(w, "read body", http.StatusBadRequest)
 			return
 		}
+		// Keep the REAL temp dir / input names pristine ("fbgrade-", "candidate.bin").
+		// These path strings enter the harness child's argv/env, and some bugs are
+		// allocator-layout sensitive (e.g. ndpi-01 crosses its redzone only after
+		// 10000 in-process runs at a precise heap layout); renaming them shifts the
+		// child's stack/heap layout and can flip such a bug from firing to silent.
+		// The benchmark tells ("fbgrade"/"candidate.bin"/"grader-run"/oracle path)
+		// are stripped from the agent-facing OUTPUT TEXT in toolGrade (sanitizeDisplay),
+		// which changes nothing the child actually runs.
 		ws, err := os.MkdirTemp("", "fbgrade-")
 		if err != nil {
 			http.Error(w, "workspace", http.StatusInternalServerError)

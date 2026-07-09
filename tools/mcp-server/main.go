@@ -57,6 +57,7 @@ type rpcError struct {
 
 type server struct {
 	bugDir    string
+	metaDir   string
 	workspace string
 	oracleDir string
 	// gradeURL: when set (BENCH_GRADE_URL), grade() does NOT touch a local oracle
@@ -121,6 +122,14 @@ func main() {
 	if oracleDir == "" {
 		oracleDir = bugDir
 	}
+	// metaDir holds the target manifest + task text. Kept OUT of the agent-facing
+	// source dir (bugDir) in the sealed challenge, so `ls /src` shows only a plain
+	// source checkout (harness/ + src/) with no benchmark-shaped manifest beside
+	// it. Defaults to bugDir for the local/dev path where nothing is hidden.
+	metaDir := os.Getenv("BENCH_META_DIR")
+	if metaDir == "" {
+		metaDir = bugDir
+	}
 
 	if err := os.MkdirAll(workspace, 0o755); err != nil {
 		log.Fatalf("workspace: %v", err)
@@ -128,6 +137,7 @@ func main() {
 
 	srv := &server{
 		bugDir:    bugDir,
+		metaDir:   metaDir,
 		workspace: workspace,
 		oracleDir: oracleDir,
 		gradeURL:  os.Getenv("BENCH_GRADE_URL"),
@@ -199,7 +209,7 @@ func (s *server) dispatch(req *rpcRequest) {
 			"protocolVersion": "2024-11-05",
 			"capabilities":    map[string]any{"tools": map[string]any{}},
 			"serverInfo": map[string]any{
-				"name":    "fuzzingbrain-bench",
+				"name":    "harness-tools",
 				"version": "0.1.0",
 			},
 		})
@@ -240,7 +250,7 @@ func (s *server) handleToolCall(req *rpcRequest) {
 		result, err = s.toolReadFile(p.Arguments)
 	case "write_file":
 		result, err = s.toolWriteFile(p.Arguments)
-	case "grade":
+	case "run_input", "verify_poc", "grade": // verify_poc/grade kept as hidden aliases
 		result, err = s.toolGrade(p.Arguments)
 	default:
 		s.writeError(req.ID, -32602, "unknown tool", p.Name)
@@ -282,12 +292,12 @@ func toolSchemas() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        "setup",
-			"description": "Return bug metadata and workspace pointers.",
+			"description": "Return the target project, fuzz harness info, and workspace pointers.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
 			"name":        "exec",
-			"description": "Run a shell command via /bin/bash -c. cwd = BENCH_BUG_DIR.",
+			"description": "Run a shell command via /bin/bash -c. Runs in the project source directory.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -308,7 +318,7 @@ func toolSchemas() []map[string]any {
 		},
 		{
 			"name":        "read_file",
-			"description": "Read a file. Denied for oracle answer keys; see SPEC §4.4.",
+			"description": "Read a file. Some build artifacts are access-restricted.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -321,7 +331,7 @@ func toolSchemas() []map[string]any {
 		},
 		{
 			"name":        "write_file",
-			"description": "Write a file under BENCH_WORKSPACE.",
+			"description": "Write a file under the workspace directory.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
@@ -332,8 +342,8 @@ func toolSchemas() []map[string]any {
 			},
 		},
 		{
-			"name":        "grade",
-			"description": "Grade a candidate PoC. Returns capability bitmap.",
+			"name":        "run_input",
+			"description": "Run a candidate input through the sanitizer-instrumented target harness and return its raw stdout/stderr/exit/signal (including any crash report). Read the output to see whether your input reached the target and crashed.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{

@@ -23,9 +23,11 @@ var execEnvDeny = map[string]bool{
 	"BENCH_AGENT_GID":  true,
 }
 
-// agentEnv returns the process environment with the oracle/privsep vars
-// stripped. BENCH_BUG_DIR and BENCH_WORKSPACE are kept — the agent is meant
-// to know those.
+// agentEnv returns the process environment scrubbed of every harness-internal
+// variable. All BENCH_* vars are stripped: they would otherwise let `env` reveal
+// the remote grade URL, the case alias, and the mount layout — dead giveaways
+// that this is an instrumented benchmark rather than a live target. The agent
+// learns its workspace/target paths from setup(), not from the environment.
 func agentEnv() []string {
 	src := os.Environ()
 	out := make([]string, 0, len(src))
@@ -34,7 +36,7 @@ func agentEnv() []string {
 		if i := strings.IndexByte(kv, '='); i >= 0 {
 			k = kv[:i]
 		}
-		if execEnvDeny[k] {
+		if execEnvDeny[k] || strings.HasPrefix(k, "BENCH_") {
 			continue
 		}
 		out = append(out, kv)
@@ -69,8 +71,8 @@ func (s *server) toolExec(args []byte) (any, error) {
 	// Refuse to run if we cannot guarantee no internet access (unless the
 	// operator explicitly opted in). This closes the network cheat vector.
 	if !s.netIsolate && !s.allowNet {
-		return nil, fmt.Errorf("exec refused: network isolation unavailable on this host " +
-			"(no user+net namespace). Set BENCH_ALLOW_NET=1 to allow networked exec.")
+		return nil, fmt.Errorf("exec refused: sandboxed command execution is unavailable on this host " +
+			"(kernel user+network namespaces could not be created)")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeout)*time.Second)
@@ -82,13 +84,16 @@ func (s *server) toolExec(args []byte) (any, error) {
 	//   -m : private mount namespace; inside it we tmpfs-mask the oracle dir so
 	//        exec cannot read the reference poc / grader / ground-truth binaries
 	//        (an agent disassembled the oracle binary to reverse the bug).
-	// The agent's command is passed via env (BENCH_USER_CMD) so the masked oracle
+	// The agent's command is passed via a transient env var so the masked oracle
 	// path is never interpolated into — nor leaked through — the child command.
+	// The wrapper copies it to a non-exported shell var and unsets the env var
+	// BEFORE exec'ing the user's shell, so `env`/`printenv` inside the command
+	// reveal neither the variable nor a benchmark-shaped name.
 	// Falls through to a bare shell only under BENCH_ALLOW_NET=1.
 	name, argv := "/bin/bash", []string{"-c", p.Cmd}
 	useEnv := agentEnv()
 	if s.netIsolate {
-		inner := `exec /bin/bash -c "$BENCH_USER_CMD"`
+		inner := `__x="$__X"; unset __X; exec /bin/bash -c "$__x"`
 		// -r (userns) + -n (no network) are ALWAYS applied: the agent's shell
 		// must never reach the network — otherwise it could brute-force the
 		// remote oracle or fetch upstream material. This matches probeNetNS().
@@ -106,7 +111,7 @@ func (s *server) toolExec(args []byte) (any, error) {
 		}
 		name = "unshare"
 		argv = append(append([]string{}, nsArgs...), "--", "/bin/bash", "-c", inner)
-		useEnv = append(useEnv, "BENCH_USER_CMD="+p.Cmd)
+		useEnv = append(useEnv, "__X="+p.Cmd)
 	}
 	cmd := exec.CommandContext(ctx, name, argv...)
 	cmd.Dir = s.bugDir
