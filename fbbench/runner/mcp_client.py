@@ -165,7 +165,7 @@ def _redact_urls_in_tree(root: str) -> None:
 
 def _full_scan_alias(real_bug_dir: str) -> str:
     """A neutral `<project>-NN` handle for full-scan, replacing the descriptive
-    bug_id (e.g. `libpng-01` -> `libpng-03`) so the identifier no
+    bug_id (e.g. `libpng-zlib-inflate-uaf` -> `libpng-03`) so the identifier no
     longer names the bug. NN is the bug's stable 1-based position among its
     project's bundles (sorted). The project name is not a leak — the harness
     source reveals it anyway."""
@@ -184,13 +184,44 @@ def _full_scan_alias(real_bug_dir: str) -> str:
 # FORMAT are kept — the agent legitimately needs them to craft an input.
 _SRC_EXTS = (".c", ".cc", ".cpp", ".cxx", ".h", ".hpp", ".hh", ".java")
 _ENTRYPOINT_MARKERS = ("LLVMFuzzerTestOneInput", "fuzzerTestOneInput")
-# Neutral class name that a JVM entrypoint class is renamed to in full-scan. The
+# Neutral class name a JVM entrypoint class is renamed to in full-scan. The
 # original name can describe the fault (e.g. `DecompressionBombFuzzer` names a
-# decompression-bomb / memory-exhaustion bug); the file rename alone doesn't hide
-# it because the `public class <Name>` decl, build.sh `-DtargetClass=<Name>`, and
-# bench.yaml `entrypoint: <Name>.method` all still spell it out. _stage_bench_yaml
-# rewrites the entrypoint field to the same constant so the two stay consistent.
+# decompression-bomb / memory-exhaustion bug); renaming only the file doesn't hide
+# it because `public class <Name>`, build.sh `-DtargetClass=<Name>`, and bench.yaml
+# `entrypoint: <Name>.method` all still spell it out. _stage_bench_yaml rewrites
+# the entrypoint field to the same constant so the two stay consistent.
 _JAVA_NEUTRAL_CLASS = "Harness"
+
+# Author hint words that, in a comment, would hand the agent the answer
+# ("/* this is where the vulnerability triggers */", "// found the bug here").
+# The fuzzed-API code is kept; only comments matching this are dropped.
+_HINT_RE = re.compile(
+    r"(vulnerab|the bug|buggy|trigger|exploit|overflow|underflow|use-after|uaf|"
+    r"oob|out-of-bound|null[- ]?deref|npd|memory ?leak|memleak|double-free|"
+    r"the crash|the fault|the defect|negative|sanitiz|payload that|malicious|"
+    r"upstream fuzzer|fuzz-[a-z-]+\.c|build script for)",
+    re.I,
+)
+
+
+def _scrub_hint_comments(text: str) -> str:
+    """Remove comments whose text would reveal the bug, leaving the code intact.
+    Drops /* ... */ blocks and // tails (and # lines, for build.sh) that match
+    _HINT_RE; non-matching comments and all code are preserved."""
+    text = re.sub(r"/\*.*?\*/", lambda m: "" if _HINT_RE.search(m.group(0)) else m.group(0),
+                  text, flags=re.S)
+    out = []
+    for ln in text.splitlines(keepends=True):
+        i = ln.find("//")
+        if i >= 0 and _HINT_RE.search(ln[i:]):
+            code = ln[:i].rstrip()
+            out.append(code + ("\n" if ln.endswith("\n") else ""))
+            continue
+        s = ln.lstrip()
+        if s.startswith("#") and not s.startswith("#!") and _HINT_RE.search(ln):
+            continue  # build.sh comment line that leaks
+        out.append(ln)
+    return "".join(out)
 
 # Neutral description.txt staged in full-scan so setup() returns this (and not the
 # server's "re-trigger the documented crash" synthDescription fallback). The text
@@ -224,15 +255,14 @@ def _neutralize_java_entry_class(harness_dir: str, old_class: str) -> None:
     `entrypoint: <Class>.method`) to the neutral `_JAVA_NEUTRAL_CLASS`, so a
     descriptive class name (e.g. `DecompressionBombFuzzer`) can't name the fault.
 
-    `old_class` is the AUTHORITATIVE entrypoint class — do NOT guess it from the
-    `fuzzerTestOneInput` marker, which also matches a reflective runner
-    (PocRunner's `getMethod("fuzzerTestOneInput")`) and would rename the wrong
-    file. Whole-word replaces the identifier across every staged harness file (the
-    class source, build.sh's `-DtargetClass=`/compile path, any file naming it) and
-    renames the declaring file to `<Neutral>.java` so `public class` still matches
-    the filename. Helpers that reach the target reflectively via the `targetClass`
-    property follow the replaced value. Edits only the staged copy; the oracle's own
-    binary/bench.yaml are untouched, so grading is unaffected."""
+    `old_class` is AUTHORITATIVE — do NOT guess it from the `fuzzerTestOneInput`
+    marker, which also matches a reflective runner (PocRunner's
+    `getMethod("fuzzerTestOneInput")`) and would rename the wrong file. Whole-word
+    replaces the identifier across every staged harness file (the class source,
+    build.sh's `-DtargetClass=`/compile path, any file naming it) and renames the
+    declaring file to `<Neutral>.java` so `public class` still matches the filename.
+    Edits only the staged copy; the oracle's own binary/bench.yaml are untouched,
+    so grading is unaffected."""
     if not old_class or old_class == _JAVA_NEUTRAL_CLASS:
         return
     decl = re.compile(r'\bclass\s+' + re.escape(old_class) + r'\b')
@@ -259,56 +289,80 @@ def _neutralize_java_entry_class(harness_dir: str, old_class: str) -> None:
             os.rename(entry_file, new_path)
 
 
-def _neutralize_harness(harness_dir: str, entry_class: str | None = None) -> None:
-    """full-scan: strip leading header comments from staged harness sources and
-    rename the entrypoint file to a neutral `harness.<ext>` (e.g.
-    `vp9_encoder_midstream_reconfig_fuzzer.cc` -> `harness.cc`). The filename and
-    header are pure hints; the code itself (the fuzzed API) is left intact because
-    the agent needs it to know the input shape. build.sh and helper files keep
-    their names; only their header comment is stripped.
+def _jvm_entry_class(real_bug_dir: str) -> str | None:
+    """The JVM entrypoint CLASS from bench.yaml `entrypoint: <Class>.method` (only
+    for java/jvm harnesses with an unpackaged, single-dot entrypoint), else None.
+    Authoritative name for _neutralize_java_entry_class; must match the class
+    rewrite in _stage_bench_yaml's entrypoint field."""
+    try:
+        data = yaml.safe_load(open(os.path.join(real_bug_dir, "bench.yaml"))) or {}
+    except OSError:
+        return None
+    h = data.get("harness")
+    if not isinstance(h, dict) or h.get("type") not in ("java", "jvm"):
+        return None
+    ep = h.get("entrypoint")
+    if isinstance(ep, str) and ep.count(".") == 1:
+        return ep.split(".", 1)[0]
+    return None
 
-    `entry_class` (set for JVM harnesses, from bench.yaml `entrypoint`) additionally
-    neutralizes a descriptive entrypoint CLASS name (see
-    _neutralize_java_entry_class) — for JVM the class, not the filename, is the leak,
-    and it's referenced from build.sh + bench.yaml too."""
+
+def _neutralize_harness(harness_dir: str, bug_name: str | None = None,
+                        alias: str | None = None,
+                        entry_class: str | None = None) -> None:
+    """full-scan: scrub the staged harness of everything that names or locates
+    the bug, while leaving the fuzzed-API code intact (the agent needs it to know
+    the input shape). Specifically: strip the leading license/descriptive header;
+    drop any inline comment that would reveal the bug (`_scrub_hint_comments`,
+    incl. build.sh `# ...` lines); replace the descriptive bug id with its neutral
+    alias everywhere; drop note files (*.md); rename a descriptive JVM entrypoint
+    class to a neutral one (`entry_class`, see _neutralize_java_entry_class); and
+    rename a C/C++ entrypoint source to a neutral `harness.<ext>`."""
     if not os.path.isdir(harness_dir):
         return
     for root, _, files in os.walk(harness_dir):
         for fn in files:
-            if fn == "build.sh" or os.path.splitext(fn)[1] not in _SRC_EXTS:
-                continue
             p = os.path.join(root, fn)
+            if fn.endswith(".md"):       # NOTES/PROVENANCE next to the harness leak
+                os.remove(p)
+                continue
+            # build.sh leaks benchmark-shaped build infra: a coverage-instrumented
+            # twin build (partial-credit scoring), the debug/asan/coverage config
+            # matrix, and — after the C entrypoint is renamed to harness.<ext> —
+            # a dangling reference to the original descriptive filename. The agent
+            # never builds (run_input runs the pre-built oracle harness), so drop
+            # it entirely; harness.<ext> alone is a clean fuzz-target layout.
+            if fn == "build.sh" or (fn.endswith(".sh") and root == harness_dir):
+                os.remove(p)
+                continue
+            ext = os.path.splitext(fn)[1]
+            if fn != "build.sh" and ext not in _SRC_EXTS:
+                continue
             try:
                 txt = open(p, encoding="utf-8", errors="replace").read()
             except OSError:
                 continue
-            stripped = _strip_leading_comment(txt)
-            if stripped != txt:
+            new = txt
+            if ext in _SRC_EXTS:
+                new = _strip_leading_comment(new)
+            new = _scrub_hint_comments(new)
+            if bug_name and alias:
+                new = new.replace(bug_name, alias)
+            if new != txt:
                 with open(p, "w") as fp:
-                    fp.write(stripped)
+                    fp.write(new)
     if entry_class:
-        # JVM: rename the authoritative entrypoint class everywhere it's named.
+        # JVM: rename the authoritative entrypoint class everywhere it's named
+        # (a descriptive class like `DecompressionBombFuzzer` names the fault).
         _neutralize_java_entry_class(harness_dir, entry_class)
         return
-    # C/C++: rename the single entrypoint source file to harness.<ext>. (The C
-    # entrypoint symbol LLVMFuzzerTestOneInput is fixed/non-descriptive; only the
-    # filename hints, so a rename suffices.)
-    for root, _, files in os.walk(harness_dir):
-        for fn in sorted(files):
-            ext = os.path.splitext(fn)[1]
-            if ext not in (".c", ".cc", ".cpp", ".cxx"):
-                continue
-            p = os.path.join(root, fn)
-            try:
-                txt = open(p, encoding="utf-8", errors="replace").read()
-            except OSError:
-                continue
-            if any(m in txt for m in _ENTRYPOINT_MARKERS):
-                new = os.path.join(root, "harness" + ext)
-                if os.path.abspath(new) != os.path.abspath(p) \
-                        and not os.path.exists(new):
-                    os.rename(p, new)
-                return
+    # C/C++: DO NOT rename the entrypoint source. The oracle's pre-built binary
+    # carries the ORIGINAL filename in its debug info, so every sanitizer stack
+    # frame prints it (e.g. `datafile_fuzzer.c:87`) no matter what we call the
+    # staged copy — renaming the copy to harness.<ext> only creates a visible/
+    # crash-trace MISMATCH that reads as a repackaged benchmark. The C filename
+    # (naming the fuzzed API, which the harness body reveals anyway) is not a
+    # bug-locating hint, so keeping it costs nothing and removes the seam.
 
 
 def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
@@ -325,50 +379,45 @@ def _stage_bench_yaml(src: str, dst: str, full_scan: bool = False,
     for k in _BENCH_SCRUB_TOP:
         data.pop(k, None)
     if full_scan:
-        for k in ("title", "disclosed", "capability_set", "notes"):
-            data.pop(k, None)
+        # Rebuild a MINIMAL fuzz-target manifest holding only the build/harness
+        # facts an ordinary fuzzing setup would expose. Everything that frames
+        # this as a catalogued benchmark case is dropped: bug_id (the case
+        # alias), harness.provenance ("fuzzingbrain"), status ("fixed"),
+        # reproducibility snapshot metadata, and title/capability_set/notes. The
+        # result reads like a normal project's harness descriptor, not a graded
+        # benchmark entry.
+        h = data.get("harness") or {}
+        ep = h.get("entrypoint")
         # A JVM entrypoint `<Class>.method` can name the fault via the class
-        # (e.g. `DecompressionBombFuzzer`). _neutralize_java_entry_class renames
-        # the class to _JAVA_NEUTRAL_CLASS in the staged harness; rewrite the
-        # entrypoint here to match so the two views stay consistent. Only the
-        # (unpackaged, single-dot) java case is touched; C/C++ entrypoints
-        # (LLVMFuzzerTestOneInput) are not descriptive and are left as-is.
-        h = data.get("harness")
-        if isinstance(h, dict):
-            ep = h.get("entrypoint")
-            if (isinstance(ep, str) and h.get("type") in ("java", "jvm")
-                    and ep.count(".") == 1):
-                h["entrypoint"] = f"{_JAVA_NEUTRAL_CLASS}.{ep.split('.', 1)[1]}"
-    # Neutral bug_id alias in ALL modes (the descriptive id would otherwise name
-    # the bug; the real id is kept in the run records, not the agent's view).
+        # (e.g. `DecompressionBombFuzzer`); _neutralize_harness renames it to
+        # _JAVA_NEUTRAL_CLASS in the staged harness, so keep the manifest in sync.
+        if (isinstance(ep, str) and h.get("type") in ("java", "jvm")
+                and ep.count(".") == 1):
+            ep = f"{_JAVA_NEUTRAL_CLASS}.{ep.split('.', 1)[1]}"
+        slim: dict = {"project": data.get("project"),
+                      "target": {"language": (data.get("target") or {}).get("language")}}
+        # Keep only what the agent needs to understand the target (type +
+        # entrypoint + invocation). rss_limit_mb / timeout_s are run-limit knobs
+        # that read as benchmark/OSS-Fuzz config in a manifest, and the agent-side
+        # setup() never surfaces them, so drop them from the staged manifest.
+        harness = {k: h[k] for k in ("type", "entrypoint", "invocation")
+                   if isinstance(h, dict) and h.get(k) is not None}
+        if ep is not None:
+            harness["entrypoint"] = ep
+        slim["harness"] = harness
+        with open(dst, "w") as fp:
+            yaml.safe_dump(slim, fp, sort_keys=False)
+        return
+    # Non-full-scan (internal hinted view): keep the rich manifest, only stripping
+    # the upstream repo/commit identifiers and swapping in the neutral alias.
     if alias:
         data["bug_id"] = alias
-    elif full_scan:
-        data.pop("bug_id", None)
     tgt = data.get("target")
     if isinstance(tgt, dict):
         for k in _BENCH_SCRUB_TARGET:
             tgt.pop(k, None)
     with open(dst, "w") as fp:
         yaml.safe_dump(data, fp, sort_keys=False)
-
-
-def _jvm_entry_class(real_bug_dir: str) -> str | None:
-    """The JVM entrypoint CLASS name from bench.yaml `entrypoint: <Class>.method`
-    (only for java/jvm harnesses with an unpackaged, single-dot entrypoint), else
-    None. This is the authoritative name _neutralize_harness renames — and it must
-    match the class rewrite done in _stage_bench_yaml's entrypoint field."""
-    try:
-        data = yaml.safe_load(open(os.path.join(real_bug_dir, "bench.yaml"))) or {}
-    except OSError:
-        return None
-    h = data.get("harness")
-    if not isinstance(h, dict) or h.get("type") not in ("java", "jvm"):
-        return None
-    ep = h.get("entrypoint")
-    if isinstance(ep, str) and ep.count(".") == 1:
-        return ep.split(".", 1)[0]
-    return None
 
 
 def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
@@ -396,14 +445,19 @@ def stage_bug_view(real_bug_dir: str, full_scan: bool = False) -> str:
         src = os.path.join(real_bug_dir, name)
         if not os.path.exists(src):
             continue
-        dst = os.path.join(sandbox, name)
+        # In full-scan the manifest is renamed bench.yaml -> target.yaml: the
+        # literal filename "bench.yaml" is itself a benchmark tell to a wary agent.
+        out_name = "target.yaml" if (full_scan and name == "bench.yaml") else name
+        dst = os.path.join(sandbox, out_name)
         if name == "bench.yaml":
             _stage_bench_yaml(src, dst, full_scan=full_scan, alias=alias)
         elif os.path.isdir(src):
             shutil.copytree(src, dst, ignore=_ignore_leaky)
             _redact_urls_in_tree(dst)
             if full_scan and name == "harness":
-                _neutralize_harness(dst, entry_class=entry_class)
+                _neutralize_harness(dst, bug_name=os.path.basename(
+                    os.path.normpath(real_bug_dir)), alias=alias,
+                    entry_class=entry_class)
         else:
             shutil.copy2(src, dst)
     if full_scan:
@@ -442,15 +496,14 @@ class MCPClient:
             # image name.)
             # BENCH_GRADE_REVEAL=1 marks this as the TRUSTED runner: the in-image
             # mcp-server returns the verdict (capabilities/evidence) so the runner
-            # can SCORE the run; episode.py then strips it to harness_output before
-            # the model sees the grade result, so the agent still gets no verdict.
-            # Sealed-image / codex arms do NOT set it, so grade() returns only
-            # harness_output there.
+            # can score, then strips it before the model sees the grade result.
+            # Codex / sealed images do NOT set it, so grade() returns only
+            # harness_output there (no verdict leak to the agent).
             cmd = ["docker", "run", "-i", "--rm",
                    "--security-opt", "seccomp=unconfined",
                    "-e", "BENCH_GRADE_REVEAL=1",
                    image, "mcp-server"]
-            bug_dir, workspace = "/challenge", "/workspace"
+            bug_dir, workspace = "/src", "/workspace"
         else:
             # Dev/local path: a host mcp-server graded against the local oracle.
             env["BENCH_BUG_DIR"] = bug_dir

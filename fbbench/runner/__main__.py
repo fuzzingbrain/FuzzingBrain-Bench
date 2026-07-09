@@ -126,7 +126,7 @@ def main() -> int:
         # Canonical: everything (challenge surface, workspace, remote grading) is
         # inside the image. The host stages nothing.
         workspace, bug_view = None, None
-        ep_bug_dir = "/challenge"
+        ep_bug_dir = "/src"
     else:
         workspace = tempfile.mkdtemp(prefix=ws_prefix)
         # Agent sees a staged sandbox (no grader/, poc/, binaries/); the grader

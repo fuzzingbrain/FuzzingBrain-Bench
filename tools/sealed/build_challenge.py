@@ -37,13 +37,15 @@ def leak_audit(bundle: Path) -> list[str]:
             leaks.append(str(rel))
         elif p.name in ANSWER_SUFFIX:
             leaks.append(str(rel))
-    # bench.yaml must not carry fix_commit / fix_patch
-    by = bundle / "bench.yaml"
-    if by.exists():
-        b = yaml.safe_load(by.read_text()) or {}
-        tgt = b.get("target", {}) or {}
-        if tgt.get("fix_commit") or tgt.get("fix_patch"):
-            leaks.append("bench.yaml:fix_commit/fix_patch")
+    # the target manifest (bench.yaml, or the slim full-scan target.yaml) must
+    # not carry fix_commit / fix_patch
+    for mname in ("bench.yaml", "target.yaml"):
+        by = bundle / mname
+        if by.exists():
+            b = yaml.safe_load(by.read_text()) or {}
+            tgt = b.get("target", {}) or {}
+            if tgt.get("fix_commit") or tgt.get("fix_patch"):
+                leaks.append(f"{mname}:fix_commit/fix_patch")
     return leaks
 
 DOCKERFILE = """# syntax=docker/dockerfile:1.6
@@ -54,13 +56,17 @@ FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \\
         clang libclang-rt-14-dev build-essential ca-certificates python3 \\
     && rm -rf /var/lib/apt/lists/*
-WORKDIR /challenge
-COPY bundle/ /challenge/
+WORKDIR /src
+COPY bundle/ /src/
+# The target manifest + task brief live OUTSIDE the agent's source dir so `ls /src`
+# is just a plain source checkout (harness/ + src/), with no manifest beside it.
+COPY meta/ /opt/harness/
 COPY mcp-server /usr/local/bin/mcp-server
 RUN mkdir -p /workspace && chmod 0777 /workspace
 ENV BENCH_BUG_ID={bug}
 ENV BENCH_GRADE_URL={grade_url}
-ENV BENCH_BUG_DIR=/challenge
+ENV BENCH_BUG_DIR=/src
+ENV BENCH_META_DIR=/opt/harness
 ENV BENCH_WORKSPACE=/workspace
 # Self-driveable: `docker run -i <image> mcp-server` speaks the stdio MCP protocol
 # (setup/read/list/write/exec/grade) with everything baked in — this is the single
@@ -106,11 +112,31 @@ def main():
     shutil.copytree(bundle_src, bundle, symlinks=True, ignore_dangling_symlinks=True)
     shutil.rmtree(bundle_src, ignore_errors=True)
 
+    # Strip orchestration sentinels that the runner's staging cache leaves behind
+    # (e.g. a zero-byte ".ready" marker). Baked into /src they read as eval
+    # scaffolding, so they must never ship in the agent-facing image.
+    for sentinel in bundle.rglob(".ready"):
+        sentinel.unlink()
+
     leaks = leak_audit(bundle)
     if leaks:
         print(f"*** LEAK AUDIT FAILED for {a.bug_id}: {leaks}", file=sys.stderr)
         shutil.rmtree(ctx, ignore_errors=True); return 3
     print(f"[{a.bug_id}] leak audit CLEAN ({sum(1 for _ in bundle.rglob('*'))} files in bundle)")
+
+    # Move the target manifest + task brief OUT of the agent-facing bundle (which
+    # is COPY'd to /src) into a separate meta/ dir (COPY'd to /opt/harness). This
+    # keeps `ls /src` looking like a plain source checkout — just harness/ + src/ —
+    # with no manifest/description sitting beside the code as a "task package".
+    meta = ctx / "meta"
+    meta.mkdir(exist_ok=True)
+    for mname in ("target.yaml", "bench.yaml", "description.txt"):
+        mf = bundle / mname
+        if mf.exists():
+            shutil.move(str(mf), str(meta / mname))
+    # Placeholder so `COPY meta/` always has content even if a manifest is absent.
+    if not any(meta.iterdir()):
+        (meta / ".keep").write_text("")
 
     shutil.copy2(ROOT / "bin" / "mcp-server", ctx / "mcp-server")
     # BENCH_BUG_ID = alias: the challenge POSTs /grade?bug=<alias>; the oracle keys

@@ -106,7 +106,7 @@ def run_episode(
     grade_idx = 0
 
     setup_resp = mcp.call("setup", {})
-    bug_desc = setup_resp.get("bug_desc", "")
+    bug_desc = setup_resp.get("task", setup_resp.get("bug_desc", ""))
     # full_scan: description.txt is not staged, so bug_desc is empty; the message
     # builder switches to the no-description "find a crash" prompt.
     user_text = build_initial_user_message(bug_desc, setup_resp, full_scan=full_scan)
@@ -216,7 +216,8 @@ def run_episode(
                     continue
                 would_stop = ("refusal" if _is_refusal(comp)
                               else "malformed_function_call" if _is_malformed(comp)
-                              else "voluntary" if "EPISODE COMPLETE" in comp.text.upper()
+                              else "voluntary" if ("ASSESSMENT COMPLETE" in comp.text.upper()
+                                                   or "EPISODE COMPLETE" in comp.text.upper())
                               else "no_tool_use")
                 if require_preset:
                     # Force-preset mode: an off-target crash does NOT count. Allow a
