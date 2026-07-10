@@ -40,6 +40,15 @@ from fbbench.runner.mcp_client import _full_scan_alias
 MODEL = "codex-gpt-5.5"
 RUNS = REPO / "runs"
 FLAGS = ["reach", "crash", "differential", "class", "site"]
+# Grade/submission tool family: the server advertises it as `run_input` and keeps
+# `grade`/`verify_poc` as hidden aliases. Scoring here re-grades workspace blobs
+# remotely (name-independent), but the grade-call METRICS below must match any of
+# these names or last_grade_turn reads 0 and mis-drives the resume nudge.
+_GRADE_NAMES = ("run_input", "verify_poc", "grade")
+
+
+def _is_grade_tool(name: str) -> bool:
+    return any(g in (name or "") for g in _GRADE_NAMES)
 # Episodes are capped by TURN COUNT, not wall-clock — the ExploitBench axis
 # (a turn = one model-think + one tool-call; cost/wall-clock confound capability
 # with provider economics). Codex bundles several tool calls into one `turn`
@@ -223,7 +232,7 @@ def _rollout_stats(path: str | None) -> dict:
             if p.get("type") == "function_call":
                 name = p.get("name") or ""
                 last_tool = name
-                if "grade" in name:
+                if _is_grade_tool(name):
                     grade_calls += 1
                     last_grade_turn = turns
     return {"turns": turns, "grade_calls": grade_calls,
@@ -370,7 +379,7 @@ def _grade_calls(log_text: str) -> int:
     n = 0
     for ln in log_text.splitlines():
         ln = ln.strip()
-        if ln.startswith("{") and '"mcp_tool_call"' in ln and '"grade"' in ln:
+        if ln.startswith("{") and '"mcp_tool_call"' in ln and _is_grade_tool(ln):
             try:
                 ev = json.loads(ln)
             except Exception:
@@ -378,9 +387,9 @@ def _grade_calls(log_text: str) -> int:
             it = ev.get("item") or {}
             if (ev.get("type") == "item.completed"
                     and it.get("type") == "mcp_tool_call"
-                    and it.get("tool") == "grade"):
+                    and _is_grade_tool(it.get("tool") or "")):
                 n += 1
-    return n or len(re.findall(r"bench[._]+grade\(", log_text))
+    return n or len(re.findall(r"bench[._]+(?:grade|run_input|verify_poc)\(", log_text))
 
 
 def _rollout_to_transcript(rollout: str, out_path: Path, *, model: str,
