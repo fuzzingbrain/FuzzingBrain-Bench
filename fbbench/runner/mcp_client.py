@@ -19,6 +19,12 @@ import yaml
 
 from fbbench.paths import REPO
 
+# Upper bound (seconds) on an exec tool call's timeout_s. A single blocking
+# exec pins the whole episode (the client waits on the server's read), so a
+# model that asks for a multi-hour timeout on a runaway command would stall a
+# worker indefinitely. Kept in sync with the cap in tools/mcp-server/exec.go.
+EXEC_TIMEOUT_CAP_S = 300
+
 # Cached library-source checkouts (repo @ vuln_commit), shared across episodes.
 # gitignored (under runs/). Each entry is the source tree at the buggy commit
 # with .git removed, so the agent can read/grep the real (vulnerable) code but
@@ -541,8 +547,24 @@ class MCPClient:
         return self._call("tools/list", {})["tools"]
 
     def call(self, name: str, arguments: dict) -> Any:
+        arguments = self._clamp_exec_timeout(name, arguments)
         resp = self._call("tools/call", {"name": name, "arguments": arguments})
         return resp.get("structuredContent", resp)
+
+    @staticmethod
+    def _clamp_exec_timeout(name: str, arguments: dict) -> dict:
+        # Weak models routinely set an absurd exec timeout_s (e.g. 10000s on a
+        # runaway `grep -R ..`), which blocks the episode for hours since the
+        # client waits on the server's blocking read. Clamp it here so the fix
+        # applies even to the server baked into the challenge docker image
+        # (which we don't rebuild). Server-side exec.go enforces the same cap
+        # for --local runs. Copy so the transcript keeps the model's real request.
+        if name != "exec":
+            return arguments
+        ts = arguments.get("timeout_s")
+        if isinstance(ts, (int, float)) and ts > EXEC_TIMEOUT_CAP_S:
+            arguments = {**arguments, "timeout_s": EXEC_TIMEOUT_CAP_S}
+        return arguments
 
     def _call(self, method: str, params: dict) -> dict:
         with self._lock:

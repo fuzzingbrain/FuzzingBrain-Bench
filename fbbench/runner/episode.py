@@ -24,6 +24,13 @@ from fbbench.runner.mcp_client import MCPClient, MCPToolError
 _REFUSAL_STOPS = {"refusal", "content_filter", "safety", "prohibited_content",
                   "blocklist", "recitation", "image_safety"}
 
+# The submission/grading tool. The server advertises it as `run_input` and keeps
+# `grade`/`verify_poc` as hidden aliases (tools/mcp-server/main.go), so the model
+# only ever calls `run_input`. Scoring MUST match the same family, or a correct
+# solve submitted via the advertised name is silently scored 0 (and, under
+# reveal, the oracle verdict leaks back to the model instead of harness_output).
+_GRADE_TOOLS = {"grade", "run_input", "verify_poc"}
+
 
 def _is_refusal(comp: Completion) -> bool:
     sr = (comp.stop_reason or "").lower()
@@ -256,7 +263,7 @@ def run_episode(
                     out = {"error": str(e), "data": e.data}
                     is_error = True
 
-                if tc.name == "grade" and not is_error:
+                if tc.name in _GRADE_TOOLS and not is_error:
                     # Scoring uses the hidden T1-T4 verdict; the agent NEVER
                     # sees it — only the raw harness output of its own input,
                     # like a fuzzer on one input. This keeps the oracle answer
