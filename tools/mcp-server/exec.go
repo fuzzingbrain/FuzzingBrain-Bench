@@ -67,6 +67,12 @@ func (s *server) toolExec(args []byte) (any, error) {
 	if timeout <= 0 {
 		timeout = 60
 	}
+	// Cap: weak models set an absurd timeout_s (e.g. 10000s on a runaway
+	// `grep -R ..`) and stall the whole episode, since one blocking exec pins
+	// the client's read. Kept in sync with EXEC_TIMEOUT_CAP_S in mcp_client.py.
+	if timeout > 300 {
+		timeout = 300
+	}
 
 	// Refuse to run if we cannot guarantee no internet access (unless the
 	// operator explicitly opted in). This closes the network cheat vector.
