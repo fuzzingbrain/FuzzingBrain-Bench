@@ -12,7 +12,7 @@ tokens are billed as output and are included. Batch discounts are not modeled.
 """
 from __future__ import annotations
 
-from fbbench.models.catalog import provider_for
+from fbbench.models.catalog import LOCAL_PROVIDERS, provider_for
 
 # Per-provider prompt-cache multipliers, applied to the INPUT rate.
 #   read  = cache hit  (re-reading an already-cached prefix)
@@ -24,8 +24,15 @@ from fbbench.models.catalog import provider_for
 # DeepSeek auto-caches on disk: cache-hit input is ~0.25x the miss rate, no
 # write surcharge. It reports hits under usage.prompt_cache_hit_tokens (the
 # OpenAI backend maps that into the cache_read bucket).
-CACHE_READ_MULT = {"anthropic": 0.10, "openai": 0.10, "gemini": 0.25, "deepseek": 0.25}
-CACHE_WRITE_MULT = {"anthropic": 1.25, "openai": 1.0, "gemini": 1.0, "deepseek": 1.0}
+# Open-model API providers auto-cache like DeepSeek/OpenAI (cheap read, no write
+# surcharge); ollama is local (free) so its multipliers are irrelevant. Unlisted
+# providers fall back to the 0.10 read / 1.0 write defaults in cost_usd().
+CACHE_READ_MULT = {"anthropic": 0.10, "openai": 0.10, "gemini": 0.25,
+                   "deepseek": 0.25, "dashscope": 0.25, "moonshot": 0.10,
+                   "zhipu": 0.10, "openrouter": 0.10, "ollama": 0.0}
+CACHE_WRITE_MULT = {"anthropic": 1.25, "openai": 1.0, "gemini": 1.0,
+                    "deepseek": 1.0, "dashscope": 1.0, "moonshot": 1.0,
+                    "zhipu": 1.0, "openrouter": 1.0, "ollama": 0.0}
 
 # model_id -> (input_usd_per_mtok, output_usd_per_mtok)
 PRICES: dict[str, tuple[float, float]] = {
@@ -51,6 +58,22 @@ PRICES: dict[str, tuple[float, float]] = {
     # api-docs.deepseek.com/quick_start/pricing before quoting.
     "deepseek-v4-pro":   (0.55, 2.19),
     "deepseek-v4-flash": (0.27, 1.10),
+    # Qwen via DashScope. ESTIMATE — verify at help.aliyun.com/zh/model-studio
+    # /models before quoting (per-1M-token, standard tier).
+    "qwen3-max":         (1.20, 6.00),
+    "qwen3-coder-plus":  (1.00, 5.00),
+    "qwen-plus":         (0.40, 1.20),
+    "qwen-turbo":        (0.05, 0.20),
+    # Kimi via Moonshot. ESTIMATE — verify at platform.moonshot.cn/docs/pricing.
+    "kimi-k2-0711-preview": (0.60, 2.50),
+    # GLM via Zhipu. ESTIMATE — verify at open.bigmodel.cn/pricing.
+    "glm-4.6":           (0.60, 2.20),
+    "glm-4.5-air":       (0.20, 1.10),
+    # OpenRouter prices per underlying model (+ a small routing fee); the id here
+    # is illustrative. Left unpriced so cost_usd reports pricing_known=False
+    # rather than a wrong number — add the exact vendor/model id to price it.
+    # Local (Ollama/vLLM): no per-token cost.
+    "llama3.1:8b":       (0.0, 0.0),
 }
 
 
@@ -63,6 +86,13 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int,
     of the input rate. Backends that do not report caching pass 0 for both, so
     this reduces to the old flat-rate behavior.
     """
+    # Local (self-hosted) models have no per-token cost regardless of the tag.
+    if provider_for(model) in LOCAL_PROVIDERS:
+        return {"input_tokens": input_tokens, "output_tokens": output_tokens,
+                "cache_read_tokens": cache_read_tokens,
+                "cache_write_tokens": cache_write_tokens,
+                "pricing_known": True, "local": True,
+                "input_usd": 0.0, "output_usd": 0.0, "total_usd": 0.0}
     rates = PRICES.get(model)
     if rates is None:
         return {"input_tokens": input_tokens, "output_tokens": output_tokens,
