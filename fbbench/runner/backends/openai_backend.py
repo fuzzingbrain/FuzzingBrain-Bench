@@ -25,23 +25,30 @@ def _is_local(model: str) -> bool:
 
 class OpenAIBackend:
     def __init__(self, model: str, api_key: str | None = None,
-                 base_url: str | None = None, key_env: str = "OPENAI_API_KEY"):
+                 base_url: str | None = None, key_env: str = "OPENAI_API_KEY",
+                 local: bool = False):
         # base_url/key_env let this backend serve any OpenAI-compatible provider
         # (e.g. DeepSeek at https://api.deepseek.com with DEEPSEEK_API_KEY).
+        # local=True forces the small-model path (Ollama/vLLM); it is also
+        # inferred from a llama*-style id. A globally-set OLLAMA_BASE_URL only
+        # flips to local when no explicit base_url is given, so a cloud provider
+        # that passes its own base_url is never hijacked by that env var.
         self.model = model
-        if base_url:
-            self.local = False
+        self.local = local or _is_local(model)
+        if not base_url and os.environ.get("OLLAMA_BASE_URL"):
+            self.local = True
+        # max_retries above the SDK default (2) for rate-limit resilience.
+        if self.local:
+            base = base_url or os.environ.get(
+                "OLLAMA_BASE_URL", "http://localhost:11434/v1")
+            # Ollama ignores the key but the SDK requires a non-empty string.
+            self._client = openai.OpenAI(
+                base_url=base, api_key=api_key or "ollama", max_retries=8)
+        elif base_url:
             self._client = openai.OpenAI(
                 base_url=base_url, api_key=api_key or os.environ.get(key_env),
                 max_retries=8)
-            return
-        self.local = _is_local(model) or bool(os.environ.get("OLLAMA_BASE_URL"))
-        if self.local:
-            base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434/v1")
-            # Ollama ignores the key but the SDK requires a non-empty string.
-            self._client = openai.OpenAI(base_url=base, api_key=api_key or "ollama")
         else:
-            # max_retries above the SDK default (2) for rate-limit resilience.
             self._client = openai.OpenAI(
                 api_key=api_key or os.environ.get(key_env), max_retries=8)
 

@@ -16,7 +16,8 @@ from fbbench.grading import (
     capability_set, find_bug, grade_blob, list_bugs, read_bench,
 )
 from fbbench.models import (
-    CATALOG, PRICES, PROVIDER_DEFAULT, PROVIDER_KEY_ENV, route_provider,
+    CATALOG, PRICES, PROVIDER_DEFAULT, PROVIDER_KEY_ENV, needs_key,
+    route_provider,
 )
 from fbbench.paths import REPO, SERVER
 
@@ -203,7 +204,10 @@ def cmd_models(_args) -> int:
         rate = PRICES.get(m)
         ins = f"{rate[0]:.2f}" if rate else "?"
         outs = f"{rate[1]:.2f}" if rate else "?"
-        keyc = green("yes") if have[prov] else red("no ")
+        if not needs_key(prov):
+            keyc = cyan("local")
+        else:
+            keyc = green("yes") if have[prov] else red("no ")
         is_default = cyan(" ✓") if PROVIDER_DEFAULT[prov] == m else ""
         print(f"  {m:<26s} {prov:<10s} {tier:<9s} "
               f"{ins:>7s} {outs:>8s}  {keyc}   {is_default}")
@@ -249,7 +253,8 @@ def cmd_run(args) -> int:
         if provider == "unknown":
             sys.exit(red(f"  cannot route model {model!r} to a provider "
                          "(expected claude*/gpt*/gemini*)"))
-        if not args.api_key and not env_combined.get(PROVIDER_KEY_ENV[provider]):
+        if (needs_key(provider) and not args.api_key
+                and not env_combined.get(PROVIDER_KEY_ENV[provider])):
             sys.exit(red(
                 f"  model {model!r} needs ${PROVIDER_KEY_ENV[provider]} "
                 f"but it is not set in ./.env or env.\n"
