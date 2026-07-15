@@ -38,6 +38,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="model id (default: auto-pick from provider key in .env)")
     sp_run.add_argument("--max-turns", type=int, default=100,
                         help="turn budget (default: 100 for full-scan; diff-scan uses 50)")
+    sp_run.add_argument("--wall-cap", type=float, default=None,
+                        help="episode wall-clock backstop in seconds "
+                             "(default: max_turns*60; 0 disables)")
     sp_run.add_argument("--exp", "-e", default=None,
                         help="experiment namespace (default: auto-assigned exp-<timestamp>); "
                              "groups runs into runs/<exp>/<bug>/<model>/run-N/")

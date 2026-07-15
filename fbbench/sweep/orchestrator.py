@@ -76,13 +76,22 @@ def bug_kb(bug: str) -> list[str]:
     return capability_set(bd) if bd else ["reach", "crash", "class", "site"]
 
 
+def _wall_cap_arg(timeout: int, wall_cap: float | None) -> list[str]:
+    """The --wall-cap the runner gets: an in-episode graceful backstop set just
+    below the subprocess --timeout, so the episode writes score.json before the
+    hard-kill. Explicit wall_cap wins; wall_cap<=0 disables (empty -> no flag)."""
+    if wall_cap is not None:
+        return [] if wall_cap <= 0 else ["--wall-cap", str(wall_cap)]
+    return ["--wall-cap", str(max(60.0, timeout - 60.0))]
+
+
 def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
              timeout: int, preserve_pocs: bool = True,
-             full_scan: bool = False) -> dict | None:
+             full_scan: bool = False, wall_cap: float | None = None) -> dict | None:
     cd = cell_dir(out, bug, model, sample)
     cmd = RUNNER + ["--bug", bug, "--model", model,
                     "--max-turns", str(max_turns),
-                    "--out-dir", str(cd)]
+                    "--out-dir", str(cd)] + _wall_cap_arg(timeout, wall_cap)
     cmd.append("--preserve-pocs" if preserve_pocs else "--no-preserve-pocs")
     if full_scan:
         cmd.append("--full-scan")
@@ -151,6 +160,11 @@ def main() -> int:
     ap.add_argument("--max-turns", type=int, default=100,
                     help="turn budget per episode (default 100 for full-scan; diff-scan uses 50)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-episode seconds")
+    ap.add_argument("--wall-cap", type=float, default=None,
+                    help="in-episode wall-clock backstop in seconds passed to the runner "
+                         "(default: --timeout minus 60s, so the episode stops gracefully "
+                         "and still writes score.json before the subprocess hard-kill). "
+                         "0 disables it.")
     ap.add_argument("--exp", "-e", default=None,
                     help="experiment namespace (default: auto-assigned exp-<timestamp>). "
                          "Pass an existing name (e.g. paper-v1) to resume that campaign.")
@@ -217,7 +231,8 @@ def main() -> int:
             i, model, bug, sample = item
             print(f"  [{i}/{len(cells)}] start {model} / {bug} / sample-{sample}", flush=True)
             r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
-                         preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
+                         preserve_pocs=args.preserve_pocs, full_scan=args.full_scan,
+                         wall_cap=args.wall_cap)
             if r and "error" not in r:
                 print(f"      -> [{bug}] {r.get('tier_score','?')}/5  "
                       f"{r.get('terminated_reason','')}  ${r.get('total_usd') or 0.0:.4f}",
@@ -240,7 +255,8 @@ def main() -> int:
                 if use_dash:
                     STATUS.cell_start(model, bug, sample, kb)
                     cmd = RUNNER + ["--bug", bug, "--model", model,
-                                    "--max-turns", str(args.max_turns), "--out-dir", str(cd)]
+                                    "--max-turns", str(args.max_turns), "--out-dir", str(cd)
+                                    ] + _wall_cap_arg(args.timeout, args.wall_cap)
                     cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
                     if args.full_scan:
                         cmd.append("--full-scan")
@@ -250,7 +266,8 @@ def main() -> int:
                 else:
                     print(f"  {tag} ...", flush=True)
                     r = run_cell(model, bug, sample, args.max_turns, out, args.timeout,
-                                 preserve_pocs=args.preserve_pocs, full_scan=args.full_scan)
+                                 preserve_pocs=args.preserve_pocs, full_scan=args.full_scan,
+                                 wall_cap=args.wall_cap)
                     if r and "error" not in r:
                         ts = r.get("tier_score", "?")
                         print(f"      -> {ts}/5  {r.get('terminated_reason','')}  "

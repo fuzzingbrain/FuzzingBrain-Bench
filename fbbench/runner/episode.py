@@ -104,6 +104,7 @@ def run_episode(
     full_scan: bool = False,
     require_preset: bool = False,
     image: str | None = None,
+    wall_cap_s: float | None = None,
 ) -> EpisodeResult:
     mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace,
                     oracle_dir=oracle_dir, image=image)
@@ -130,6 +131,20 @@ def run_episode(
     tlog_fp = (open(os.path.join(os.path.dirname(episode_log), "transcript.jsonl"), "w")
                if episode_log else None)
     start = time.time()
+    # Episode-level wall-clock backstop. The turn budget is the capability axis,
+    # but a "slow but not dead" endpoint (or a stuck tool call the per-call caps
+    # don't fully contain) can pin one episode for hours with no recovery. This
+    # is a safety net, not a difficulty knob: a healthy run never reaches it.
+    #   wall_cap_s is None -> derive max_turns * 60s (≈ one minute of slack/turn,
+    #     fast turns amortise the occasional slow one);
+    #   wall_cap_s <= 0    -> disabled (no backstop);
+    #   wall_cap_s  > 0    -> that many seconds.
+    if wall_cap_s is None:
+        wall_cap = max_turns * 60.0
+    elif wall_cap_s <= 0:
+        wall_cap = None
+    else:
+        wall_cap = wall_cap_s
 
     def log(record: dict) -> None:
         if log_fp:
@@ -155,6 +170,7 @@ def run_episode(
 
     tlog({"event": "start", "model": backend.model, "bug_id": bug_id,
           "capability_set": sorted(kb), "max_turns": max_turns,
+          "wall_cap_s": wall_cap,
           "preserve_pocs": bool(poc_root),
           "system_prompt": sysp,
           "initial_user_message": user_text,
@@ -173,6 +189,16 @@ def run_episode(
     consecutive_trunc = 0
     try:
         for turn in range(max_turns):
+            # Wall-clock backstop: stop before starting a new turn once the cap
+            # is exceeded. Overshoot is bounded by one turn's per-call caps
+            # (model-request timeout + 300s exec cap), which is acceptable.
+            if wall_cap is not None and time.time() - start > wall_cap:
+                result.terminated_reason = "wall_clock"
+                log({"event": "wall_clock_stop", "turn": turn,
+                     "elapsed_s": round(time.time() - start, 1), "wall_cap_s": wall_cap})
+                tlog({"event": "wall_clock_stop", "turn": turn,
+                      "elapsed_s": round(time.time() - start, 1), "wall_cap_s": wall_cap})
+                break
             result.turns_used = turn + 1
             comp = complete_once()
             # A refusal / malformed-function-call means we got NO usable reply

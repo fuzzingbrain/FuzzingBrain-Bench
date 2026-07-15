@@ -10,7 +10,8 @@ import os
 
 import openai
 
-from .base import Completion, ToolCall
+from .base import (LOCAL_REQUEST_MAX_RETRIES, LOCAL_REQUEST_TIMEOUT_S,
+                   REQUEST_MAX_RETRIES, REQUEST_TIMEOUT_S, Completion, ToolCall)
 
 
 def _is_reasoning(model: str) -> bool:
@@ -37,20 +38,25 @@ class OpenAIBackend:
         self.local = local or _is_local(model)
         if not base_url and os.environ.get("OLLAMA_BASE_URL"):
             self.local = True
-        # max_retries above the SDK default (2) for rate-limit resilience.
+        # timeout bounds a single hung request; max_retries absorbs a rate-limit
+        # wave. See base.py for why the SDK defaults are unsafe for this loop.
+        # Local CPU generation is legitimately slow, so it gets a looser timeout
+        # and fewer retries (no server-side rate limits apply).
         if self.local:
             base = base_url or os.environ.get(
                 "OLLAMA_BASE_URL", "http://localhost:11434/v1")
             # Ollama ignores the key but the SDK requires a non-empty string.
             self._client = openai.OpenAI(
-                base_url=base, api_key=api_key or "ollama", max_retries=8)
+                base_url=base, api_key=api_key or "ollama",
+                timeout=LOCAL_REQUEST_TIMEOUT_S, max_retries=LOCAL_REQUEST_MAX_RETRIES)
         elif base_url:
             self._client = openai.OpenAI(
                 base_url=base_url, api_key=api_key or os.environ.get(key_env),
-                max_retries=8)
+                timeout=REQUEST_TIMEOUT_S, max_retries=REQUEST_MAX_RETRIES)
         else:
             self._client = openai.OpenAI(
-                api_key=api_key or os.environ.get(key_env), max_retries=8)
+                api_key=api_key or os.environ.get(key_env),
+                timeout=REQUEST_TIMEOUT_S, max_retries=REQUEST_MAX_RETRIES)
 
     def _to_messages(self, system: str, messages: list[dict]) -> list[dict]:
         out: list[dict] = [{"role": "system", "content": system}]
