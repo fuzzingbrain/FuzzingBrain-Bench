@@ -307,10 +307,10 @@ _INITIAL_USER_TMPL = _reg("initial_user_message",
           "setup_json (setup() response)")
 
 _FULLSCAN_INITIAL_TMPL = _reg("initial_user_message_fullscan",
-    "No specific vulnerability report accompanies this target.\n\n"
     "{context}\n\n"
-    "No particular defect is singled out for you — audit the harness and the "
-    "code it reaches to find one. Read the harness source to "
+    "No specific vulnerability report accompanies this target, and no particular "
+    "defect is singled out for you — audit the harness and the code it reaches to "
+    "find one. Read the harness source to "
     "learn how it consumes its input and read `src/` to locate a defect, then "
     "craft an input that makes the target fault in the way the sanitizer above "
     "reports.\n\n"
