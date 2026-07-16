@@ -17,6 +17,7 @@ from fbbench.prompts import (
     FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
     budget_note, build_initial_user_message, system_prompt,
 )
+from fbbench.grading.bench_yaml import harness_sanitizer
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
 
@@ -89,6 +90,20 @@ def neutral_tools(mcp: MCPClient) -> list[dict]:
              "input_schema": t["inputSchema"]} for t in mcp.list_tools()]
 
 
+def backfill_sanitizer(setup_resp: dict, bug_dir: str) -> None:
+    """Ensure setup_resp carries the build's sanitizer token before the first user
+    turn. The sanitizer the build is judged under is public setup info the model
+    must have (a real auditor always knows their own instrumentation); the
+    canonical answer-free challenge image's setup() omits it, so backfill it from
+    the local bench.yaml. No-op if setup() already supplied it or it is unknown.
+    """
+    if setup_resp.get("sanitizer"):
+        return
+    san = harness_sanitizer(Path(bug_dir))
+    if san:
+        setup_resp["sanitizer"] = san
+
+
 def run_episode(
     backend: Backend,
     bug_id: str,
@@ -113,6 +128,9 @@ def run_episode(
     grade_idx = 0
 
     setup_resp = mcp.call("setup", {})
+    # Read the sanitizer from the LOCAL bundle: in the canonical path bug_dir is a
+    # container path ("/src"); the host-side bug bundle is oracle_dir.
+    backfill_sanitizer(setup_resp, oracle_dir or bug_dir)
     bug_desc = setup_resp.get("task", setup_resp.get("bug_desc", ""))
     # full_scan: description.txt is not staged, so bug_desc is empty; the message
     # builder switches to the no-description "find a crash" prompt.
