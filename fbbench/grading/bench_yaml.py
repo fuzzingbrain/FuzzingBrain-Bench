@@ -14,6 +14,31 @@ from fbbench.paths import REPO
 DEFAULT_KB = ["reach", "crash", "class", "site"]
 
 
+def harness_sanitizer(bug_dir: Path) -> str | None:
+    """The build's sanitizer token (asan / ubsan / lsan / libfuzzer / jazzer) read
+    from bench.yaml's nested `harness.sanitizer`. This is public build metadata a
+    real auditor always knows (it is NOT the answer — the crash class stays
+    hidden), so it is safe to surface to the model. Returns None if absent.
+
+    read_bench() only captures top-level scalars, so this walks the file to find
+    the `sanitizer:` line inside the `harness:` block specifically.
+    """
+    bench = Path(bug_dir) / "bench.yaml"
+    if not bench.is_file():
+        return None
+    in_harness = False
+    for line in bench.read_text().splitlines():
+        line = line.split("#", 1)[0].rstrip()
+        if not line:
+            continue
+        if not line[0].isspace():                     # a new top-level key
+            in_harness = line.split(":", 1)[0].strip() == "harness"
+            continue
+        if in_harness and line.strip().startswith("sanitizer:"):
+            return line.split(":", 1)[1].strip().strip("\"'") or None
+    return None
+
+
 def read_bench(path: Path) -> dict:
     """Parse a bench.yaml's top-level scalars and one-line [lists]."""
     out: dict = {}
