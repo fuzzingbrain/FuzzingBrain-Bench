@@ -144,8 +144,15 @@ def run_agent(bug: str, model: str, max_turns: int, timeout_s: int,
     if best_blob:
         shutil.copy(best_blob, out_dir / "best_blob")
 
-    cost = cost_usd(model, ar.get("input_tokens", 0), ar.get("output_tokens", 0),
-                    ar.get("cache_read_tokens", 0), ar.get("cache_write_tokens", 0))
+    # The CRS LLM client reports litellm/OpenAI-convention input_tokens, which
+    # INCLUDE the cached portions. fbbench.cost_usd expects FRESH (uncached)
+    # input and prices the cache buckets separately, so subtract the cache
+    # tokens first — otherwise cached reads are charged at full rate too (a ~7x
+    # overcount on a long, well-cached agent run).
+    cr = ar.get("cache_read_tokens", 0)
+    cw = ar.get("cache_write_tokens", 0)
+    fresh_input = max(0, ar.get("input_tokens", 0) - cr - cw)
+    cost = cost_usd(model, fresh_input, ar.get("output_tokens", 0), cr, cw)
     score = {
         "bug_id": bug, "model": model_label(model), "base_model": model, "seed": 0,
         "capabilities": {f: caps.get(f, "not_fired") for f in FLAGS},
