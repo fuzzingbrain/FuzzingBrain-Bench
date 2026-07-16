@@ -15,8 +15,9 @@ from pathlib import Path
 
 from fbbench.env import load_dotenv
 from fbbench.grading.bench_yaml import capability_set, find_bug
-from fbbench.models import CATALOG, PRICES, cost_usd, default_sweep
+from fbbench.models import CATALOG, PRICES, agent_label, cost_usd, default_sweep
 from fbbench.paths import REPO
+from fbbench.runner.agent import run_agent_episode
 from fbbench.runner.backends import make_backend
 from fbbench.runner.episode import run_episode
 from fbbench.runner.mcp_client import stage_bug_view, _full_scan_alias
@@ -52,6 +53,12 @@ def main() -> int:
     ap.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                     help="save every graded candidate blob into pocs/{solved,failed}/ "
                          "(default on; pass --no-preserve-pocs to disable)")
+    ap.add_argument("--agent", action="store_true",
+                    help="drive the model through the native AGENT harness "
+                         "(fbbench.runner.agent): a Codex-style loop with a "
+                         "persistent plan, forced test-often pacing, post-test "
+                         "reflection, and a build-and-fuzz-locally methodology. "
+                         "Recorded as fb-agent-<model> (a distinct leaderboard arm).")
     ap.add_argument("--force-full", action="store_true",
                     help="ignore voluntary/no-tool-use early stops; run the full "
                          "--max-turns budget (nudges the model to keep iterating)")
@@ -133,8 +140,9 @@ def main() -> int:
         # reads the answer key + ground-truth binaries from the real bug dir.
         bug_view = stage_bug_view(str(bug_dir), full_scan=args.full_scan)
         ep_bug_dir = bug_view
+    driver = run_agent_episode if args.agent else run_episode
     try:
-        result = run_episode(
+        result = driver(
             backend=backend,
             bug_id=args.bug,
             bug_dir=ep_bug_dir,
@@ -156,12 +164,18 @@ def main() -> int:
         if bug_view:
             shutil.rmtree(bug_view, ignore_errors=True)
 
+    # On the agent arm the run is recorded under a distinct label
+    # (fb-agent-<model>) so it forms its own leaderboard entry, but the base
+    # model still drives pricing/routing.
+    record_model = agent_label(result.model) if args.agent else result.model
     score = {
         "bug_id": result.bug_id,
-        "model": result.model,
+        "model": record_model,
         # Every run knob that shaped this episode — surfaced verbatim in the
         # report so a result is fully reproducible from its own score.json.
         "config": {
+            "arm": "agent" if args.agent else "tool-loop",
+            "base_model": result.model,
             "mode": "full-scan" if args.full_scan else "normal",
             "max_turns": args.max_turns,
             "full_scan": bool(args.full_scan),
@@ -182,7 +196,7 @@ def main() -> int:
     }
     if result.error:
         score["error"] = result.error
-    cost = {"model": result.model,
+    cost = {"model": record_model,
             **cost_usd(result.model, result.input_tokens, result.output_tokens,
                        result.cache_read_tokens, result.cache_write_tokens)}
     score["total_usd"] = cost["total_usd"]

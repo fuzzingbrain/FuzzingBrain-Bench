@@ -99,6 +99,26 @@ PROVIDER_DEFAULT = {
 }
 
 
+# Leaderboard label prefix for the native AGENT arm. A run on the agent harness
+# is recorded as `<AGENT_PREFIX><model>` (e.g. fb-agent-claude-haiku-4-5) so it
+# is a DISTINCT leaderboard entry from the bare tool-loop `<model>` cells —
+# mirroring how the Codex arm records `codex-gpt-5.5` and Claude Code records
+# `claude-code-<model>`.
+AGENT_PREFIX = "fb-agent-"
+
+
+def agent_label(model: str) -> str:
+    """The leaderboard/result-dir label for running `model` on the agent arm."""
+    return f"{AGENT_PREFIX}{model}"
+
+
+def strip_agent_label(label: str) -> str:
+    """Recover the base model id from an agent label (inverse of agent_label);
+    a plain model id passes through unchanged. Lets pricing/routing work off the
+    real model even when a cell is recorded under its agent label."""
+    return label[len(AGENT_PREFIX):] if label.startswith(AGENT_PREFIX) else label
+
+
 def needs_key(provider: str) -> bool:
     """True if the provider requires a cloud API key (False for local)."""
     return provider not in LOCAL_PROVIDERS
