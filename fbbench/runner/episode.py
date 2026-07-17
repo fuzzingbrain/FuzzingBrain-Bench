@@ -17,7 +17,7 @@ from fbbench.prompts import (
     FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
     budget_note, build_initial_user_message, system_prompt,
 )
-from fbbench.grading.bench_yaml import harness_sanitizer
+from fbbench.grading.bench_yaml import DEFAULT_KB, harness_sanitizer
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
 
@@ -123,7 +123,7 @@ def run_episode(
     mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace,
                     oracle_dir=oracle_dir, image=image)
     mcp.initialize()
-    kb: set[str] = set(capability_set or ["reach", "crash", "class", "site"])
+    kb: set[str] = set(capability_set or DEFAULT_KB)
     poc_root: Path | None = Path(pocs_dir) if pocs_dir else None
     grade_idx = 0
 

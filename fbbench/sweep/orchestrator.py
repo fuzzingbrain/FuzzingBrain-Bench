@@ -31,7 +31,7 @@ import sys
 import time
 from pathlib import Path
 
-from fbbench.grading import capability_set, find_bug, list_bugs
+from fbbench.grading import DEFAULT_KB, capability_set, find_bug, list_bugs
 from fbbench.models import SUPPORTED_MODELS, default_sweep
 from fbbench.paths import REPO
 
@@ -73,7 +73,7 @@ def cell_dir(out: Path, bug: str, model: str, sample: int) -> Path:
 def bug_kb(bug: str) -> list[str]:
     """The capability_set (required flags) for a bug, from its bench.yaml."""
     bd = find_bug(bug)
-    return capability_set(bd) if bd else ["reach", "crash", "class", "site"]
+    return capability_set(bd) if bd else list(DEFAULT_KB)
 
 
 def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,

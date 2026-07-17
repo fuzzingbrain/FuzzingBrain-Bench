@@ -53,16 +53,20 @@ def _tool_stats(nodes: list[dict]) -> list[tuple[str, int, int]]:
 
 
 def _ladder_html(caps: dict, kb: list[str]) -> str:
+    # Applicability is the ORACLE's call: a tier it does not grade for THIS bug
+    # comes back "n/a". Render straight from caps so the ladder can never disagree
+    # with the tier count — both read the same authoritative dict. kb is NOT
+    # consulted: a local guess (DEFAULT_KB) drifted from the oracle and greyed
+    # tiers the oracle had actually fired (5/5 header, differential shown as ·).
     cells = []
     for k in LADDER:
-        applicable = (not kb) or (k in kb)
         state = caps.get(k)
-        if not applicable or state == "n/a":
-            cls, glyph = "na", "·"
-        elif state == "fired":
+        if state == "fired":
             cls, glyph = "fired", "●"
-        else:
+        elif state == "not_fired":
             cls, glyph = "miss", "○"
+        else:  # "n/a" or absent → not applicable to this bug
+            cls, glyph = "na", "·"
         cells.append(
             f'<div class="rung {cls}"><div class="g">{glyph}</div>'
             f'<div class="k">{_LADDER_LABEL[k]}</div></div>'
@@ -304,6 +308,14 @@ def build_report_html(run_dir: Path) -> str:
             if e.get("event") == "start":
                 kb = sorted(e.get("capability_set", []) or [])
                 break
+
+    # Authoritative applicable K_b comes from the oracle's caps: any tier it does
+    # not grade for this bug is "n/a". Prefer that over the runner's logged
+    # capability_set (a local DEFAULT_KB guess that has drifted). Fall back to the
+    # logged kb only when caps carry no verdict yet (e.g. an aborted run).
+    applicable_kb = [k for k in LADDER if caps.get(k) not in (None, "n/a")]
+    if applicable_kb:
+        kb = applicable_kb
 
     grades = [n for n in nodes if n["tool"] == "grade"]
     faults = [n for n in grades if n["crash"]]

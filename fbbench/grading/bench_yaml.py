@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fbbench.paths import REPO
 
-DEFAULT_KB = ["reach", "crash", "class", "site"]
+DEFAULT_KB = ["reach", "crash", "differential", "class", "site"]
 
 
 def harness_sanitizer(bug_dir: Path) -> str | None:
