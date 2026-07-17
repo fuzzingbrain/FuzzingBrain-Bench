@@ -75,6 +75,26 @@ Models: `claude-haiku-4-5` · `claude-sonnet-4-6` · `claude-opus-4-7` ·
 `deepseek-v4-pro` · `deepseek-v4-flash`
 (any catalog id works via `--model`; see `fb-bench models`).
 
+### 2b. Agent mode (`--agent`) — the "fuzzing brain" harness
+
+By default `fb-bench run` drives the model as a bare tool-use loop. Add `--agent`
+to drive it instead through **FuzzingBrain's native agent harness** — a
+Codex-style loop that gives any base model the scaffolding the leaderboard-topping
+vendor agents have: a persistent plan (`update_plan`), forced *test-often* pacing,
+a short reflection after every `run_input`, and a methodology that pushes the
+model to **compile the libFuzzer harness locally (the sandbox ships
+clang++ with libFuzzer + ASan) and actually fuzz it**, then submit the crash the
+fuzzer finds — pairing LLM reasoning with real fuzzing.
+
+```bash
+fb-bench run flatbuffers-03 --model claude-haiku-4-5 --agent
+```
+
+Agent runs are recorded as a **distinct leaderboard arm** `fb-agent-<model>`
+(e.g. `fb-agent-claude-haiku-4-5`), separate from the bare-loop `<model>` cells.
+On flatbuffers-03, the bare `claude-haiku-4-5` loop scores 0/5; the same model on
+`--agent` builds the harness, fuzzes it, and solves it 5/5 in ~20 turns for < $0.10.
+
 ### 3. Run the whole corpus with a model
 
 ```bash
@@ -83,6 +103,9 @@ python -m fbbench.sweep.orchestrator --models claude-haiku-4-5 --bugs all --exp 
 
 # default multi-model lineup, all challenges
 python -m fbbench.sweep.orchestrator --models sweep --bugs all --exp sweep1
+
+# the native agent harness over the whole corpus (records the fb-agent-<model> arm)
+python -m fbbench.sweep.orchestrator --models claude-haiku-4-5 --agent --bugs all --exp agent1
 ```
 
 Results land in `runs/<exp>/<bug>/<model>/run-N/` (`score.json`, `episode.jsonl`,
@@ -115,6 +138,27 @@ python -m fbbench.sweep.codex one avro-03
 ```bash
 python -m fbbench.sweep.codex sweep --bugs all          # batched, resumable
 ```
+
+### 6. Agent mode (FuzzingBrain) — the CRS competing as itself
+
+The **FuzzingBrain** arm drives the CRS's own **agent model**
+(`fuzzingbrain.agent_model`, in the [CRS repo](https://github.com/fuzzingbrain/afc-crs-all-you-need-is-a-fuzzing-brain))
+over the same bench MCP server — the FuzzingBrain product competing head-to-head
+with the Codex and Claude-Code arms, on any base model, using its own LLM brain
+and the build-the-harness-and-fuzz-it strategy. Records as `fuzzingbrain-<model>`.
+
+```bash
+# point the arm at the CRS checkout + a python with its deps (one-time)
+export FUZZINGBRAIN_HOME=/path/to/afc-crs-all-you-need-is-a-fuzzing-brain/v2
+# (that repo's fuzzingbrain/agent_model/README.md covers venv + litellm setup)
+
+python -m fbbench.sweep.fuzzingbrain one   flatbuffers-03 --model claude-haiku-4-5
+python -m fbbench.sweep.fuzzingbrain sweep --bugs all      --model claude-haiku-4-5
+```
+
+On `flatbuffers-03`, `fuzzingbrain-claude-haiku-4-5` solves it **5/5** (all rungs,
+incl. `differential`) in ~23 turns for < $0.40 — the cheapest model, driven by
+FuzzingBrain's agent model.
 
 ---
 

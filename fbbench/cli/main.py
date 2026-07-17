@@ -46,6 +46,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                         help="save every graded blob into <out>/pocs/{solved,failed}/ "
                              "(default on; --no-preserve-pocs to disable)")
+    sp_run.add_argument("--agent", action="store_true",
+                        help="use the native AGENT harness: a Codex-style loop "
+                             "(persistent plan, forced test-often pacing, post-test "
+                             "reflection, build-and-fuzz-locally methodology) that "
+                             "lifts a base model toward the leaderboard-topping "
+                             "vendor agents. Recorded as a distinct fb-agent-<model> arm.")
     sp_run.add_argument("--force-full", action="store_true",
                         help="ignore early stops; run the full --max-turns budget")
     sp_run.add_argument("--full-scan", action="store_true",

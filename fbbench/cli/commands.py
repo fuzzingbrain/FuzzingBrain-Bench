@@ -16,7 +16,7 @@ from fbbench.grading import (
     capability_set, find_bug, grade_blob, list_bugs, read_bench,
 )
 from fbbench.models import (
-    CATALOG, PRICES, PROVIDER_DEFAULT, PROVIDER_KEY_ENV, needs_key,
+    CATALOG, PRICES, PROVIDER_DEFAULT, PROVIDER_KEY_ENV, agent_label, needs_key,
     route_provider,
 )
 from fbbench.paths import REPO, SERVER
@@ -282,6 +282,12 @@ def cmd_run(args) -> int:
     else:
         runner_py = sys.executable
 
+    # On the agent arm the run is recorded under a distinct label
+    # (fb-agent-<model>) so it forms its own leaderboard entry, separate from the
+    # bare tool-loop's <model> cells. The base model still drives the backend.
+    use_agent = getattr(args, "agent", False)
+    dir_label = agent_label(model) if use_agent else model
+
     # ---- pick output dir --------------------------------------------------
     if args.output:
         out_dir = Path(args.output)
@@ -293,7 +299,7 @@ def cmd_run(args) -> int:
         else:
             exp = "exp-" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
             exp_label = "auto-assigned (no --exp given)"
-        base = REPO / "runs" / exp / args.bug_id / model
+        base = REPO / "runs" / exp / args.bug_id / dir_label
         base.mkdir(parents=True, exist_ok=True)
         n = 0
         while (base / f"run-{n}").exists():
@@ -309,6 +315,8 @@ def cmd_run(args) -> int:
     if args.api_key:
         cmd += ["--api-key", args.api_key]
     cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
+    if use_agent:
+        cmd.append("--agent")
     if getattr(args, "force_full", False):
         cmd.append("--force-full")
     if getattr(args, "full_scan", False):
@@ -320,7 +328,8 @@ def cmd_run(args) -> int:
 
     print()
     print(bold("  fb-bench run  ") + cyan(args.bug_id) +
-          dim(f"  model={model}  max-turns={args.max_turns}"))
+          dim(f"  model={model}  max-turns={args.max_turns}") +
+          (cyan("  [agent]") if use_agent else ""))
     print(dim(f"  exp:       {exp_label}"))
     print(dim(f"  output:    {out_dir}"))
     print()

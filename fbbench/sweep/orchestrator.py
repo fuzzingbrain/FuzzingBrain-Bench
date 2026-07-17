@@ -32,7 +32,7 @@ import time
 from pathlib import Path
 
 from fbbench.grading import capability_set, find_bug, list_bugs
-from fbbench.models import SUPPORTED_MODELS, default_sweep
+from fbbench.models import SUPPORTED_MODELS, default_sweep, strip_agent_label
 from fbbench.paths import REPO
 
 RUNNER = [sys.executable, "-m", "fbbench.runner"]
@@ -76,16 +76,29 @@ def bug_kb(bug: str) -> list[str]:
     return capability_set(bd) if bd else ["reach", "crash", "class", "site"]
 
 
+def _runner_cmd(model: str, bug: str, cd: Path, max_turns: int,
+                preserve_pocs: bool, full_scan: bool) -> list[str]:
+    """Build the `python -m fbbench.runner` argv for one cell.
+
+    `model` may be an agent label (fb-agent-<base>): strip it back to the base
+    model for --model and add --agent, so the cell is driven on the agent arm
+    but its recorded model / dir label stays the agent label."""
+    base = strip_agent_label(model)
+    cmd = RUNNER + ["--bug", bug, "--model", base,
+                    "--max-turns", str(max_turns), "--out-dir", str(cd)]
+    cmd.append("--preserve-pocs" if preserve_pocs else "--no-preserve-pocs")
+    if base != model:
+        cmd.append("--agent")
+    if full_scan:
+        cmd.append("--full-scan")
+    return cmd
+
+
 def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
              timeout: int, preserve_pocs: bool = True,
              full_scan: bool = False) -> dict | None:
     cd = cell_dir(out, bug, model, sample)
-    cmd = RUNNER + ["--bug", bug, "--model", model,
-                    "--max-turns", str(max_turns),
-                    "--out-dir", str(cd)]
-    cmd.append("--preserve-pocs" if preserve_pocs else "--no-preserve-pocs")
-    if full_scan:
-        cmd.append("--full-scan")
+    cmd = _runner_cmd(model, bug, cd, max_turns, preserve_pocs, full_scan)
     try:
         subprocess.run(cmd, cwd=REPO, timeout=timeout,
                        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
@@ -148,6 +161,11 @@ def main() -> int:
     # public repo (it exists only in the private answers repo). Kept as a no-op.
     ap.add_argument("--full-scan", action="store_true", default=True,
                     help=argparse.SUPPRESS)
+    ap.add_argument("--agent", action="store_true",
+                    help="drive every cell through the native AGENT harness "
+                         "(Codex-style loop: plan + test-often + build-and-fuzz). "
+                         "Cells are recorded/aggregated as fb-agent-<model>, a "
+                         "distinct leaderboard arm from the bare tool-loop.")
     ap.add_argument("--max-turns", type=int, default=100,
                     help="turn budget per episode (default 100 for full-scan; diff-scan uses 50)")
     ap.add_argument("--timeout", type=int, default=1800, help="per-episode seconds")
@@ -178,6 +196,12 @@ def main() -> int:
         print(f"  no --exp given; auto-assigned: {exp}")
     out = Path(args.output) / exp
     models = resolve_models(args.models)
+    if args.agent:
+        # Relabel to the agent arm everywhere (dir naming, aggregation,
+        # leaderboard); _runner_cmd strips the label back to the base model and
+        # adds --agent when launching each cell.
+        from fbbench.models import agent_label
+        models = [agent_label(m) for m in models]
     bugs = resolve_bugs(args.bugs)
     samples = [int(s) for s in args.samples.split(",") if s.strip() != ""]
 
@@ -239,11 +263,8 @@ def main() -> int:
                 tag = f"[{i}/{len(cells)}] {model} / {bug} / sample-{sample}"
                 if use_dash:
                     STATUS.cell_start(model, bug, sample, kb)
-                    cmd = RUNNER + ["--bug", bug, "--model", model,
-                                    "--max-turns", str(args.max_turns), "--out-dir", str(cd)]
-                    cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
-                    if args.full_scan:
-                        cmd.append("--full-scan")
+                    cmd = _runner_cmd(model, bug, cd, args.max_turns,
+                                      args.preserve_pocs, args.full_scan)
                     r = run_cell_tailing(cmd, str(REPO), args.timeout,
                                          cd / "episode.jsonl", model, bug, sample)
                     STATUS.cell_finish(model, bug, sample, r)
