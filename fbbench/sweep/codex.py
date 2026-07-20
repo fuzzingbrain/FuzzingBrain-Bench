@@ -32,7 +32,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from fbbench.grading import capability_set, find_bug, list_bugs
+from fbbench.grading import DEFAULT_GRADE_URL, capability_set, find_bug, list_bugs
 from fbbench.paths import REPO
 from fbbench.prompts import CODEX_TASK_PROMPT
 from fbbench.runner.mcp_client import _full_scan_alias
@@ -58,7 +58,7 @@ MAX_TURNS_DEFAULT = 100
 # The canonical challenge images + the remote oracle — the SAME ones the API arm
 # uses. Overridable via env for private/staging registries or oracles.
 IMAGE_PREFIX = os.environ.get("FBBENCH_IMAGE_PREFIX", "docker.io/osanzas/fbbench-challenge-")
-GRADE_URL = os.environ.get("BENCH_GRADE_URL", "https://nonretinal-arletha-arduous.ngrok-free.dev")
+GRADE_URL = os.environ.get("BENCH_GRADE_URL", DEFAULT_GRADE_URL)
 
 # Codex config.toml: hard-disable Codex's own host-side cheat surfaces and point
 # the bench MCP server at the canonical challenge container. {image}/{ws} filled in.

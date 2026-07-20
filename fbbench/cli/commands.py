@@ -84,6 +84,28 @@ def cmd_grade(args) -> int:
     if not blob.is_file():
         sys.exit(red(f"error: blob not found: {blob}"))
 
+    # Preflight: host grading here goes through the remote oracle (this repo
+    # ships no local answer key). List each missing env var on its own line
+    # with what it is and an example value, then a ready-to-copy command —
+    # instead of failing deep inside the oracle.
+    # BENCH_GRADE_URL is internal infrastructure (defaulted inside grade_blob),
+    # not a user knob — deliberately absent here so we never advertise it.
+    required = (
+        ("BENCH_BUG_ID", "which challenge to grade", args.bug_id),
+        ("BENCH_GRADE_REVEAL", "return the capability verdict", "1"),
+    )
+    missing = [(v, desc, ex) for v, desc, ex in required if not os.environ.get(v)]
+    if missing:
+        lines = [red("  grade needs these env vars (this repo has no local oracle):"), ""]
+        width = max(len(v) for v, _, _ in missing)
+        for v, desc, ex in missing:
+            lines.append(f"    {cyan(v.ljust(width))}  {desc:<30s} {dim('e.g. ' + ex)}")
+        blob_ex = args.blob or "<blob>"
+        cmd_parts = [f"{v}={os.environ.get(v) or ex}" for v, _, ex in required]
+        cmd = f"{' '.join(cmd_parts)} ./fb-bench grade {args.bug_id} {blob_ex}"
+        lines += ["", "  example:", dim(f"    {cmd}")]
+        sys.exit("\n".join(lines))
+
     K_b = capability_set(bd)
     is_self = args.blob is None
     label = dim("(self-test, bug's own poc.bin)") if is_self else cyan(str(blob))

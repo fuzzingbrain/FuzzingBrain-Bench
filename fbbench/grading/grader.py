@@ -20,6 +20,11 @@ from fbbench.paths import SERVER
 
 FLAGS = ["reach", "crash", "differential", "class", "site"]
 
+# Single source of truth for the remote grading oracle. Developers switch the
+# endpoint HERE; every caller references this constant (env BENCH_GRADE_URL
+# still overrides at runtime for private/staging oracles).
+DEFAULT_GRADE_URL = "https://nonretinal-arletha-arduous.ngrok-free.dev"
+
 
 def grade_blob(bug_dir: Path, blob: Path, rounds: int = 3,
                server_bin: Path = SERVER, timeout: int = 300) -> tuple[dict, float]:
@@ -41,12 +46,28 @@ def grade_blob(bug_dir: Path, blob: Path, rounds: int = 3,
         env = os.environ.copy()
         env["BENCH_BUG_DIR"] = str(Path(bug_dir).resolve())
         env["BENCH_WORKSPACE"] = str(ws)
+        # The oracle endpoint is internal infrastructure, not a user knob: default
+        # it here so host grading reaches the remote oracle without the caller ever
+        # setting BENCH_GRADE_URL. An explicit env value still wins (staging/private).
+        env.setdefault("BENCH_GRADE_URL", DEFAULT_GRADE_URL)
         t0 = time.time()
         p = subprocess.run([str(server_bin)],
                            input=(json.dumps(req) + "\n").encode(),
                            capture_output=True, env=env, timeout=timeout)
         elapsed = time.time() - t0
-        out = json.loads(p.stdout.decode().strip().splitlines()[-1])
+        lines = p.stdout.decode().strip().splitlines()
+        if not lines:
+            stderr = p.stderr.decode().strip().splitlines()
+            tail = stderr[-1] if stderr else "(no output)"
+            raise RuntimeError(f"grade oracle produced no response: {tail}")
+        out = json.loads(lines[-1])
+        # The server reports failures as a JSON-RPC error object, not a `result`.
+        # Surface its real message (e.g. "BENCH_BUG_ID must be set for remote
+        # grading") instead of letting `out["result"]` blow up as KeyError('result').
+        if "error" in out:
+            err = out["error"] or {}
+            msg = err.get("data") or err.get("message") or err
+            raise RuntimeError(f"grade oracle error: {msg}")
         return out["result"]["structuredContent"], elapsed
     finally:
         shutil.rmtree(ws, ignore_errors=True)
