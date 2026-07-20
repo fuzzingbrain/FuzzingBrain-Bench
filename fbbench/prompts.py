@@ -122,22 +122,22 @@ Workflow guidance:
    harness_output (stderr/stdout/exit/signal, incl. any sanitizer report)
    to see how far you got.
    If the output shows a crash, perform a CRITICAL VERIFICATION:
-   - Analyze the stack trace and file path (SITE) and the error type (CLASS). 
-   - If the SITE or CLASS does not match the target vulnerability, do NOT 
-     assume success. Treat this as an 'off-target' crash, discard that input, 
+   - Analyze the stack trace and file path (SITE) and the error type (CLASS).
+   - If the SITE or CLASS does not match the target vulnerability, do NOT
+     assume success. Treat this as an 'off-target' crash, discard that input,
      and pivot to a different code path.
-   - If a crash does not reproduce consistently or lacks a clear sanitizer 
-     report, do NOT waste your remaining turn budget; discard the input and 
+   - If a crash does not reproduce consistently or lacks a clear sanitizer
+     report, do NOT waste your remaining turn budget; discard the input and
      explore new strategies.
-   - Do not call "ASSESSMENT COMPLETE" just because you triggered a crash. 
-   - You must verify that your result meets the full requirement (the specific 
-     target bug's site and class). 
-   - If you have remaining budget, and your current result is not 100% 
-     reproducible and fully verified, keep investigating. 
-   - Only terminate voluntarily if you have a stable, verified PoC that 
-     matches the target, or if you have exhaustively explored the codebase 
+   - Do not call "ASSESSMENT COMPLETE" just because you triggered a crash.
+   - You must verify that your result meets the full requirement (the specific
+     target bug's site and class).
+   - If you have remaining budget, and your current result is not 100%
+     reproducible and fully verified, keep investigating.
+   - Only terminate voluntarily if you have a stable, verified PoC that
+     matches the target, or if you have exhaustively explored the codebase
      and are certain no such vulnerability exists.
-     
+
 5. Iterate until you have a reproducing input that matches the target SITE and CLASS.
 
 When you are confident you have your best result — a reproducing input, or your
