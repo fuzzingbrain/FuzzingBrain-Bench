@@ -172,6 +172,7 @@ def main() -> int:
             "image": image or "(host mcp-server, --local)",
             "capability_set": sorted(capability_set(bug_dir) or []),
         },
+        "solved": result.solved,
         "capabilities": result.capabilities,
         "capabilities_bestof": result.capabilities_bestof,
         "tier_score": sum(1 for v in result.capabilities.values() if v == "fired"),
