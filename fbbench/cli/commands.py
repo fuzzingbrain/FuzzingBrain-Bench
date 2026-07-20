@@ -175,7 +175,12 @@ def cmd_grade(args) -> int:
                 print(f"    {dim(flag + ':'):<10s} {ev[flag]}")
 
     agreed = r.get("agreed", False)
-    kb_ok = all(caps.get(c) == "fired" for c in K_b) and agreed
+    # Authoritative: the oracle's target_bug_found (a single input reproduced the
+    # full defect). Fall back to caps-all-fired only if the field is absent.
+    if "target_bug_found" in r:
+        kb_ok = bool(r["target_bug_found"])
+    else:
+        kb_ok = all(caps.get(c) == "fired" for c in K_b) and agreed
     summary_color = green if kb_ok else red
     badge = "PASS" if kb_ok else "FAIL"
 
@@ -216,7 +221,10 @@ def cmd_grade_all(args) -> int:
         try:
             r, elapsed = grade_blob(bd, blob, args.rounds)
             caps = r["capabilities"]
-            kb_ok = all(caps.get(c) == "fired" for c in K_b) and r.get("agreed", False)
+            if "target_bug_found" in r:
+                kb_ok = bool(r["target_bug_found"])
+            else:
+                kb_ok = all(caps.get(c) == "fired" for c in K_b) and r.get("agreed", False)
             verdict = "PASS" if kb_ok else "FAIL"
         except Exception:
             verdict, caps, elapsed = "ERR", {}, 0.0

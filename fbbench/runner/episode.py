@@ -264,7 +264,10 @@ def run_episode(
                     # going until max_turns. Unlike force_full this DOES stop early —
                     # but only when the documented defect is actually reproduced.
                     fired = {k for k, v in result.capabilities.items() if v == "fired"}
-                    if not (kb and kb.issubset(fired)):
+                    # Allow a stop only once a single candidate reproduced the full
+                    # target defect (authoritative solve), not a best-single caps
+                    # union — consistent with stop-on-solve and every report.
+                    if not result.solved:
                         messages.append({"role": "user", "content": REQUIRE_PRESET_NUDGE})
                         log({"event": "require_preset_continue", "turn": turn,
                              "would_stop": would_stop, "fired": sorted(fired)})
