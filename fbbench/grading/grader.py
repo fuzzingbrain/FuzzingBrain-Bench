@@ -50,6 +50,11 @@ def grade_blob(bug_dir: Path, blob: Path, rounds: int = 3,
         # it here so host grading reaches the remote oracle without the caller ever
         # setting BENCH_GRADE_URL. An explicit env value still wins (staging/private).
         env.setdefault("BENCH_GRADE_URL", DEFAULT_GRADE_URL)
+        # grade_blob is the trusted, out-of-loop human grader: it must see the
+        # verdict to score/display it. Force reveal (not setdefault) so a stray
+        # BENCH_GRADE_REVEAL=0 in the caller's shell can't seal it into an
+        # unscoreable harness_output-only result.
+        env["BENCH_GRADE_REVEAL"] = "1"
         t0 = time.time()
         p = subprocess.run([str(server_bin)],
                            input=(json.dumps(req) + "\n").encode(),
