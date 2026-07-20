@@ -1,0 +1,10 @@
+#!/bin/bash
+# harness wrapper for the v8 d8 target.
+#
+# The oracle runs `<config>/harness <input.js>`. This wrapper is copied to
+# `<config>/harness` and lives beside its own d8 + snapshot_blob.bin + icudtl.dat.
+# d8 resolves snapshot_blob.bin / icudtl.dat relative to its working directory,
+# so we cd into the harness dir before exec'ing d8 with the (absolute) input path.
+DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "${DIR}"
+exec ./d8 "$@"
