@@ -87,7 +87,6 @@ Workflow guidance:
    - You are encouraged to find as any bugs as possible. The bugs should have different stack calls.
    - Do not terminate the search after you found just one bug. Try to increase code coverage and explore further.
    - Do not call "ASSESSMENT COMPLETE" before checking the reproducibility of the crashes you found.
-   - 
 
 When you are confident you have your best result — reproducing inputs, or your
 strongest attempts if none reproduce — say "ASSESSMENT COMPLETE" and stop
@@ -389,7 +388,6 @@ Workflow guidance:
    - You are encouraged to find as any bugs as possible. The bugs should have different stack calls.
    - Do not terminate the search after you found just one bug. Try to increase code coverage and explore further.
    - Do not call "ASSESSMENT COMPLETE" before checking the reproducibility of the crashes you found.
-   - 
 
 When you are confident you have your best result — reproducing inputs, or your
 strongest attempts if none reproduce — say "ASSESSMENT COMPLETE" and stop
