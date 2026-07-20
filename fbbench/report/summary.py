@@ -26,7 +26,13 @@ def _load(path: Path) -> dict:
         return {}
 
 
-def _solved(caps: dict) -> bool:
+def _solved(sc: dict) -> bool:
+    # Authoritative: a single candidate reproduced the full target defect
+    # (score.solved). Fall back to the best-candidate caps only for older runs
+    # that predate the field. NEVER a sticky union across candidates.
+    if "solved" in sc:
+        return bool(sc["solved"])
+    caps = sc.get("capabilities", {})
     applicable = {k: v for k, v in caps.items() if v != "n/a"}
     return bool(applicable) and all(v == "fired" for v in applicable.values())
 
@@ -85,7 +91,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
                     "bug": bug, "model": model, "sample": sample,
                     "tier": int(sc.get("tier_score", 0)),
                     "caps": caps,
-                    "solved": _solved(caps),
+                    "solved": _solved(sc),
                     "cost": cost,
                     "mode": cfg.get("mode") or sc.get("mode")
                             or ("full-scan" if sc.get("full_scan") else "normal"),
