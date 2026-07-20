@@ -69,6 +69,9 @@ class EpisodeResult:
         "reach": "not_fired", "crash": "not_fired", "differential": "not_fired",
         "class": "not_fired", "site": "not_fired",
     })
+    # The authoritative solve: some SINGLE candidate reproduced the full target
+    # defect (oracle target_bug_found). NOT a sticky union across candidates.
+    solved: bool = False
     turns_used: int = 0
     duration_s: float = 0.0
     input_tokens: int = 0
@@ -133,6 +136,10 @@ def run_episode(
     kb: set[str] = set(capability_set or DEFAULT_KB)
     poc_root: Path | None = Path(pocs_dir) if pocs_dir else None
     grade_idx = 0
+    # Rank of the best SINGLE candidate seen so far — (best-of fired, unanimity
+    # fired, is-target). result.capabilities holds that candidate's verdict, NOT
+    # a union across different inputs.
+    best_cand_key = (-1, -1, -1)
 
     setup_resp = mcp.call("setup", {})
     # Read the sanitizer from the LOCAL bundle: in the canonical path bug_dir is a
@@ -281,6 +288,7 @@ def run_episode(
 
             results: list[ToolResult] = []
             off_target_hit = False  # a crash this turn that is NOT the target defect
+            solved_hit = False      # a candidate this turn that IS the target defect
             for tc in comp.tool_calls:
                 try:
                     out = mcp.call(tc.name, tc.input or {})
@@ -297,48 +305,55 @@ def run_episode(
                     result.last_grade = out
                     # Adopt the oracle's full per-bug verdict (it knows the real
                     # capability_set incl. `differential` and any `n/a` rungs).
-                    # `fired` is sticky: once a rung fires on any candidate it
-                    # stays fired even if a later grade on a worse input doesn't.
                     caps_now = out.get("capabilities", {})          # unanimity
                     bestof_now = out.get("capabilities_bestof") or {}  # best-of
-                    for cap, status in caps_now.items():
-                        if result.capabilities.get(cap) == "fired":
-                            continue
-                        result.capabilities[cap] = status
-                    for cap, status in bestof_now.items():
-                        if result.capabilities_bestof.get(cap) == "fired":
-                            continue
-                        result.capabilities_bestof[cap] = status
+                    target_found = bool(out.get("target_bug_found", False))
+                    if target_found:
+                        result.solved = True
 
-                    # Preserve every graded candidate, bucketed by whether it
-                    # satisfies K_b. The blob lives in the workspace and gets
+                    # Keep the BEST SINGLE candidate — NOT a sticky union across
+                    # different inputs. A union lets inputs that each fire a
+                    # different rung add up to a bogus "solve" no single PoC ever
+                    # achieved; the honest signal is one input's own reach. Rank by
+                    # (best-of fired, unanimity fired, is-target).
+                    cand_key = (sum(1 for v in bestof_now.values() if v == "fired"),
+                                sum(1 for v in caps_now.values() if v == "fired"),
+                                int(target_found))
+                    if cand_key > best_cand_key:
+                        best_cand_key = cand_key
+                        if caps_now:
+                            result.capabilities = dict(caps_now)
+                        if bestof_now:
+                            result.capabilities_bestof = dict(bestof_now)
+
+                    # Preserve every graded candidate, bucketed by whether it IS
+                    # the target defect. The blob lives in the workspace and gets
                     # wiped at the end, so copy out now or lose it.
                     if poc_root is not None:
                         grade_idx += 1
                         src = (tc.input or {}).get("path", "")
                         if src and os.path.isfile(src):
-                            fired_now = {k for k, v in caps_now.items() if v == "fired"}
-                            solved = kb.issubset(fired_now) and bool(kb)
-                            sub = poc_root / ("solved" if solved else "failed")
+                            fired_now = {k for k, v in bestof_now.items() if v == "fired"}
+                            sub = poc_root / ("solved" if target_found else "failed")
                             sub.mkdir(parents=True, exist_ok=True)
                             stem = f"blob-{grade_idx:03d}-turn{turn:02d}"
                             shutil.copy2(src, sub / f"{stem}.bin")
                             (sub / f"{stem}.json").write_text(json.dumps({
                                 "turn": turn,
-                                "tier_score": sum(1 for v in caps_now.values() if v == "fired"),
+                                "tier_score": sum(1 for v in bestof_now.values() if v == "fired"),
                                 "fired": sorted(fired_now),
                                 "k_b": sorted(kb),
-                                "solved": solved,
+                                "solved": target_found,
                                 "agreed": out.get("agreed"),
                             }, indent=2))
 
-                    # Off-target: the input faulted but did NOT reproduce the
-                    # target defect. Flag it (crash-driven — stays silent when
-                    # nothing crashed) so we can steer the model back via a note.
-                    # We read the oracle's own solved bool + best-of crash rung
-                    # here but NEVER surface them (or the rung names) to the model.
-                    if (bestof_now or caps_now).get("crash") == "fired" \
-                            and not out.get("target_bug_found", False):
+                    # Steering flags: a full single-input solve stops the episode;
+                    # an off-target crash (faulted but NOT the target) steers the
+                    # model back. Crash-driven — silent when nothing crashed. Read
+                    # here but NEVER surfaced (field/rung names) to the model.
+                    if target_found:
+                        solved_hit = True
+                    elif (bestof_now or caps_now).get("crash") == "fired":
                         off_target_hit = True
 
                     payload = json.dumps({"harness_output": out.get("harness_output", {})})
@@ -366,6 +381,15 @@ def run_episode(
             # Record the budget note in the transcript so the run is auditable
             # (it's injected into the model's context but not in tool_result).
             tlog({"event": "budget_note", "turn": turn, "note": note})
+            # Stop-on-solve: a single candidate reproduced the full target defect
+            # (target_bug_found). The model is blind to the verdict and cannot know
+            # it succeeded, so the runner ends the episode here — except under
+            # force_full, which deliberately spends the whole budget.
+            if solved_hit and not force_full:
+                result.terminated_reason = "solved"
+                log({"event": "solved", "turn": turn})
+                tlog({"event": "solved", "turn": turn})
+                break
         else:
             result.terminated_reason = "max_turns"
     except Exception as e:

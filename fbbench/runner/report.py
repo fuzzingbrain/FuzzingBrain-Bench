@@ -336,7 +336,13 @@ def build_report_html(run_dir: Path) -> str:
     tags.append(mode)
     tag_html = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags)
 
-    solved = bool(caps) and all(caps.get(k) == "fired" for k in (kb or LADDER))
+    # Authoritative solve: a SINGLE candidate reproduced the full target defect
+    # (score.solved / terminated "solved"). Fall back to the best-candidate caps
+    # for older runs that predate the field. NOT a sticky union across inputs.
+    if "solved" in score:
+        solved = bool(score.get("solved"))
+    else:
+        solved = bool(caps) and all(caps.get(k) == "fired" for k in (kb or LADDER))
     verdict_cls = "g" if solved else ("r" if reason == "error" else "a")
 
     # ---- trajectory rows ----
