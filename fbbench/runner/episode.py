@@ -14,7 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fbbench.prompts import (
-    FORCE_FULL_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
+    FORCE_FULL_NUDGE, OFF_TARGET_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
     budget_note, build_initial_user_message, system_prompt,
 )
 from fbbench.grading.bench_yaml import DEFAULT_KB, harness_sanitizer
@@ -59,6 +59,13 @@ class EpisodeResult:
     bug_id: str
     model: str
     capabilities: dict[str, str] = field(default_factory=lambda: {
+        "reach": "not_fired", "crash": "not_fired", "differential": "not_fired",
+        "class": "not_fired", "site": "not_fired",
+    })
+    # Best-of counterpart: a rung counts fired if it fired on ANY round (vs
+    # `capabilities`, which is unanimity — fired only if every round fired).
+    # Human/report facing only; never enters the model payload.
+    capabilities_bestof: dict[str, str] = field(default_factory=lambda: {
         "reach": "not_fired", "crash": "not_fired", "differential": "not_fired",
         "class": "not_fired", "site": "not_fired",
     })
@@ -273,6 +280,7 @@ def run_episode(
             consecutive_trunc = 0
 
             results: list[ToolResult] = []
+            off_target_hit = False  # a crash this turn that is NOT the target defect
             for tc in comp.tool_calls:
                 try:
                     out = mcp.call(tc.name, tc.input or {})
@@ -291,11 +299,16 @@ def run_episode(
                     # capability_set incl. `differential` and any `n/a` rungs).
                     # `fired` is sticky: once a rung fires on any candidate it
                     # stays fired even if a later grade on a worse input doesn't.
-                    caps_now = out.get("capabilities", {})
+                    caps_now = out.get("capabilities", {})          # unanimity
+                    bestof_now = out.get("capabilities_bestof") or {}  # best-of
                     for cap, status in caps_now.items():
                         if result.capabilities.get(cap) == "fired":
                             continue
                         result.capabilities[cap] = status
+                    for cap, status in bestof_now.items():
+                        if result.capabilities_bestof.get(cap) == "fired":
+                            continue
+                        result.capabilities_bestof[cap] = status
 
                     # Preserve every graded candidate, bucketed by whether it
                     # satisfies K_b. The blob lives in the workspace and gets
@@ -319,6 +332,15 @@ def run_episode(
                                 "agreed": out.get("agreed"),
                             }, indent=2))
 
+                    # Off-target: the input faulted but did NOT reproduce the
+                    # target defect. Flag it (crash-driven — stays silent when
+                    # nothing crashed) so we can steer the model back via a note.
+                    # We read the oracle's own solved bool + best-of crash rung
+                    # here but NEVER surface them (or the rung names) to the model.
+                    if (bestof_now or caps_now).get("crash") == "fired" \
+                            and not out.get("target_bug_found", False):
+                        off_target_hit = True
+
                     payload = json.dumps({"harness_output": out.get("harness_output", {})})
                 else:
                     payload = json.dumps(out)
@@ -335,6 +357,11 @@ def run_episode(
             done_t = turn + 1
             remaining = max_turns - done_t
             note = budget_note(done_t, max_turns, remaining)
+            # An off-target crash this turn: prepend the keep-searching guidance so
+            # the model doesn't mistake the wrong crash for a solve. The verdict
+            # itself is never revealed — only this natural-language steer.
+            if off_target_hit:
+                note = OFF_TARGET_NUDGE + "\n\n" + note
             messages.append({"role": "tool", "results": results, "note": note})
             # Record the budget note in the transcript so the run is auditable
             # (it's injected into the model's context but not in tool_result).
@@ -371,9 +398,10 @@ def run_episode(
             # traj.md). Best-effort: never let it break a completed episode.
             try:
                 from fbbench.runner.traj import write_traj
-                d = os.path.dirname(episode_log)
-                write_traj(os.path.join(d, "transcript.jsonl"), d,
-                           f"{bug_id} / {backend.model}")
+                if episode_log:
+                    d = os.path.dirname(episode_log)
+                    write_traj(os.path.join(d, "transcript.jsonl"), d,
+                               f"{bug_id} / {backend.model}")
             except Exception:
                 pass
         mcp.close()

@@ -87,6 +87,12 @@ class GeminiBackend:
                     parts.append(types.Part(function_response=types.FunctionResponse(
                         name=r.name, response=resp)))
                 contents.append(types.Content(role="user", parts=parts))
+                # Budget note / off-target steer rides after the tool results, as
+                # its own user turn (Gemini has no per-message note slot). Without
+                # this the note channel is silently dropped for Gemini models.
+                if m.get("note"):
+                    contents.append(types.Content(
+                        role="user", parts=[types.Part(text=m["note"])]))
         return contents
 
     def complete(self, system, messages, tools, max_tokens) -> Completion:

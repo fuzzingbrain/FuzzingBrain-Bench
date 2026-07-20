@@ -289,6 +289,7 @@ def build_report_html(run_dir: Path) -> str:
                      else run_dir.name)
     model = score.get("model", "—")
     caps = score.get("capabilities", {})
+    caps_bestof = score.get("capabilities_bestof", {})
     tier = score.get("tier_score", 0)
     reason = score.get("terminated_reason", "—")
     turns = score.get("turns_used", 0)
@@ -369,12 +370,25 @@ def build_report_html(run_dir: Path) -> str:
 
     config_html = _config_html(_config_rows(score, kb, None))
 
+    # Best-of ladder shown alongside the unanimity one (only if the run recorded
+    # it). Unanimity drives the tier score; best-of is the "fired on any round"
+    # view. Both are human/report facing — neither reaches the model.
+    tier_bestof = score.get("tier_score_bestof")
+    ladder_bestof_html = ""
+    if caps_bestof:
+        ladder_bestof_html = (
+            '<div class="sub" style="margin-top:14px">best-of '
+            f'&mdash; fired on any round ({tier_bestof}/5)</div>'
+            + _ladder_html(caps_bestof, kb)
+        )
+
     return _TEMPLATE.format(
         bug=_esc(bug), model=_esc(model), tags=tag_html,
         tier=tier, verdict_cls=verdict_cls,
         turns=turns, ncalls=len(nodes), usd=f"{usd:.4f}",
         config=config_html,
         ladder=_ladder_html(caps, kb),
+        ladder_bestof=ladder_bestof_html,
         reason=_esc(reason), dur=f"{dur:.1f}",
         refus=score.get("refusal_retries", 0), malf=score.get("malformed_retries", 0),
         in_tok=f"{in_tok:,}", out_tok=f"{out_tok:,}", cache_r=f"{cache_r:,}",
@@ -492,7 +506,9 @@ reproducible from these parameters alone.</div>
 {config}
 
 <h2>Capability ladder</h2>
+<div class="sub">unanimity &mdash; a rung counts only if it fired on every round (drives the tier score)</div>
 {ladder}
+{ladder_bestof}
 
 <h2>Breakdown</h2>
 <div class="grid">

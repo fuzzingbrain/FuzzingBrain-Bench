@@ -126,12 +126,23 @@ def cmd_grade(args) -> int:
         sys.exit(red(f"  grade failed: {e}"))
 
     caps = r["capabilities"]
+    caps_bestof = r.get("capabilities_bestof") or {}
     print()
-    print(bold("  results:"))
+    print(bold("  results:") + dim("  (unanimity — fired on every round)"))
     for flag, tier in TIERS:
         status = caps.get(flag, "n/a")
         glyph, word = fmt_status(status, flag in K_b)
         print(f"    {glyph}  {tier}  {flag:<6s}  {word}")
+
+    # Best-of view alongside unanimity (a rung fired on ANY round). Human-facing
+    # only; the model never receives either verdict.
+    if caps_bestof:
+        print()
+        print(bold("  results:") + dim("  (best-of — fired on any round)"))
+        for flag, tier in TIERS:
+            status = caps_bestof.get(flag, "n/a")
+            glyph, word = fmt_status(status, flag in K_b)
+            print(f"    {glyph}  {tier}  {flag:<6s}  {word}")
 
     # The human grader must see at least what the model saw — the raw harness
     # output of its own input — plus the verdict on top. (Server-truncated
