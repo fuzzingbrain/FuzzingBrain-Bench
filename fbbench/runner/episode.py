@@ -407,11 +407,13 @@ def run_episode(
     finally:
         result.duration_s = time.time() - start
         log({"event": "end", "terminated_reason": result.terminated_reason,
-             "capabilities": result.capabilities, "turns_used": result.turns_used,
+             "capabilities": result.capabilities, "solved": result.solved,
+             "turns_used": result.turns_used,
              "duration_s": result.duration_s,
              "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
         tlog({"event": "end", "terminated_reason": result.terminated_reason,
-              "capabilities": result.capabilities, "turns_used": result.turns_used,
+              "capabilities": result.capabilities, "solved": result.solved,
+              "turns_used": result.turns_used,
               "duration_s": result.duration_s,
               "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
         if log_fp:
