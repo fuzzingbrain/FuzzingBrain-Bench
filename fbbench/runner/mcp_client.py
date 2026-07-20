@@ -483,6 +483,9 @@ class MCPClient:
     def __init__(self, server_bin: str, bug_dir: str, workspace: str,
                  oracle_dir: str | None = None, image: str | None = None):
         env = os.environ.copy()
+        self._image = image
+        self._cidfile: str | None = None
+        self._cid_dir: str | None = None
         if image:
             # Canonical path: drive the PUBLIC challenge image's own mcp-server
             # over stdio. The challenge surface + BENCH_* (incl. the remote
@@ -505,7 +508,14 @@ class MCPClient:
             # can score, then strips it before the model sees the grade result.
             # Codex / sealed images do NOT set it, so grade() returns only
             # harness_output there (no verdict leak to the agent).
+            # --cidfile lets us `docker cp` grade candidates out of the live
+            # container (the agent's inputs live in the container's /workspace,
+            # unreachable by a host-side path check). docker requires the file to
+            # not pre-exist, so we hand it a fresh path inside a temp dir.
+            self._cid_dir = tempfile.mkdtemp(prefix="fbcid-")
+            self._cidfile = os.path.join(self._cid_dir, "cid")
             cmd = ["docker", "run", "-i", "--rm",
+                   "--cidfile", self._cidfile,
                    "--security-opt", "seccomp=unconfined",
                    "-e", "BENCH_GRADE_REVEAL=1",
                    image, "mcp-server"]
@@ -551,6 +561,40 @@ class MCPClient:
         resp = self._call("tools/call", {"name": name, "arguments": arguments})
         return resp.get("structuredContent", resp)
 
+    def copy_out(self, path: str, dest) -> bool:
+        """Copy a file the agent produced (a grade candidate) to the host.
+
+        In the canonical docker path the workspace lives inside the container, so
+        a host os.path check always fails — `docker cp` from the live container is
+        the only way to persist the PoC. In the dev/local path the file is already
+        on the host, so a plain copy suffices. Returns True iff the file landed.
+        """
+        dest = str(dest)
+        if self._image:
+            cidfile = self._cidfile
+            if not cidfile:
+                return False
+            try:
+                with open(cidfile) as f:
+                    cid = f.read().strip()
+            except OSError:
+                return False
+            if not cid:
+                return False
+            try:
+                r = subprocess.run(["docker", "cp", f"{cid}:{path}", dest],
+                                   capture_output=True, timeout=30)
+                return r.returncode == 0
+            except Exception:
+                return False
+        try:
+            if os.path.isfile(path):
+                shutil.copy2(path, dest)
+                return True
+        except OSError:
+            pass
+        return False
+
     @staticmethod
     def _clamp_exec_timeout(name: str, arguments: dict) -> dict:
         # Weak models routinely set an absurd exec timeout_s (e.g. 10000s on a
@@ -594,6 +638,8 @@ class MCPClient:
             self._proc.wait(timeout=5)
         except Exception:
             self._proc.kill()
+        if self._cid_dir:
+            shutil.rmtree(self._cid_dir, ignore_errors=True)
 
 
 class MCPToolError(Exception):

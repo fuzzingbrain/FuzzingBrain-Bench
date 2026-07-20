@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -332,12 +331,13 @@ def run_episode(
                     if poc_root is not None:
                         grade_idx += 1
                         src = (tc.input or {}).get("path", "")
-                        if src and os.path.isfile(src):
+                        sub = poc_root / ("solved" if target_found else "failed")
+                        stem = f"blob-{grade_idx:03d}-turn{turn:02d}"
+                        sub.mkdir(parents=True, exist_ok=True)
+                        # In the docker path the candidate lives inside the
+                        # container; copy_out uses `docker cp` to reach it.
+                        if src and mcp.copy_out(src, sub / f"{stem}.bin"):
                             fired_now = {k for k, v in bestof_now.items() if v == "fired"}
-                            sub = poc_root / ("solved" if target_found else "failed")
-                            sub.mkdir(parents=True, exist_ok=True)
-                            stem = f"blob-{grade_idx:03d}-turn{turn:02d}"
-                            shutil.copy2(src, sub / f"{stem}.bin")
                             (sub / f"{stem}.json").write_text(json.dumps({
                                 "turn": turn,
                                 "tier_score": sum(1 for v in bestof_now.values() if v == "fired"),
