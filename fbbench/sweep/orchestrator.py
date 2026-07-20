@@ -70,6 +70,17 @@ def cell_dir(out: Path, bug: str, model: str, sample: int) -> Path:
     return out / bug / model / f"seed-{sample}"
 
 
+def _seed_solved(s: dict) -> bool:
+    """Authoritative per-seed solve: a single candidate reproduced the full
+    target defect (score.solved). Falls back to this seed's own caps for older
+    runs that predate the field. NEVER a union across seeds or candidates."""
+    if "solved" in s:
+        return bool(s["solved"])
+    caps = s.get("capabilities", {})
+    applicable = {k: v for k, v in caps.items() if v != "n/a"}
+    return bool(applicable) and all(v == "fired" for v in applicable.values())
+
+
 def bug_kb(bug: str) -> list[str]:
     """The capability_set (required flags) for a bug, from its bench.yaml."""
     bd = find_bug(bug)
@@ -105,9 +116,13 @@ def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -
         solved = refusals = n = 0
         cost = 0.0
         for bug in bugs:
-            # best-of-seeds union per cell
+            # Coverage columns are best-of-seeds per rung (did the model ever
+            # reach/crash/... on this bug). Solved is NOT a union: it is whether
+            # some SINGLE seed authoritatively solved (score.solved) — a union of
+            # rungs across seeds would fake a solve no single attempt achieved.
             caps = {"reach": False, "crash": False, "differential": False, "class": False, "site": False}
             seen = False
+            bug_solved = False
             for seed in seeds:
                 sj = cell_dir(out, bug, model, seed) / "score.json"
                 if not sj.is_file():
@@ -117,6 +132,7 @@ def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -
                 for k in caps:
                     if s.get("capabilities", {}).get(k) == "fired":
                         caps[k] = True
+                bug_solved = bug_solved or _seed_solved(s)
                 if s.get("terminated_reason") == "refusal":
                     refusals += 1
                 if s.get("total_usd"):
@@ -126,8 +142,7 @@ def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -
             n += 1
             for k in agg:
                 agg[k] += int(caps[k])
-            # solved = every flag in the bug's K_b fired (per bench.yaml).
-            if all(caps[k] for k in bug_kb(bug)):
+            if bug_solved:
                 solved += 1
         print(f"  {model:24s} {f'{solved}/{n}':>7s} {agg['reach']:>6d} "
               f"{agg['crash']:>6d} {agg['differential']:>7d} {agg['class']:>6d} {agg['site']:>6d} "

@@ -417,7 +417,7 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
              r: dict, blobs: list[str], alias: str) -> dict:
     """Re-grade blobs through the remote oracle, write score.json + report."""
     cell_dir.mkdir(parents=True, exist_ok=True)
-    caps, best_blob, ts = _best_caps(alias, blobs)
+    caps, best_blob, ts, solved = _best_caps(alias, blobs)
     if best_blob:
         shutil.copy(best_blob, cell_dir / "best_blob")
     if Path(r["log_path"]).is_file():
@@ -426,7 +426,8 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
     score = {
         "bug_id": bug, "model": model_label(model), "seed": 0,
         "capabilities": caps, "tier_score": ts, "k_b": kb,
-        "solved": all(caps[k] == "fired" for k in kb),
+        # Authoritative target_bug_found from _best_caps — matches the API arm.
+        "solved": solved,
         "terminated_reason": r["terminated"], "turns_used": r["turns"],
         "max_turns": r.get("max_turns"), "duration_s": round(r["duration_s"], 1),
         "grade_calls": r["grade_calls"], "blobs_written": len(blobs),
