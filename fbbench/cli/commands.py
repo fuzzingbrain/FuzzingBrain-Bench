@@ -84,6 +84,29 @@ def cmd_grade(args) -> int:
     if not blob.is_file():
         sys.exit(red(f"error: blob not found: {blob}"))
 
+    # Preflight: host grading here goes through the remote oracle (this repo
+    # ships no local answer key). List each missing env var on its own line
+    # with what it is and an example value, then a ready-to-copy command —
+    # instead of failing deep inside the oracle.
+    # BENCH_GRADE_URL and BENCH_GRADE_REVEAL are internal infrastructure
+    # (defaulted/forced inside grade_blob), not user knobs — deliberately absent
+    # here so we never advertise them. BENCH_BUG_ID is the only thing the user
+    # supplies (which challenge the remote oracle grades against).
+    required = (
+        ("BENCH_BUG_ID", "which challenge to grade", args.bug_id),
+    )
+    missing = [(v, desc, ex) for v, desc, ex in required if not os.environ.get(v)]
+    if missing:
+        lines = [red("  grade needs these env vars (this repo has no local oracle):"), ""]
+        width = max(len(v) for v, _, _ in missing)
+        for v, desc, ex in missing:
+            lines.append(f"    {cyan(v.ljust(width))}  {desc:<30s} {dim('e.g. ' + ex)}")
+        blob_ex = args.blob or "<blob>"
+        cmd_parts = [f"{v}={os.environ.get(v) or ex}" for v, _, ex in required]
+        cmd = f"{' '.join(cmd_parts)} ./fb-bench grade {args.bug_id} {blob_ex}"
+        lines += ["", "  example:", dim(f"    {cmd}")]
+        sys.exit("\n".join(lines))
+
     K_b = capability_set(bd)
     is_self = args.blob is None
     label = dim("(self-test, bug's own poc.bin)") if is_self else cyan(str(blob))
@@ -103,12 +126,45 @@ def cmd_grade(args) -> int:
         sys.exit(red(f"  grade failed: {e}"))
 
     caps = r["capabilities"]
+    caps_bestof = r.get("capabilities_bestof") or {}
     print()
-    print(bold("  results:"))
+    print(bold("  results:") + dim("  (unanimity — fired on every round)"))
     for flag, tier in TIERS:
         status = caps.get(flag, "n/a")
         glyph, word = fmt_status(status, flag in K_b)
         print(f"    {glyph}  {tier}  {flag:<6s}  {word}")
+
+    # Best-of view alongside unanimity (a rung fired on ANY round). Human-facing
+    # only; the model never receives either verdict.
+    if caps_bestof:
+        print()
+        print(bold("  results:") + dim("  (best-of — fired on any round)"))
+        for flag, tier in TIERS:
+            status = caps_bestof.get(flag, "n/a")
+            glyph, word = fmt_status(status, flag in K_b)
+            print(f"    {glyph}  {tier}  {flag:<6s}  {word}")
+
+    # The human grader must see at least what the model saw — the raw harness
+    # output of its own input — plus the verdict on top. (Server-truncated
+    # already: stdout tail 2000, stderr tail 8000.)
+    ho = r.get("harness_output") or {}
+    if ho:
+        print()
+        print(bold("  harness output:")
+              + dim(f"   exit_code={ho.get('exit_code')}  signal={ho.get('signal') or '—'}"))
+        printed = False
+        for stream in ("stdout", "stderr"):
+            text = (ho.get(stream) or "").rstrip("\n")
+            if text:
+                printed = True
+                print(f"    {dim(stream + ':')}")
+                for line in text.splitlines():
+                    print(f"      {line}")
+        # A signal death with no captured output means the harness crashed before
+        # flushing anything (e.g. a spurious startup segfault) — say so, so a blank
+        # block doesn't read as lost/hidden output.
+        if not printed and ho.get("signal"):
+            print(dim("    (no output — harness died on the signal before emitting any)"))
 
     if args.verbose:
         ev = r.get("evidence") or {}
@@ -119,7 +175,12 @@ def cmd_grade(args) -> int:
                 print(f"    {dim(flag + ':'):<10s} {ev[flag]}")
 
     agreed = r.get("agreed", False)
-    kb_ok = all(caps.get(c) == "fired" for c in K_b) and agreed
+    # Authoritative: the oracle's target_bug_found (a single input reproduced the
+    # full defect). Fall back to caps-all-fired only if the field is absent.
+    if "target_bug_found" in r:
+        kb_ok = bool(r["target_bug_found"])
+    else:
+        kb_ok = all(caps.get(c) == "fired" for c in K_b) and agreed
     summary_color = green if kb_ok else red
     badge = "PASS" if kb_ok else "FAIL"
 
@@ -160,7 +221,10 @@ def cmd_grade_all(args) -> int:
         try:
             r, elapsed = grade_blob(bd, blob, args.rounds)
             caps = r["capabilities"]
-            kb_ok = all(caps.get(c) == "fired" for c in K_b) and r.get("agreed", False)
+            if "target_bug_found" in r:
+                kb_ok = bool(r["target_bug_found"])
+            else:
+                kb_ok = all(caps.get(c) == "fired" for c in K_b) and r.get("agreed", False)
             verdict = "PASS" if kb_ok else "FAIL"
         except Exception:
             verdict, caps, elapsed = "ERR", {}, 0.0
@@ -380,7 +444,8 @@ def cmd_traj(args) -> int:
     nodes = build_traj(tr)
     if args.write:
         write_traj(tr, d)
-    grades = [n for n in nodes if n["tool"] == "grade"]
+    from fbbench.runner.traj import GRADE_TOOLS
+    grades = [n for n in nodes if n["tool"] in GRADE_TOOLS]
     hits = [n for n in grades if n["crash"]]
     print()
     print(bold(f"  {len(nodes)} tool calls · {len(grades)} grade() · "

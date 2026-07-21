@@ -72,6 +72,7 @@ class Cell:
     grades: int = 0                 # number of grade() calls so far
     kb: list[str] = field(default_factory=list)   # capability_set (applicable flags)
     caps: dict[str, str] = field(default_factory=dict)  # flag -> fired/not_fired/n-a
+    solved_val: bool | None = None  # authoritative solve (score.solved); None = unknown
     tier: int = 0
     cost: float = 0.0
     reason: str = ""                # terminated_reason
@@ -85,7 +86,11 @@ class Cell:
 
     @property
     def solved(self) -> bool:
-        # solved = every flag the bug declares in its capability_set fired.
+        # Authoritative: a single candidate reproduced the full target defect
+        # (score.solved). Fall back to the caps for older runs that predate the
+        # field. NEVER a sticky union across candidates.
+        if self.solved_val is not None:
+            return self.solved_val
         ks = self.kb or LADDER
         return bool(self.caps) and all(self.caps.get(k) == "fired" for k in ks)
 
@@ -156,6 +161,8 @@ class SweepStatus:
                     c.grades += 1
             elif kind == "end":
                 c.caps = ev.get("capabilities", c.caps)
+                if "solved" in ev:
+                    c.solved_val = bool(ev["solved"])
                 c.reason = ev.get("terminated_reason", c.reason)
                 c.turn = int(ev.get("turns_used", c.turn))
 
@@ -165,6 +172,8 @@ class SweepStatus:
             c.t_end = time.time()
             if score and "error" not in score:
                 c.caps = score.get("capabilities", c.caps)
+                if "solved" in score:
+                    c.solved_val = bool(score["solved"])
                 c.tier = int(score.get("tier_score", 0))
                 c.cost = float(score.get("total_usd") or 0.0)
                 c.reason = score.get("terminated_reason", c.reason)

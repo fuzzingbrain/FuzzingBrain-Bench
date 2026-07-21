@@ -32,7 +32,7 @@ import time
 import urllib.request
 from pathlib import Path
 
-from fbbench.grading import capability_set, find_bug, list_bugs
+from fbbench.grading import DEFAULT_GRADE_URL, capability_set, find_bug, list_bugs
 from fbbench.paths import REPO
 from fbbench.prompts import CODEX_TASK_PROMPT
 from fbbench.runner.mcp_client import _full_scan_alias
@@ -58,7 +58,7 @@ MAX_TURNS_DEFAULT = 100
 # The canonical challenge images + the remote oracle — the SAME ones the API arm
 # uses. Overridable via env for private/staging registries or oracles.
 IMAGE_PREFIX = os.environ.get("FBBENCH_IMAGE_PREFIX", "docker.io/osanzas/fbbench-challenge-")
-GRADE_URL = os.environ.get("BENCH_GRADE_URL", "https://nonretinal-arletha-arduous.ngrok-free.dev")
+GRADE_URL = os.environ.get("BENCH_GRADE_URL", DEFAULT_GRADE_URL)
 
 # Codex config.toml: hard-disable Codex's own host-side cheat surfaces and point
 # the bench MCP server at the canonical challenge container. {image}/{ws} filled in.
@@ -341,32 +341,39 @@ def _candidate_blobs(ws: str) -> list[str]:
 
 
 def _remote_grade(alias: str, data: bytes) -> dict:
-    """POST a candidate blob to the REMOTE oracle; return its capabilities dict."""
+    """POST a candidate blob to the REMOTE oracle; return its full verdict dict
+    (capabilities, capabilities_bestof, target_bug_found, ...)."""
     req = urllib.request.Request(
         f"{GRADE_URL}/grade?bug={alias}", data=data,
         headers={"Content-Type": "application/octet-stream",
                  "ngrok-skip-browser-warning": "true"})
     with urllib.request.urlopen(req, timeout=300) as r:
-        return json.load(r).get("capabilities", {})
+        return json.load(r)
 
 
-def _best_caps(alias: str, blobs: list[str]) -> tuple[dict, str | None, int]:
-    """Re-grade each blob through the REMOTE oracle; keep the highest-scoring one.
+def _best_caps(alias: str, blobs: list[str]) -> tuple[dict, str | None, int, bool]:
+    """Re-grade each blob through the REMOTE oracle; keep the BEST SINGLE blob
+    (never a union across blobs). Returns (caps, blob, tier, solved) where solved
+    is the oracle's target_bug_found for that one blob — the authoritative solve,
+    consistent with the API arm.
 
     Grading goes to the same remote oracle the in-run grade() tool hits, so Codex's
     reported caps are consistent with the canonical path — not a local re-grade that
     could diverge.
     """
-    best: tuple[dict, str | None, int] = (
-        {f: "not_fired" for f in FLAGS}, None, 0)
+    best: tuple[dict, str | None, int, bool] = (
+        {f: "not_fired" for f in FLAGS}, None, 0, False)
     for b in blobs:
         try:
-            caps = _remote_grade(alias, Path(b).read_bytes())
+            resp = _remote_grade(alias, Path(b).read_bytes())
         except Exception:
             continue
+        caps = resp.get("capabilities", {})
+        target = bool(resp.get("target_bug_found", False))
         ts = sum(1 for f in FLAGS if caps.get(f) == "fired")
-        if ts > best[2]:
-            best = ({f: caps.get(f, "not_fired") for f in FLAGS}, b, ts)
+        # Prefer a blob that IS the target, then higher tier.
+        if (int(target), ts) > (int(best[3]), best[2]):
+            best = ({f: caps.get(f, "not_fired") for f in FLAGS}, b, ts, target)
     return best
 
 
@@ -512,7 +519,7 @@ def cmd_one(args) -> int:
     print(f"\n=== {len(blobs)} candidate blob(s) in workspace ===", flush=True)
     for b in blobs:
         print(f"  {os.path.basename(b):30s} ({os.path.getsize(b)}b)")
-    caps, best_blob, ts = _best_caps(alias, blobs)
+    caps, best_blob, ts, solved = _best_caps(alias, blobs)
     if best_blob:
         fired = [f for f in FLAGS if caps[f] == "fired"]
         print(f"\nBEST: {os.path.basename(best_blob)}  fired {fired}", flush=True)
@@ -537,7 +544,7 @@ def cmd_one(args) -> int:
     (cell_dir / "score.json").write_text(json.dumps({
         "bug_id": args.bug_id, "model": MODEL, "seed": 0,
         "capabilities": caps, "tier_score": ts, "k_b": kb,
-        "solved": all(caps[k] == "fired" for k in kb),
+        "solved": solved,
         "terminated_reason": r["terminated"], "turns_used": r["turns"],
         "max_turns": args.max_turns, "duration_s": round(r["duration_s"], 1),
         "grade_calls": r["grade_calls"], "blobs_written": len(blobs),
@@ -579,7 +586,7 @@ def run_sweep_cell(bug: str, timeout_s: int,
     cheated_web = bool(re.search(r"web search:|web_search\b|browser_use|fetch.*http", log_text, re.I))
 
     blobs = _candidate_blobs(work)
-    caps, best_blob, ts = _best_caps(alias, blobs)
+    caps, best_blob, ts, solved = _best_caps(alias, blobs)
 
     if best_blob:
         shutil.copy(best_blob, cell_dir / "best_blob")
@@ -591,7 +598,8 @@ def run_sweep_cell(bug: str, timeout_s: int,
         cost = _codex_cost(rollout)
         (cell_dir / "cost.json").write_text(json.dumps(cost, indent=2))
     kb = capability_set(real)
-    solved = all(caps[k] == "fired" for k in kb)
+    # `solved` is the authoritative target_bug_found from _best_caps — NOT
+    # recomputed from caps-all-fired, so it matches the API arm exactly.
     score = {
         "bug_id": bug, "model": MODEL, "seed": 0,
         "capabilities": caps, "tier_score": ts,

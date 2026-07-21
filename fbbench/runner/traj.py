@@ -17,6 +17,11 @@ import json
 import re
 from pathlib import Path
 
+# The submission/grading tool is advertised as `run_input`; `grade`/`verify_poc`
+# are hidden aliases. Match all three so trajectory grade-call / fault counts
+# aren't silently zero (the server renamed grade() -> run_input).
+GRADE_TOOLS = frozenset({"grade", "run_input", "verify_poc"})
+
 # Markers in a grade()'s raw harness stderr that mean "this input faulted".
 _CRASH_RE = re.compile(
     r"AddressSanitizer|UndefinedBehaviorSanitizer|LeakSanitizer|MemorySanitizer|"
@@ -32,7 +37,7 @@ def _short(s: str, n: int = 90) -> str:
 
 def _arg_summary(tool: str, inp: dict) -> str:
     inp = inp or {}
-    if tool in ("read_file", "list_directory", "grade"):
+    if tool in ("read_file", "list_directory") or tool in GRADE_TOOLS:
         a = inp.get("path", "")
         if tool == "read_file" and (inp.get("offset") or inp.get("limit")):
             a += f" [{inp.get('offset', 0)}:+{inp.get('limit', '')}]"
@@ -74,7 +79,7 @@ def _out_summary(tool: str, result, is_error: bool) -> tuple[str, bool]:
         return "ERROR " + _short(data or "", 70), False
     if not isinstance(result, dict):
         return _short(result, 80), False
-    if tool == "grade":
+    if tool in GRADE_TOOLS:
         return _grade_out(result)
     if tool == "setup":
         return f"bug={result.get('bug_id', '?')}", False
@@ -114,7 +119,7 @@ def build_traj(transcript_path: str | Path) -> list[dict]:
 
 def render_md(nodes: list[dict], header: str = "") -> str:
     out = [f"# Trajectory — {header}".rstrip(" —"), ""]
-    grades = [n for n in nodes if n["tool"] == "grade"]
+    grades = [n for n in nodes if n["tool"] in GRADE_TOOLS]
     hits = [n for n in grades if n["crash"]]
     out.append(f"{len(nodes)} tool calls · {len(grades)} grade() calls · "
                f"{len(hits)} faulted"

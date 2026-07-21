@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fbbench.runner.traj import build_traj, _grade_out
+from fbbench.runner.traj import GRADE_TOOLS, build_traj, _grade_out
 
 LADDER = ["reach", "crash", "differential", "class", "site"]
 
@@ -53,16 +53,20 @@ def _tool_stats(nodes: list[dict]) -> list[tuple[str, int, int]]:
 
 
 def _ladder_html(caps: dict, kb: list[str]) -> str:
+    # Applicability is the ORACLE's call: a tier it does not grade for THIS bug
+    # comes back "n/a". Render straight from caps so the ladder can never disagree
+    # with the tier count — both read the same authoritative dict. kb is NOT
+    # consulted: a local guess (DEFAULT_KB) drifted from the oracle and greyed
+    # tiers the oracle had actually fired (5/5 header, differential shown as ·).
     cells = []
     for k in LADDER:
-        applicable = (not kb) or (k in kb)
         state = caps.get(k)
-        if not applicable or state == "n/a":
-            cls, glyph = "na", "·"
-        elif state == "fired":
+        if state == "fired":
             cls, glyph = "fired", "●"
-        else:
+        elif state == "not_fired":
             cls, glyph = "miss", "○"
+        else:  # "n/a" or absent → not applicable to this bug
+            cls, glyph = "na", "·"
         cells.append(
             f'<div class="rung {cls}"><div class="g">{glyph}</div>'
             f'<div class="k">{_LADDER_LABEL[k]}</div></div>'
@@ -143,7 +147,7 @@ def _result_text(tool: str, result, is_error: bool) -> tuple[str, bool]:
         return "ERROR: " + (str(data) if data else ""), False
     if not isinstance(result, dict):
         return str(result), False
-    if tool == "grade":
+    if tool in GRADE_TOOLS:
         crash = _grade_out(result)[1]
         ho = result.get("harness_output") or {}
         parts = []
@@ -285,6 +289,7 @@ def build_report_html(run_dir: Path) -> str:
                      else run_dir.name)
     model = score.get("model", "—")
     caps = score.get("capabilities", {})
+    caps_bestof = score.get("capabilities_bestof", {})
     tier = score.get("tier_score", 0)
     reason = score.get("terminated_reason", "—")
     turns = score.get("turns_used", 0)
@@ -305,7 +310,15 @@ def build_report_html(run_dir: Path) -> str:
                 kb = sorted(e.get("capability_set", []) or [])
                 break
 
-    grades = [n for n in nodes if n["tool"] == "grade"]
+    # Authoritative applicable K_b comes from the oracle's caps: any tier it does
+    # not grade for this bug is "n/a". Prefer that over the runner's logged
+    # capability_set (a local DEFAULT_KB guess that has drifted). Fall back to the
+    # logged kb only when caps carry no verdict yet (e.g. an aborted run).
+    applicable_kb = [k for k in LADDER if caps.get(k) not in (None, "n/a")]
+    if applicable_kb:
+        kb = applicable_kb
+
+    grades = [n for n in nodes if n["tool"] in GRADE_TOOLS]
     faults = [n for n in grades if n["crash"]]
     tool_rows = _tool_stats(nodes)
 
@@ -323,7 +336,13 @@ def build_report_html(run_dir: Path) -> str:
     tags.append(mode)
     tag_html = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags)
 
-    solved = bool(caps) and all(caps.get(k) == "fired" for k in (kb or LADDER))
+    # Authoritative solve: a SINGLE candidate reproduced the full target defect
+    # (score.solved / terminated "solved"). Fall back to the best-candidate caps
+    # for older runs that predate the field. NOT a sticky union across inputs.
+    if "solved" in score:
+        solved = bool(score.get("solved"))
+    else:
+        solved = bool(caps) and all(caps.get(k) == "fired" for k in (kb or LADDER))
     verdict_cls = "g" if solved else ("r" if reason == "error" else "a")
 
     # ---- trajectory rows ----
@@ -357,12 +376,25 @@ def build_report_html(run_dir: Path) -> str:
 
     config_html = _config_html(_config_rows(score, kb, None))
 
+    # Best-of ladder shown alongside the unanimity one (only if the run recorded
+    # it). Unanimity drives the tier score; best-of is the "fired on any round"
+    # view. Both are human/report facing — neither reaches the model.
+    tier_bestof = score.get("tier_score_bestof")
+    ladder_bestof_html = ""
+    if caps_bestof:
+        ladder_bestof_html = (
+            '<div class="sub" style="margin-top:14px">best-of '
+            f'&mdash; fired on any round ({tier_bestof}/5)</div>'
+            + _ladder_html(caps_bestof, kb)
+        )
+
     return _TEMPLATE.format(
         bug=_esc(bug), model=_esc(model), tags=tag_html,
         tier=tier, verdict_cls=verdict_cls,
         turns=turns, ncalls=len(nodes), usd=f"{usd:.4f}",
         config=config_html,
         ladder=_ladder_html(caps, kb),
+        ladder_bestof=ladder_bestof_html,
         reason=_esc(reason), dur=f"{dur:.1f}",
         refus=score.get("refusal_retries", 0), malf=score.get("malformed_retries", 0),
         in_tok=f"{in_tok:,}", out_tok=f"{out_tok:,}", cache_r=f"{cache_r:,}",
@@ -480,7 +512,9 @@ reproducible from these parameters alone.</div>
 {config}
 
 <h2>Capability ladder</h2>
+<div class="sub">unanimity &mdash; a rung counts only if it fired on every round (drives the tier score)</div>
 {ladder}
+{ladder_bestof}
 
 <h2>Breakdown</h2>
 <div class="grid">

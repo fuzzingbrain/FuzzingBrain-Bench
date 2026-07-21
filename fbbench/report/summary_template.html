@@ -22,7 +22,8 @@ header h1 .m{color:var(--accent);}
 .sub{color:var(--muted);font-size:.95rem;}
 .tag{display:inline-block;font-size:.72rem;background:#1f6feb22;color:var(--accent);
 border:1px solid #1f6feb55;border-radius:20px;padding:3px 11px;margin:0 6px 6px 0;}
-.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin:24px 0 8px;}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:24px 0 8px;}
+.stat .n .den{font-size:.9rem;color:var(--muted);font-weight:600;}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;text-align:center;}
 .stat .n{font-size:1.7rem;font-weight:700;letter-spacing:-.02em;}
 .stat .n.g{color:var(--green)}.stat .n.a{color:var(--accent)}.stat .n.p{color:var(--purple)}
@@ -67,6 +68,8 @@ table.ladder td.rung{font-size:1.05rem;font-weight:700;width:62px;}
 table.ladder td.rung.fired{color:var(--green);}
 table.ladder td.rung.miss{color:#6e7681;}
 table.ladder td.rung.na{color:#39414b;}
+table.ladder td.diff{font-weight:700;font-variant-numeric:tabular-nums;text-align:center;}
+td.diff.d1{color:#10b981}td.diff.d2{color:#84cc16}td.diff.d3{color:#f59e0b}td.diff.d4{color:#f97316}td.diff.d5{color:#ef4444}td.diff.d0{color:var(--muted)}
 table.ladder td.tier{font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap;}
 table.ladder td.tier.solved{color:var(--green);}
 table.ladder td.tier.t0{color:var(--muted);}
@@ -142,6 +145,10 @@ document.getElementById("exp").textContent = D.exp;
 const cells = D.cells || [];
 const done = cells.length;
 const solved = cells.filter(c => c.solved).length;
+// Difficulty-weighted score: each solved bug earns its difficulty D (1..5), so
+// cracking rare hard bugs is worth more. maxScore = sum of D over all 68 bugs.
+const score = cells.filter(c => c.solved).reduce((a,c) => a + (c.d||0), 0);
+const maxScore = D.max_score || 0;
 const errs = cells.filter(c => c.reason === "error").length;
 const elapsed = D.elapsed_s ? fmtDur(D.elapsed_s) : "—";
 function fmtDur(s){s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);
@@ -149,7 +156,9 @@ function fmtDur(s){s=Math.round(s);const h=Math.floor(s/3600),m=Math.floor(s%360
 function stat(n,l,cls=""){return `<div class="stat"><div class="n ${cls}">${n}</div><div class="l">${l}</div></div>`;}
 document.getElementById("stats").innerHTML =
   stat(`${done}`,"cells graded") + stat(`${solved}`,"solved","g") +
-  stat(`${errs}`,"errors", errs?"":"") + stat(`$${(D.total_cost||0).toFixed(2)}`,"total cost","p") +
+  (maxScore ? stat(`${score}<span class="den"> / ${maxScore}</span>`,"difficulty score","p") : "") +
+  (errs ? stat(`${errs}`,"errors") : "") +
+  stat(`$${(D.total_cost||0).toFixed(2)}`,"total cost") +
   stat(elapsed,"elapsed","a");
 
 // --- run configuration panel ---
@@ -181,7 +190,8 @@ for (const c of cells){
 const tally = {};
 for (const m of models){
   const cs = cells.filter(c => c.model === m);
-  tally[m] = { solved: cs.filter(c=>c.solved).length, cost: cs.reduce((a,c)=>a+(c.cost||0),0) };
+  tally[m] = { solved: cs.filter(c=>c.solved).length, cost: cs.reduce((a,c)=>a+(c.cost||0),0),
+               score: cs.filter(c=>c.solved).reduce((a,c)=>a+(c.d||0),0) };
 }
 
 const LADDER_LABEL = {reach:"reach", crash:"crash", differential:"diff", "class":"class", site:"site"};
@@ -204,7 +214,7 @@ function renderLadder(filter){
     const ca=(byKey[a]||{})[m], cb=(byKey[b]||{})[m];
     return (cb?cb.tier:-1)-(ca?ca.tier:-1) || a.localeCompare(b);
   });
-  let head = `<tr><th class="bug">bug (${bugs.length})</th>`;
+  let head = `<tr><th class="bug">bug (${bugs.length})</th><th>D</th>`;
   for (const k of LADDER) head += `<th>${LADDER_LABEL[k]}</th>`;
   head += `<th>tier</th><th>cost</th><th>report</th></tr>`;
   let rows = "";
@@ -212,6 +222,7 @@ function renderLadder(filter){
     const c = (byKey[b]||{})[m];
     const solved = !!(c && c.solved);
     rows += `<tr class="${solved?'solved':''}"><td class="bug">${esc(b)}</td>`;
+    rows += `<td class="diff d${c&&c.d?c.d:0}">${c && c.d ? 'D'+c.d : '—'}</td>`;
     for (const k of LADDER) rows += rungCell(c ? (c.caps||{})[k] : null);
     const tier = c ? c.tier : 0;
     const tcls = solved ? "solved" : (tier===0 ? "t0" : "");
