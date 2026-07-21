@@ -6,7 +6,7 @@ import re
 
 import anthropic
 
-from .base import Completion, ToolCall
+from .base import REQUEST_MAX_RETRIES, REQUEST_TIMEOUT_S, Completion, ToolCall
 
 # Anthropic rejects max_tokens above a model's per-model output ceiling with a
 # 400 (e.g. Haiku caps at 64000, below episode.py's generous 65536 default).
@@ -18,11 +18,12 @@ _MAX_TOKENS_LIMIT_RE = re.compile(r"max_tokens:\s*\d+\s*>\s*(\d+)")
 class AnthropicBackend:
     def __init__(self, model: str, api_key: str | None = None):
         self.model = model
-        # max_retries higher than the SDK default (2) so rate-limit (429/529)
-        # waves recover inside the episode instead of failing it.
+        # timeout bounds a single hung request; max_retries still absorbs a
+        # rate-limit (429/529) wave inside the episode. See base.py for why the
+        # SDK defaults (no timeout, low retries) are unsafe for this loop.
         self._client = anthropic.Anthropic(
             api_key=api_key or os.environ.get("ANTHROPIC_API_KEY"),
-            max_retries=8)
+            timeout=REQUEST_TIMEOUT_S, max_retries=REQUEST_MAX_RETRIES)
         # Discovered per-model output ceiling (None until a 400 reveals it).
         self._max_tokens_cap: int | None = None
 

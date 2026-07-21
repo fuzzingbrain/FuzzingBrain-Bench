@@ -370,6 +370,8 @@ def cmd_run(args) -> int:
            "--model", model,
            "--max-turns", str(args.max_turns),
            "--out-dir", str(out_dir)]
+    if getattr(args, "wall_cap", None) is not None:
+        cmd += ["--wall-cap", str(args.wall_cap)]
     if args.api_key:
         cmd += ["--api-key", args.api_key]
     cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")

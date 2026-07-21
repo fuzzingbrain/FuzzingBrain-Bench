@@ -14,6 +14,19 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
+# Per-request wall-clock ceiling on a single model call, and retry count for
+# transient (rate-limit / 5xx) failures. Without an explicit timeout the SDKs
+# fall back to a ~600s default and, combined with a high retry count, a "slow
+# but not dead" endpoint can pin a single turn for tens of minutes. 300s is
+# generous for xhigh-thinking + 65536-token replies while still bounding a
+# hang; 4 retries still absorbs a rate-limit wave without amplifying a stall.
+# Local (Ollama/vLLM) generation on CPU is legitimately slow, so its backend
+# uses a looser timeout and fewer retries (no server-side rate limits apply).
+REQUEST_TIMEOUT_S = 300.0
+REQUEST_MAX_RETRIES = 4
+LOCAL_REQUEST_TIMEOUT_S = 1200.0
+LOCAL_REQUEST_MAX_RETRIES = 2
+
 
 @dataclass
 class ToolCall:

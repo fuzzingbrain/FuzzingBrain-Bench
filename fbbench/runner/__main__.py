@@ -46,6 +46,10 @@ def main() -> int:
     ap.add_argument("--model", default="claude-opus-4-7", help="model id (claude*/gpt*/gemini*)")
     ap.add_argument("--max-turns", type=int, default=100,
                     help="turn budget per episode (default 100 for full-scan; diff-scan uses 50)")
+    ap.add_argument("--wall-cap", type=float, default=None,
+                    help="episode wall-clock backstop in seconds (default: max_turns*60). "
+                         "A safety net for a stuck endpoint, not a difficulty knob; "
+                         "0 disables it.")
     ap.add_argument("--output", default="runs", help="output root (legacy nesting <output>/<bug>/<model>/)")
     ap.add_argument("--out-dir", default=None,
                     help="literal output dir; takes precedence over --output")
@@ -149,6 +153,7 @@ def main() -> int:
             force_full=args.force_full,
             full_scan=args.full_scan,
             require_preset=args.require_preset,
+            wall_cap_s=args.wall_cap,
         )
     finally:
         if workspace:
@@ -164,6 +169,7 @@ def main() -> int:
         "config": {
             "mode": "full-scan" if args.full_scan else "normal",
             "max_turns": args.max_turns,
+            "wall_cap_s": args.wall_cap if args.wall_cap is not None else args.max_turns * 60.0,
             "full_scan": bool(args.full_scan),
             "force_full": bool(args.force_full),
             "require_preset": bool(args.require_preset),

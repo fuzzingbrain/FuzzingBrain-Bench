@@ -14,7 +14,7 @@ import time
 from google import genai
 from google.genai import types
 
-from .base import Completion, ToolCall
+from .base import REQUEST_TIMEOUT_S, Completion, ToolCall
 
 # Free-tier Gemini keys are tightly rate-limited (low RPM); a multi-turn
 # episode fires many calls fast and hits 429. Retry transient errors with
@@ -52,8 +52,12 @@ def _params(input_schema: dict):
 class GeminiBackend:
     def __init__(self, model: str, api_key: str | None = None):
         self.model = model
+        # HttpOptions.timeout is in MILLISECONDS. Bounds a single hung request;
+        # a client timeout surfaces as a "timeout"/"deadline" error that the
+        # _with_backoff wrapper already classifies as transient and retries.
         self._client = genai.Client(
-            api_key=api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"))
+            api_key=api_key or os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY"),
+            http_options=types.HttpOptions(timeout=int(REQUEST_TIMEOUT_S * 1000)))
         self._n = 0  # synthetic call-id counter
 
     def _to_contents(self, messages: list[dict]) -> list[types.Content]:
