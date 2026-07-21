@@ -1,0 +1,18 @@
+DCM decoder returns zero-dimension image
+=======================================
+
+Project:     ImageMagick (MagickCore, coders/dcm.c)
+Bug class:   Improper input validation (zero columns/rows returned)
+Sanitizer:   libFuzzer (assertion abort when invalid geometry is detected)
+
+A crafted DICOM (`.dcm`) file can bypass intermediate dimension checks in
+`ReadDCMImage` and return an in-memory `Image` with zero columns or rows.
+The decoder appears to succeed, but downstream MagickCore operations that
+assume non-zero geometry can crash (for example division-by-zero during
+resize). Upstream fixed this by rejecting zero-dimension images on the
+final return path of `ReadDCMImage` (GHSA-8pj9-6897-74xc / CVE-2026-49218).
+
+The harness calls `BlobToImage` with the `dcm:` coder — the same entry
+point used when ImageMagick decodes an untrusted DICOM blob. After decode,
+it asserts that every frame in the returned image list has non-zero width
+and height, turning the policy bypass into a deterministic abort.

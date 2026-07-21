@@ -1,0 +1,8 @@
+reach:
+  expected_file: coders/dcm.c
+  expected_function: ReadDCMImage
+  expected_line_range: [3200, 4400]
+
+class:
+  expected: abrt
+  sanitizer: libfuzzer
