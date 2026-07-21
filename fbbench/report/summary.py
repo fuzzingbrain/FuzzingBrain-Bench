@@ -16,7 +16,23 @@ import json
 from pathlib import Path
 
 _TEMPLATE = Path(__file__).with_name("summary_template.html")
+_DIFFICULTY = Path(__file__).with_name("difficulty.json")
 LADDER = ["reach", "crash", "differential", "class", "site"]
+
+
+def _load_difficulty() -> tuple[dict, int]:
+    """Per-bug difficulty D (1..5) + the max score (sum of D over all 68 bugs).
+
+    D comes from the published N=8 pyramid (D = 5 - ceil(S/2), S = # of the 8
+    frontier runs that solved the bug). A model's Score = sum of D over the bugs
+    it solved — solving rare hard bugs is worth more. Answer-safe: difficulty is
+    an aggregate solve-rate, not any bug's PoC/fault.
+    """
+    try:
+        d = json.loads(_DIFFICULTY.read_text())
+        return d.get("difficulty", {}), int(d.get("max_score", 0))
+    except Exception:
+        return {}, 0
 
 
 def _load(path: Path) -> dict:
@@ -67,6 +83,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
     models = models or s_models
     samples = samples if samples is not None else s_samples
 
+    difficulty, max_score = _load_difficulty()
     cells = []
     cost_sum = 0.0
     cfg_seen: dict[str, set] = {}     # config key -> set of values seen across cells
@@ -90,6 +107,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
                 cells.append({
                     "bug": bug, "model": model, "sample": sample,
                     "tier": int(sc.get("tier_score", 0)),
+                    "d": int(difficulty.get(bug, 0)),  # published difficulty 1..5
                     "caps": caps,
                     "solved": _solved(sc),
                     "cost": cost,
@@ -126,6 +144,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
         "config": config,
         "total_cost": total_cost if total_cost is not None else cost_sum,
         "elapsed_s": elapsed_s,
+        "max_score": max_score,
         "cells": cells,
     }
 
