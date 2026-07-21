@@ -20,7 +20,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from fbbench.runner.traj import build_traj, _grade_out
+from fbbench.runner.traj import GRADE_TOOLS, build_traj, _grade_out
 
 LADDER = ["reach", "crash", "differential", "class", "site"]
 
@@ -147,7 +147,7 @@ def _result_text(tool: str, result, is_error: bool) -> tuple[str, bool]:
         return "ERROR: " + (str(data) if data else ""), False
     if not isinstance(result, dict):
         return str(result), False
-    if tool == "grade":
+    if tool in GRADE_TOOLS:
         crash = _grade_out(result)[1]
         ho = result.get("harness_output") or {}
         parts = []
@@ -318,7 +318,7 @@ def build_report_html(run_dir: Path) -> str:
     if applicable_kb:
         kb = applicable_kb
 
-    grades = [n for n in nodes if n["tool"] == "grade"]
+    grades = [n for n in nodes if n["tool"] in GRADE_TOOLS]
     faults = [n for n in grades if n["crash"]]
     tool_rows = _tool_stats(nodes)
 

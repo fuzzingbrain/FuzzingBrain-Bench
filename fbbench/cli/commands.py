@@ -444,7 +444,8 @@ def cmd_traj(args) -> int:
     nodes = build_traj(tr)
     if args.write:
         write_traj(tr, d)
-    grades = [n for n in nodes if n["tool"] == "grade"]
+    from fbbench.runner.traj import GRADE_TOOLS
+    grades = [n for n in nodes if n["tool"] in GRADE_TOOLS]
     hits = [n for n in grades if n["crash"]]
     print()
     print(bold(f"  {len(nodes)} tool calls · {len(grades)} grade() · "
