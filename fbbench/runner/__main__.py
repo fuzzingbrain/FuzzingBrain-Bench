@@ -61,12 +61,6 @@ def main() -> int:
     # `--full-scan` is kept as an accepted no-op (callers/orchestrator pass it).
     ap.add_argument("--full-scan", action="store_true", default=True,
                     help=argparse.SUPPRESS)
-    ap.add_argument("--require-preset", action="store_true",
-                    help="force-preset mode: an off-target crash (different "
-                         "stack/site/class than the documented bug) does NOT end the "
-                         "episode. The agent is pushed to keep iterating until the "
-                         "preset capability set fires, or --max-turns is hit. Works "
-                         "with normal, --full-scan, and diff-scan.")
     ap.add_argument("--server-bin", default=None,
                     help="path to mcp-server binary (default: ./bin/mcp-server)")
     ap.add_argument("--repo-root", default=None,
@@ -148,7 +142,6 @@ def main() -> int:
             pocs_dir=str(pocs_dir) if pocs_dir else None,
             force_full=args.force_full,
             full_scan=args.full_scan,
-            require_preset=args.require_preset,
         )
     finally:
         if workspace:
@@ -166,7 +159,6 @@ def main() -> int:
             "max_turns": args.max_turns,
             "full_scan": bool(args.full_scan),
             "force_full": bool(args.force_full),
-            "require_preset": bool(args.require_preset),
             "preserve_pocs": bool(args.preserve_pocs),
             "grading": "local-oracle" if args.local else "remote-oracle",
             "image": image or "(host mcp-server, --local)",

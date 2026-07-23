@@ -3,7 +3,7 @@ of natural-language text the benchmark sends to a model.
 
 This covers the whole conversation surface:
   - the API-runner system prompt + initial user turn (`fbbench.runner.episode`),
-  - the mid-episode nudges (truncation / force-full / require-preset / budget),
+  - the mid-episode nudges (truncation / force-full / off-target / budget),
   - the full-scan "no description" notice (`fbbench.runner.mcp_client`),
   - the Codex-CLI arm's task prompt (`fbbench.sweep.codex`).
 The MCP TOOL surface (tool descriptions/params, tool errors, the synthDescription
@@ -371,16 +371,6 @@ tool now.)""",
     when="The model's reply was cut off (token limit) before it made any tool call.",
     why="Asks it to be concise and call a tool, instead of burning the turn on prose.")
 
-REQUIRE_PRESET_NUDGE = _reg("require_preset_nudge", """
-Do NOT stop. If your input crashed, it is NOT the specific defect this task \
-targets — a crash at a different location or of a different type (different \
-stack/site/class) does not count. Study the target further and produce a NEW \
-input that triggers the intended fault. Keep iterating.""",
-    when="Force-preset mode: the model tries to stop but the bug's full capability "
-         "set (the intended class AND site) has not fired yet.",
-    why="An off-target crash must not count — push the model to keep iterating "
-        "toward the specific documented defect.")
-
 FORCE_FULL_NUDGE = _reg("force_full_nudge", """
 Do NOT stop yet. Keep hunting for a stronger result: write a NEW candidate input \
 different from your previous attempts and call run_input() now, and study its \
@@ -576,11 +566,13 @@ def derived_prompts() -> list[Prompt]:
 
 
 # ===========================================================================
-# DEPRECATED — normal mode (bug description given) and diff-scan mode.
+# DEPRECATED — normal mode (bug description given), diff-scan mode, and the
+# retired require-preset nudge.
 #
 # Only FULL-SCAN is an active mode. The prompts and builders below drive the two
-# retired modes and are NOT part of the live pipeline. They are kept here (moved
-# out of the main body, not deleted) for reference / possible revival.
+# retired modes (plus one retired mid-episode nudge) and are NOT part of the live
+# pipeline. They are kept here (moved out of the main body, not deleted) for
+# reference / possible revival.
 #
 # NOTE: `build_initial_user_message` (above) still references _INITIAL_USER_TMPL
 # for its full_scan=False branch; if these two modes are removed for good, drop
@@ -665,3 +657,20 @@ def build_diffscan_message(files: list[str], setup_resp: dict) -> str:
         context=bug_context(setup_resp),
         scope=scope, listing=listing,
         setup_json=json.dumps(_fullscan_safe_setup(setup_resp), indent=2))
+
+
+# --- DEPRECATED: retired mid-episode nudge (force-preset mode) ---
+# Single-target framing that clashes with the breadth goal (find as many distinct
+# crashes as possible) and leaks the hidden target's class/site. The require_preset
+# runner mode was removed; this text is kept for reference and is NEVER sent.
+REQUIRE_PRESET_NUDGE = _reg("require_preset_nudge", """
+Do NOT stop. If your input crashed, it is NOT the specific defect this task \
+targets — a crash at a different location or of a different type (different \
+stack/site/class) does not count. Study the target further and produce a NEW \
+input that triggers the intended fault. Keep iterating.""",
+    when="RETIRED — no longer wired into the runner. (Was: force-preset mode, "
+         "when the model tried to stop before the intended class AND site fired.)",
+    why="RETIRED: single-target framing that clashes with the breadth goal (find "
+        "as many distinct crashes as possible) and leaks the hidden target's "
+        "class/site. The require_preset mode was removed from the runner; the text "
+        "is kept only for reference and is never sent.")

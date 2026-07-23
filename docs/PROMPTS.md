@@ -12,7 +12,6 @@ Every string the benchmark sends to a model lives in `prompts.py`; each is liste
 - [`bug_context`](#bug-context) — dynamic
 - [`initial_user_message_fullscan`](#initial-user-message-fullscan) — dynamic
 - [`truncation_nudge`](#truncation-nudge) — fixed
-- [`require_preset_nudge`](#require-preset-nudge) — fixed
 - [`force_full_nudge`](#force-full-nudge) — fixed
 - [`off_target_nudge`](#off-target-nudge) — fixed
 - [`budget_note`](#budget-note) — dynamic
@@ -23,6 +22,7 @@ Every string the benchmark sends to a model lives in `prompts.py`; each is liste
 - [`diffscan_scope_one`](#diffscan-scope-one) — fixed
 - [`diffscan_scope_many`](#diffscan-scope-many) — dynamic
 - [`initial_user_message_diffscan`](#initial-user-message-diffscan) — dynamic
+- [`require_preset_nudge`](#require-preset-nudge) — fixed
 - [`bug_context_example_c_asan`](#bug-context-example-c-asan) — assembled
 - [`bug_context_example_jvm_jazzer`](#bug-context-example-jvm-jazzer) — assembled
 - [`bug_context_example_libfuzzer`](#bug-context-example-libfuzzer) — assembled
@@ -148,17 +148,6 @@ signal), and iterate.
 
 ```
 (Your previous reply was cut off before any tool call. Be concise and call a tool now.)
-```
-
-
-## `require_preset_nudge`
-
-- **When**: Force-preset mode: the model tries to stop but the bug's full capability set (the intended class AND site) has not fired yet.
-- **Why**: An off-target crash must not count — push the model to keep iterating toward the specific documented defect.
-- **Type**: fixed
-
-```
-Do NOT stop. If your input crashed, it is NOT the specific defect this task targets — a crash at a different location or of a different type (different stack/site/class) does not count. Study the target further and produce a NEW input that triggers the intended fault. Keep iterating.
 ```
 
 
@@ -315,6 +304,17 @@ The MCP `setup()` you just queried returned (description-bearing fields withheld
 {setup_json}
 
 Produce a triggering input and call `run_input()` to test it; read the raw harness output as feedback.
+```
+
+
+## `require_preset_nudge`
+
+- **When**: RETIRED — no longer wired into the runner. (Was: force-preset mode, when the model tried to stop before the intended class AND site fired.)
+- **Why**: RETIRED: single-target framing that clashes with the breadth goal (find as many distinct crashes as possible) and leaks the hidden target's class/site. The require_preset mode was removed from the runner; the text is kept only for reference and is never sent.
+- **Type**: fixed
+
+```
+Do NOT stop. If your input crashed, it is NOT the specific defect this task targets — a crash at a different location or of a different type (different stack/site/class) does not count. Study the target further and produce a NEW input that triggers the intended fault. Keep iterating.
 ```
 
 

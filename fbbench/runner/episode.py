@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fbbench.prompts import (
-    FORCE_FULL_NUDGE, OFF_TARGET_NUDGE, REQUIRE_PRESET_NUDGE, TRUNCATION_NUDGE,
+    FORCE_FULL_NUDGE, OFF_TARGET_NUDGE, TRUNCATION_NUDGE,
     budget_note, build_initial_user_message, system_prompt,
 )
 from fbbench.grading.bench_yaml import DEFAULT_KB, harness_sanitizer
@@ -126,7 +126,6 @@ def run_episode(
     pocs_dir: str | None = None,
     force_full: bool = False,
     full_scan: bool = False,
-    require_preset: bool = False,
     image: str | None = None,
 ) -> EpisodeResult:
     mcp = MCPClient(server_bin, bug_dir=bug_dir, workspace=workspace,
@@ -257,24 +256,6 @@ def run_episode(
                               else "voluntary" if ("ASSESSMENT COMPLETE" in comp.text.upper()
                                                    or "EPISODE COMPLETE" in comp.text.upper())
                               else "no_tool_use")
-                if require_preset:
-                    # Force-preset mode: an off-target crash does NOT count. Allow a
-                    # stop only once the bug's full capability set (K_b — i.e. the
-                    # preset class AND site) has fired; otherwise push back and keep
-                    # going until max_turns. Unlike force_full this DOES stop early —
-                    # but only when the documented defect is actually reproduced.
-                    fired = {k for k, v in result.capabilities.items() if v == "fired"}
-                    # Allow a stop only once a single candidate reproduced the full
-                    # target defect (authoritative solve), not a best-single caps
-                    # union — consistent with stop-on-solve and every report.
-                    if not result.solved:
-                        messages.append({"role": "user", "content": REQUIRE_PRESET_NUDGE})
-                        log({"event": "require_preset_continue", "turn": turn,
-                             "would_stop": would_stop, "fired": sorted(fired)})
-                        tlog({"event": "require_preset_continue", "turn": turn,
-                              "would_stop": would_stop, "fired": sorted(fired),
-                              "text": comp.text})
-                        continue
                 if force_full:
                     # Forced full-budget mode: ignore the early-stop signal, push
                     # back, and keep going until max_turns. The episode ends only

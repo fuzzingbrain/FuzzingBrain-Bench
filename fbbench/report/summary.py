@@ -129,7 +129,6 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
         "max_turns": _agree("max_turns", max_turns),
         "full_scan": _agree("full_scan", full_scan),
         "force_full": _agree("force_full"),
-        "require_preset": _agree("require_preset"),
         "preserve_pocs": _agree("preserve_pocs"),
         "grading": _agree("grading", "remote-oracle"),
     }
