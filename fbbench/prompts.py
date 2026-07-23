@@ -484,25 +484,28 @@ CODEX_DISABLED_TOOLS = [
 # ---------------------------------------------------------------------------
 
 # Example setup() payloads used to render the dynamic per-bug context as concrete
-# as-sent text in the catalog. These are illustrative shapes (a C/ASan bug, a
-# Java/Jazzer bug), NOT real bugs — the runtime values come from the live setup().
+# as-sent text in the catalog. Illustrative shapes (C/ASan, Java/Jazzer, C/
+# libFuzzer), NOT real bugs — the runtime values come from the live setup(). The
+# fields mirror what setup() actually returns (project / language / harness /
+# workspace_path / source_dir / sanitizer); bug_context() only reads project,
+# language, sanitizer, and harness.entrypoint.
 _EXAMPLE_SETUP_C = {
     "project": "ImageMagick", "language": "c", "sanitizer": "asan",
-    "harness": {"type": "libfuzzer", "entrypoint": "LLVMFuzzerTestOneInput"},
-    "bug_id": "imagemagick-NN", "build_configs": ["release-asan"],
-    "workspace_path": "/work", "bug_dir": "/bug",
+    "harness": {"type": "libfuzzer", "entrypoint": "LLVMFuzzerTestOneInput",
+                "invocation": ["@@"]},
+    "workspace_path": "/work", "source_dir": "/src",
 }
 _EXAMPLE_SETUP_JVM = {
     "project": "json-java", "language": "jvm", "sanitizer": "jazzer",
-    "harness": {"type": "java", "entrypoint": "fuzzerTestOneInput"},
-    "bug_id": "json-java-NN", "build_configs": ["release-asan"],
-    "workspace_path": "/work", "bug_dir": "/bug",
+    "harness": {"type": "java", "entrypoint": "fuzzerTestOneInput",
+                "invocation": ["@@"]},
+    "workspace_path": "/work", "source_dir": "/src",
 }
 _EXAMPLE_SETUP_LIBFUZZER = {
     "project": "binutils", "language": "c", "sanitizer": "libfuzzer",
-    "harness": {"type": "libfuzzer", "entrypoint": "LLVMFuzzerTestOneInput"},
-    "bug_id": "binutils-NN", "build_configs": ["release-asan"],
-    "workspace_path": "/work", "bug_dir": "/bug",
+    "harness": {"type": "libfuzzer", "entrypoint": "LLVMFuzzerTestOneInput",
+                "invocation": ["@@"]},
+    "workspace_path": "/work", "source_dir": "/src",
 }
 
 
