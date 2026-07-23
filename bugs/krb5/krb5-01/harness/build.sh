@@ -35,7 +35,7 @@ clang \
     "${SRC}/harness/harness.c" \
     "${SRC}/krb5/src/lib/gssapi/.libs/libgssapi_krb5.a" \
     "${SRC}/krb5/src/lib/krb5/.libs/libkrb5.a" \
-    "${SRC}/krb5/src/lib/k5crypto/.libs/libk5crypto.a" \
+    "${SRC}/krb5/src/lib/crypto/.libs/libk5crypto.a" \
     "${SRC}/krb5/src/lib/com_err/.libs/libcom_err.a" \
     "${SRC}/krb5/src/util/support/.libs/libkrb5support.a" \
     -lpthread \
