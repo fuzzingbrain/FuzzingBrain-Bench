@@ -52,9 +52,11 @@ def main() -> int:
     ap.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                     help="save every graded candidate blob into pocs/{solved,failed}/ "
                          "(default on; pass --no-preserve-pocs to disable)")
-    ap.add_argument("--force-full", action="store_true",
-                    help="ignore voluntary/no-tool-use early stops; run the full "
-                         "--max-turns budget (nudges the model to keep iterating)")
+    ap.add_argument("--no-stop-on-solve", dest="stop_on_solve",
+                    action="store_false", default=True,
+                    help="do NOT end the episode when the target defect is first "
+                         "reproduced; let the agent keep hunting for more crashes "
+                         "until it stops (ASSESSMENT COMPLETE) or --max-turns")
     # The public benchmark is ALWAYS blind (full-scan): the bug description is
     # withheld and the agent must discover a crashing input. Normal (hinted) mode
     # is removed from the public repo — it exists only in the private answers repo.
@@ -140,7 +142,7 @@ def main() -> int:
             episode_log=str(out_dir / "episode.jsonl"),
             capability_set=capability_set(bug_dir),
             pocs_dir=str(pocs_dir) if pocs_dir else None,
-            force_full=args.force_full,
+            stop_on_solve=args.stop_on_solve,
             full_scan=args.full_scan,
         )
     finally:
@@ -158,7 +160,7 @@ def main() -> int:
             "mode": "full-scan" if args.full_scan else "normal",
             "max_turns": args.max_turns,
             "full_scan": bool(args.full_scan),
-            "force_full": bool(args.force_full),
+            "stop_on_solve": bool(args.stop_on_solve),
             "preserve_pocs": bool(args.preserve_pocs),
             "grading": "local-oracle" if args.local else "remote-oracle",
             "image": image or "(host mcp-server, --local)",

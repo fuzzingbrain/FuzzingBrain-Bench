@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from fbbench.prompts import (
-    FORCE_FULL_NUDGE, OFF_TARGET_NUDGE, TRUNCATION_NUDGE,
+    KEEP_HUNTING_NUDGE, TRUNCATION_NUDGE,
     budget_note, build_initial_user_message, system_prompt,
 )
 from fbbench.grading.bench_yaml import DEFAULT_KB, harness_sanitizer
@@ -124,7 +124,7 @@ def run_episode(
     oracle_dir: str | None = None,
     capability_set: list[str] | None = None,
     pocs_dir: str | None = None,
-    force_full: bool = False,
+    stop_on_solve: bool = True,
     full_scan: bool = False,
     image: str | None = None,
 ) -> EpisodeResult:
@@ -256,22 +256,13 @@ def run_episode(
                               else "voluntary" if ("ASSESSMENT COMPLETE" in comp.text.upper()
                                                    or "EPISODE COMPLETE" in comp.text.upper())
                               else "no_tool_use")
-                if force_full:
-                    # Forced full-budget mode: ignore the early-stop signal, push
-                    # back, and keep going until max_turns. The episode ends only
-                    # when the turn budget is exhausted.
-                    messages.append({"role": "user", "content": FORCE_FULL_NUDGE})
-                    log({"event": "force_continue", "turn": turn, "would_stop": would_stop})
-                    tlog({"event": "force_continue", "turn": turn,
-                          "would_stop": would_stop, "text": comp.text})
-                    continue
                 result.terminated_reason = would_stop
                 break
             consecutive_trunc = 0
 
             results: list[ToolResult] = []
-            off_target_hit = False  # a crash this turn that is NOT the target defect
-            solved_hit = False      # a candidate this turn that IS the target defect
+            crashed_hit = False  # a crash fired this turn (not the target solve)
+            solved_hit = False   # a candidate this turn that IS the target defect
             for tc in comp.tool_calls:
                 try:
                     out = mcp.call(tc.name, tc.input or {})
@@ -331,14 +322,15 @@ def run_episode(
                                 "agreed": out.get("agreed"),
                             }, indent=2))
 
-                    # Steering flags: a full single-input solve stops the episode;
-                    # an off-target crash (faulted but NOT the target) steers the
-                    # model back. Crash-driven — silent when nothing crashed. Read
-                    # here but NEVER surfaced (field/rung names) to the model.
+                    # Steering flags: a full single-input solve stops the episode
+                    # (when stop_on_solve); any other crash triggers the breadth
+                    # "keep hunting" nudge. Crash-driven — silent when nothing
+                    # crashed. target_found is read for SCORING only and is NEVER
+                    # surfaced to the model.
                     if target_found:
                         solved_hit = True
                     elif (bestof_now or caps_now).get("crash") == "fired":
-                        off_target_hit = True
+                        crashed_hit = True
 
                     payload = json.dumps({"harness_output": out.get("harness_output", {})})
                 else:
@@ -356,20 +348,21 @@ def run_episode(
             done_t = turn + 1
             remaining = max_turns - done_t
             note = budget_note(done_t, max_turns, remaining)
-            # An off-target crash this turn: prepend the keep-searching guidance so
-            # the model doesn't mistake the wrong crash for a solve. The verdict
-            # itself is never revealed — only this natural-language steer.
-            if off_target_hit:
-                note = OFF_TARGET_NUDGE + "\n\n" + note
+            # A crash this turn (that did not end the episode): prepend the breadth
+            # "keep hunting for more distinct crashes" nudge. Positive + leak-free —
+            # it never reveals whether the crash was the hidden target.
+            if crashed_hit:
+                note = KEEP_HUNTING_NUDGE + "\n\n" + note
             messages.append({"role": "tool", "results": results, "note": note})
             # Record the budget note in the transcript so the run is auditable
             # (it's injected into the model's context but not in tool_result).
             tlog({"event": "budget_note", "turn": turn, "note": note})
-            # Stop-on-solve: a single candidate reproduced the full target defect
-            # (target_bug_found). The model is blind to the verdict and cannot know
-            # it succeeded, so the runner ends the episode here — except under
-            # force_full, which deliberately spends the whole budget.
-            if solved_hit and not force_full:
+            # Stop-on-solve (default; disable with --no-stop-on-solve): a single
+            # candidate reproduced the full target defect (target_bug_found). The
+            # model is blind to the verdict and cannot know it succeeded, so the
+            # runner ends the episode here. With stop_on_solve off, the episode
+            # instead runs until the agent stops (ASSESSMENT COMPLETE) or budget.
+            if solved_hit and stop_on_solve:
                 result.terminated_reason = "solved"
                 log({"event": "solved", "turn": turn})
                 tlog({"event": "solved", "turn": turn})

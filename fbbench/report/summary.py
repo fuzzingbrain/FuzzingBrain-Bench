@@ -128,7 +128,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
         "mode": _agree("mode", "full-scan" if full_scan else "normal"),
         "max_turns": _agree("max_turns", max_turns),
         "full_scan": _agree("full_scan", full_scan),
-        "force_full": _agree("force_full"),
+        "stop_on_solve": _agree("stop_on_solve"),
         "preserve_pocs": _agree("preserve_pocs"),
         "grading": _agree("grading", "remote-oracle"),
     }
