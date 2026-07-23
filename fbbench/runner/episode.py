@@ -143,10 +143,9 @@ def run_episode(
     # Read the sanitizer from the LOCAL bundle: in the canonical path bug_dir is a
     # container path ("/src"); the host-side bug bundle is oracle_dir.
     backfill_sanitizer(setup_resp, oracle_dir or bug_dir)
-    bug_desc = setup_resp.get("task", setup_resp.get("bug_desc", ""))
-    # full_scan: description.txt is not staged, so bug_desc is empty; the message
-    # builder switches to the no-description "find a crash" prompt.
-    user_text = build_initial_user_message(bug_desc, setup_resp, full_scan=full_scan)
+    # setup() no longer ships a task/description field — the task is conveyed by
+    # the system prompt — so no bug description is read here (full-scan is blind).
+    user_text = build_initial_user_message("", setup_resp, full_scan=full_scan)
     sysp = system_prompt(full_scan=full_scan)
 
     messages: list[dict] = [{"role": "user", "content": user_text}]

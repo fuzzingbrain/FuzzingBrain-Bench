@@ -68,43 +68,20 @@ func (s *server) loadBench() (*benchYAML, error) {
 	return &b, nil
 }
 
-// synthDescription builds a minimal task prompt from public bench.yaml fields
-// for bugs that ship no description.txt. The agent still has the harness source
-// and grade() feedback to work from.
-func synthDescription(b *benchYAML) string {
-	out := b.Title + "\n\n"
-	out += fmt.Sprintf("Project: %s\n", b.Project)
-	if b.UpstreamReport != "" {
-		out += "Upstream report: " + b.UpstreamReport + "\n"
-	}
-	out += "\n(No long-form description ships for this bug; reconstruct it from the " +
-		"harness source and the project source under src/, then drive the " +
-		"sanitizer-instrumented harness until your input makes it crash.)\n"
-	if b.Notes != "" {
-		out += "\nNotes:\n" + b.Notes + "\n"
-	}
-	return out
-}
-
 func (s *server) toolSetup(_ []byte) (any, error) {
 	bench, err := s.loadBench()
 	if err != nil {
 		return nil, err
 	}
-	descPath := filepath.Join(s.metaDir, "description.txt")
-	desc, err := os.ReadFile(descPath)
-	if err != nil {
-		// Fallback for bugs that ship no description.txt: synthesize a task
-		// prompt from public bench.yaml fields so the episode can still run.
-		desc = []byte(synthDescription(bench))
-	}
 	out := map[string]any{
-		// Neutral, non-benchmark framing: "task" (not "bug_desc") + "source_dir"
-		// (not "bug_dir"), and no case alias ("bug_id") — a real audit target
-		// hands you source + a harness, not a catalogued bug identifier.
-		"task": string(desc),
+		// No "task"/description field: the task is conveyed entirely by the
+		// system prompt, so setup() ships none (this also removes the old
+		// description.txt fallback, which leaked a benchmark framing). Neutral
+		// naming throughout: "source_dir" (not "bug_dir"), no case alias — a real
+		// audit target hands you source + a harness, not a catalogued bug.
+		//
 		// project + language are public build facts (the harness source reveals
-		// the project anyway; the language is obvious) — surfaced in every mode.
+		// the project anyway; the language is obvious).
 		"project":  bench.Project,
 		"language": bench.Target.Language,
 		"harness": map[string]any{
