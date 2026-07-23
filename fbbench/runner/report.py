@@ -114,8 +114,7 @@ def _config_rows(score: dict, kb: list[str], max_turns_fallback) -> list[tuple[s
     if kb:
         rows.append(("required ladder (K_b)", " → ".join(kb)))
 
-    rows.append(("force-full", _yn(cfg.get("force_full", score.get("force_full")))))
-    rows.append(("require-preset", _yn(cfg.get("require_preset", score.get("require_preset")))))
+    rows.append(("stop-on-solve", _yn(cfg.get("stop_on_solve", score.get("stop_on_solve", True)))))
     rows.append(("preserve PoCs", _yn(cfg.get("preserve_pocs", score.get("preserve_pocs", True)))))
     rows.append(("grading", cfg.get("grading", "remote-oracle")))
     img = cfg.get("image")

@@ -373,8 +373,8 @@ def cmd_run(args) -> int:
     if args.api_key:
         cmd += ["--api-key", args.api_key]
     cmd.append("--preserve-pocs" if args.preserve_pocs else "--no-preserve-pocs")
-    if getattr(args, "force_full", False):
-        cmd.append("--force-full")
+    if not getattr(args, "stop_on_solve", True):
+        cmd.append("--no-stop-on-solve")
     if getattr(args, "full_scan", False):
         cmd.append("--full-scan")
     if getattr(args, "local", False):

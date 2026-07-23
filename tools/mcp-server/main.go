@@ -4,15 +4,16 @@
 // convention. Implements the 6-tool contract from SPEC §4.
 //
 // Environment:
-//   BENCH_BUG_DIR    absolute path to the agent-facing bug dir (no oracle files)
-//   BENCH_WORKSPACE  absolute path to the runner's per-episode tmpdir
-//   BENCH_ORACLE_DIR absolute path the grader reads expected.yaml + binaries
-//                    from. Defaults to BENCH_BUG_DIR (so the no-AI fb-bench
-//                    CLI, which points BUG_DIR at the real bug dir, still works).
-//   BENCH_AGENT_UID  numeric uid to run exec() as. When set and the server is
-//   BENCH_AGENT_GID  root, exec subprocesses drop to this (uid,gid) so the
-//                    agent's shell cannot read root-owned oracle files even by
-//                    absolute path / `find /`. No-op when unset or not root.
+//
+//	BENCH_BUG_DIR    absolute path to the agent-facing bug dir (no oracle files)
+//	BENCH_WORKSPACE  absolute path to the runner's per-episode tmpdir
+//	BENCH_ORACLE_DIR absolute path the grader reads expected.yaml + binaries
+//	                 from. Defaults to BENCH_BUG_DIR (so the no-AI fb-bench
+//	                 CLI, which points BUG_DIR at the real bug dir, still works).
+//	BENCH_AGENT_UID  numeric uid to run exec() as. When set and the server is
+//	BENCH_AGENT_GID  root, exec subprocesses drop to this (uid,gid) so the
+//	                 agent's shell cannot read root-owned oracle files even by
+//	                 absolute path / `find /`. No-op when unset or not root.
 //
 // Diagnostics go to stderr; nothing else.
 package main
@@ -291,63 +292,109 @@ func (s *server) writeError(id json.RawMessage, code int, msg string, data any) 
 func toolSchemas() []map[string]any {
 	return []map[string]any{
 		{
-			"name":        "setup",
-			"description": "Return the target project, fuzz harness info, and workspace pointers.",
+			"name": "setup",
+			"description": "Return the task setup: the target project name and language, the fuzz " +
+				"harness info (entrypoint and how it is invoked), the sanitizer the build is judged " +
+				"under, and the workspace and source-directory paths. Takes no arguments. Call it " +
+				"first — the other tools work off the paths it returns.",
 			"inputSchema": map[string]any{"type": "object", "properties": map[string]any{}},
 		},
 		{
-			"name":        "exec",
-			"description": "Run a shell command via /bin/bash -c. Runs in the project source directory.",
+			"name": "exec",
+			"description": "Run a shell command with /bin/bash -c inside the project's source " +
+				"directory (that is the working directory). The sandbox is network-isolated — there " +
+				"is no internet access. Use it to inspect the source and to build or compute candidate " +
+				"input bytes. Returns the command's stdout and stderr (truncated if very long) and its " +
+				"exit status.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"cmd":       map[string]any{"type": "string"},
-					"timeout_s": map[string]any{"type": "integer"},
+					"cmd": map[string]any{
+						"type":        "string",
+						"description": "The shell command to run, e.g. `grep -rn parse src/`.",
+					},
+					"timeout_s": map[string]any{
+						"type":        "integer",
+						"description": "Optional wall-clock timeout in seconds (default 60, maximum 300). The command is killed if it runs longer.",
+					},
 				},
 				"required": []string{"cmd"},
 			},
 		},
 		{
-			"name":        "list_directory",
-			"description": "List directory entries.",
-			"inputSchema": map[string]any{
-				"type":       "object",
-				"properties": map[string]any{"path": map[string]any{"type": "string"}},
-				"required":   []string{"path"},
-			},
-		},
-		{
-			"name":        "read_file",
-			"description": "Read a file. Some build artifacts are access-restricted.",
+			"name": "list_directory",
+			"description": "List the entries of a directory. A relative path is resolved against the " +
+				"staged target root; the path must stay within the staged target tree (harness/, src/, " +
+				"…) or the workspace.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"path":   map[string]any{"type": "string"},
-					"offset": map[string]any{"type": "integer"},
-					"limit":  map[string]any{"type": "integer"},
+					"path": map[string]any{
+						"type":        "string",
+						"description": "Directory to list, absolute or relative to the staged target root (e.g. `src` or `harness`).",
+					},
 				},
 				"required": []string{"path"},
 			},
 		},
 		{
-			"name":        "write_file",
-			"description": "Write a file under the workspace directory.",
+			"name": "read_file",
+			"description": "Read a file's contents. A relative path is resolved against the staged " +
+				"target root; the path must stay within the staged target tree (harness/, src/, …) or " +
+				"the workspace. Some build artifacts are access-restricted and cannot be read.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"path":    map[string]any{"type": "string"},
-					"content": map[string]any{"type": "string"},
+					"path": map[string]any{
+						"type":        "string",
+						"description": "File to read, absolute or relative to the staged target root (e.g. `harness/fuzz.cc`, `src/foo.c`).",
+					},
+					"offset": map[string]any{
+						"type":        "integer",
+						"description": "Optional byte offset to start reading from (default 0).",
+					},
+					"limit": map[string]any{
+						"type":        "integer",
+						"description": "Optional maximum number of bytes to read (default 65536).",
+					},
+				},
+				"required": []string{"path"},
+			},
+		},
+		{
+			"name": "write_file",
+			"description": "Write a file, creating parent directories as needed. The path must be " +
+				"inside the workspace directory returned by setup(). Use it to save a candidate input " +
+				"before running it through run_input().",
+			"inputSchema": map[string]any{
+				"type": "object",
+				"properties": map[string]any{
+					"path": map[string]any{
+						"type":        "string",
+						"description": "Destination path; must be inside the workspace directory (setup()'s workspace_path).",
+					},
+					"content": map[string]any{
+						"type":        "string",
+						"description": "The exact contents to write to the file.",
+					},
 				},
 				"required": []string{"path", "content"},
 			},
 		},
 		{
-			"name":        "run_input",
-			"description": "Run a candidate input through the sanitizer-instrumented target harness and return its raw stdout/stderr/exit/signal (including any crash report). Read the output to see whether your input reached the target and crashed.",
+			"name": "run_input",
+			"description": "Run one candidate input through the official sanitizer-instrumented target " +
+				"harness — a single execution of the target on that input — and return its raw stdout, " +
+				"stderr, exit code, and terminating signal, including any sanitizer or crash report. " +
+				"This is your only ground-truth feedback: read the output to see whether the input " +
+				"reached the target, whether it crashed, and where, then iterate.",
 			"inputSchema": map[string]any{
 				"type": "object",
 				"properties": map[string]any{
-					"path": map[string]any{"type": "string"},
+					"path": map[string]any{
+						"type":        "string",
+						"description": "Path to the candidate input file to run; must be inside the workspace directory (e.g. a file you just wrote with write_file).",
+					},
 				},
 				"required": []string{"path"},
 			},

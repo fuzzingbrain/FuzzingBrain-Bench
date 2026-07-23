@@ -74,11 +74,14 @@ _DENY_TOOLS = ",".join((
 
 
 def claude_task_prompt() -> str:
-    """The Codex task prompt, with the Codex-specific cheat line re-pointed at
-    Claude Code's own built-in tools (which we additionally hard-disable)."""
-    return CODEX_TASK_PROMPT.replace(
-        "Do NOT use Codex's own shell/browser/web-search",
-        "Do NOT use your own built-in tools (Bash/Read/Write/Web*/Skill)")
+    """The shared CLI task prompt, re-pointed from Codex's `harness` MCP server to
+    Claude Code's `bench` server (mcp__harness__* -> mcp__bench__*). Everything
+    else — including the fuzz-harness references (./harness etc.) and the generic
+    "your own built-in tools are not available" line — is identical for both arms.
+    """
+    return (CODEX_TASK_PROMPT
+            .replace("MCP `harness`", "MCP `bench`")
+            .replace("mcp__harness__", "mcp__bench__"))
 
 
 def _budget_text(max_turns: int) -> str:
