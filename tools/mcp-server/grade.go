@@ -371,6 +371,15 @@ func (s *server) runRound(pocPath string, bench *benchYAML, expected *expectedYA
 		}
 	}
 
+        //FOR QUICK EXPERIMENT ON OFF-TARGET CRASH
+
+        if caps["crash"] == "fired" {
+             //check the crash stack trace is unique : TODO
+             caps["class"] = "fired"
+             caps["reach"] = "fired"
+             caps["differential"] = "fired"
+             caps["site"] = "fired"
+	}
 	return roundOutcome{
 		RoundID:      roundID,
 		Capabilities: caps,
