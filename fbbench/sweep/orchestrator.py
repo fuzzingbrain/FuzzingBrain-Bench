@@ -14,10 +14,10 @@ Examples:
       --bugs mongoose-01,net-snmp-02,json-java-01,simdutf-01,openldap-02
 
   # full sweep, default lineup, 2 samples per (model, bug) for best-of-2 union
-  python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0,1
+  python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 2
 
   # graded blobs (bucketed solved/failed) are kept by default; opt out with --no-preserve-pocs
-  python -m fbbench.sweep.orchestrator --models sweep --bugs all --samples 0 --no-preserve-pocs
+  python -m fbbench.sweep.orchestrator --models sweep --bugs all --no-preserve-pocs
 
   # just re-aggregate the leaderboard from existing runs/
   python -m fbbench.sweep.orchestrator --report-only
@@ -155,8 +155,10 @@ def main() -> int:
     ap.add_argument("--models", default="claude-opus-4-7",
                     help="'sweep' | 'all' | comma list of model ids")
     ap.add_argument("--bugs", default="all", help="'all' | comma list of bug ids")
-    ap.add_argument("--samples", "--seeds", dest="samples", default="0",
-                    help="comma list of repeat indices, e.g. 0,1,2 — each sample is one independent run")
+    ap.add_argument("--samples", type=int, default=1, metavar="N",
+                    help="repeat count: run each (model, bug) N times, stored as "
+                         "seed-0..seed-(N-1) (default 1). Resumable: re-run with a "
+                         "larger N to add the missing repeats.")
     ap.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                     help="save every graded blob (default on; --no-preserve-pocs to disable)")
     # Public benchmark is always blind; normal (hinted) mode is removed from the
@@ -194,7 +196,9 @@ def main() -> int:
     out = Path(args.output) / exp
     models = resolve_models(args.models)
     bugs = resolve_bugs(args.bugs)
-    samples = [int(s) for s in args.samples.split(",") if s.strip() != ""]
+    if args.samples < 1:
+        ap.error("--samples must be >= 1 (it is a repeat count, not a seed index)")
+    samples = list(range(args.samples))  # N -> seed indices [0 .. N-1]
 
     if args.report_only:
         aggregate(out, models, bugs, samples)
