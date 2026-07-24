@@ -204,7 +204,11 @@ def main() -> int:
         aggregate(out, models, bugs, samples)
         return 0
 
-    cells = [(m, b, s) for m in models for b in bugs for s in samples]
+    # samples-major order: one full (model x bug) pass per sample, so repeats of
+    # the same cell are spread across time (decorrelates transient API/model
+    # conditions) instead of running back-to-back. Tuple stays (m, b, s) so all
+    # downstream unpacking is unchanged; only iteration order differs.
+    cells = [(m, b, s) for s in samples for m in models for b in bugs]
     done = sum(1 for m, b, s in cells if (cell_dir(out, b, m, s) / "score.json").is_file())
     print(f"  sweep: {len(models)} models x {len(bugs)} bugs x {len(samples)} samples "
           f"= {len(cells)} cells ({done} already done, {len(cells)-done} to run)")
