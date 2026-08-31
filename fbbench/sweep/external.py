@@ -150,11 +150,22 @@ class Manifest:
 
 # ------------------------------------------------------------- the sandbox
 
-def _write_sandbox_shell(root: Path, allow_network: bool) -> Path:
-    """A shell that masks the Docker socket and, unless network is allowed,
-    runs in an empty net namespace. The agent's tools inherit both -- enforced
-    by the kernel, not by the prompt -- so an agent that tries to read the
-    sealed answer out of the image, or fetch a published PoC, simply cannot."""
+def _userns_available() -> bool:
+    """Whether this host lets an unprivileged process create a user namespace.
+
+    Ubuntu 24.04+ ships kernel.apparmor_restrict_unprivileged_userns=1, and
+    hardened kernels and most CI runners refuse it too, so this is a common no.
+    """
+    try:
+        r = subprocess.run(["unshare", "--mount", "--user", "--map-root-user",
+                            "/bin/true"], capture_output=True, timeout=15)
+        return r.returncode == 0
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _write_userns_shell(root: Path, allow_network: bool) -> Path:
+    """A shell in a user namespace: Docker socket masked, network optional."""
     sh = root / "sandbox-sh"
     net = "1" if not allow_network else "0"
     sh.write_text(
@@ -172,6 +183,81 @@ def _write_sandbox_shell(root: Path, allow_network: bool) -> Path:
     )
     sh.chmod(0o755)
     return sh
+
+
+class ContainerShell:
+    """The agent's shell, inside a container of the challenge image.
+
+    The user-namespace sandbox needs a host capability the bench does not
+    otherwise require, and a host that refuses it does not fail loudly -- every
+    bash call dies with "unshare: write failed /proc/self/uid_map" and the agent
+    spends its whole budget unable to write a file. Observed on Ubuntu 24.04.
+
+    Docker, by contrast, is something the bench cannot run without. So sandbox
+    with that: one container per episode, the workspace bind-mounted, no Docker
+    socket inside, `--network none` unless the manifest allows network. The
+    image is the challenge's own -- answer-free by design, and the same
+    environment the codex and claudecode arms hand their agents through exec().
+
+    One container per episode, `docker exec` per command: `docker run` per call
+    would add ~300ms to every command an agent issues.
+    """
+
+    def __init__(self, root: Path, workspace: Path, image: str, allow_network: bool):
+        self.root, self.ws, self.image = root, workspace, image
+        self.allow_network = allow_network
+        self.cid: str | None = None
+
+    def start(self) -> Path:
+        argv = ["docker", "run", "-d", "--rm", "--entrypoint", "sleep",
+                "--security-opt", "seccomp=unconfined",
+                "-v", f"{self.ws}:{self.ws}", "-w", str(self.ws)]
+        if not self.allow_network:
+            argv += ["--network", "none"]
+        argv += [self.image, "infinity"]
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=300)
+        if r.returncode != 0 or not r.stdout.strip():
+            raise RuntimeError(f"sandbox container failed to start: {r.stderr.strip()[:200]}")
+        self.cid = r.stdout.strip()
+        sh = self.root / "sandbox-sh"
+        # The workspace is mounted at the same path inside, so a path the agent
+        # builds on the host resolves identically in the container.
+        sh.write_text("#!/bin/bash\n"
+                      "set -u\n"
+                      f"exec docker exec -i -w \"$PWD\" {self.cid} /bin/bash \"$@\"\n")
+        sh.chmod(0o755)
+        return sh
+
+    def stop(self) -> None:
+        if self.cid:
+            subprocess.run(["docker", "rm", "-f", self.cid],
+                           capture_output=True, timeout=60)
+            self.cid = None
+
+
+def make_sandbox(root: Path, workspace: Path, image: str, allow_network: bool,
+                 mode: str = "auto") -> tuple[Path | None, str, ContainerShell | None]:
+    """Return (shell_path, sandbox_kind, container_to_stop).
+
+    Order: container (portable, the bench already requires Docker) -> user
+    namespace (if the host allows and the mode asks) -> none. The kind is
+    recorded in score.json, so a run can never claim isolation it did not have.
+    """
+    if mode in ("auto", "container"):
+        try:
+            cs = ContainerShell(root, workspace, image, allow_network)
+            return cs.start(), "container", cs
+        except Exception as e:  # noqa: BLE001
+            if mode == "container":
+                raise
+            print(f"  note: container sandbox unavailable ({e}); trying userns", flush=True)
+    if mode in ("auto", "userns") and _userns_available():
+        return _write_userns_shell(root, allow_network), "userns", None
+    if mode == "none" or mode == "auto":
+        print("  note: no sandbox available -- the agent's shell is unconfined "
+              "(recorded as sandbox: none in score.json)", flush=True)
+        return None, "none", None
+    raise RuntimeError(f"sandbox mode {mode!r} unavailable on this host")
 
 
 # ------------------------------------------------------------- stage + submit
@@ -358,6 +444,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     alias = _full_scan_alias(str(real))
     image = challenge_image(alias)
 
+    sandbox: ContainerShell | None = None
     root = Path(tempfile.mkdtemp(prefix=f"ext-{alias}-"))
     ws = root / "workspace"
     try:
@@ -368,7 +455,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
 
         judge = Judge(ws, Path(real))
         judge.start()
-        shell = _write_sandbox_shell(root, manifest.allow_network)
+        shell, sandbox_kind, sandbox = make_sandbox(
+            root, ws, image, manifest.allow_network,
+            os.environ.get("FBBENCH_SANDBOX", "auto"))
 
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
                                opening=DEFAULT_OPENING, submit="./submit")
@@ -378,9 +467,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # an absolute path. Harmless to agents that do not import anything.
         env["PYTHONPATH"] = os.pathsep.join(
             p for p in (str(manifest.base), env.get("PYTHONPATH", "")) if p)
-        if manifest.shell_env:
-            env[manifest.shell_env] = str(shell)
-        env["SHELL"] = str(shell)
+        if shell is not None:
+            if manifest.shell_env:
+                env[manifest.shell_env] = str(shell)
+            env["SHELL"] = str(shell)
         if api_key:
             env["ANTHROPIC_API_KEY"] = api_key
 
@@ -418,10 +508,13 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "bug_id": bug, "model": model, "seed": 0,
             "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
             "score": len(sigs), "grading": "in-image",
-            "terminated_reason": terminated, "duration_s": round(duration, 1),
+            "terminated_reason": (terminated if judge.log else
+                                  f"{terminated}: agent submitted nothing"),
+            "duration_s": round(duration, 1),
             "blobs_written": len(judge.log), "max_turns": max_turns,
             "agent": manifest.name,
             "network": "allowed" if manifest.allow_network else "blocked",
+            "sandbox": sandbox_kind,
             "tokens_used": (usage.get("input_tokens", 0)
                             + usage.get("output_tokens", 0)) or None,
             "total_usd": usage.get("total_usd"),
@@ -435,6 +528,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
              "pricing_source": f"external:{usage.get('basis')}"}, indent=2))
         return score
     finally:
+        if sandbox is not None:
+            sandbox.stop()
         shutil.rmtree(root, ignore_errors=True)
 
 
