@@ -433,6 +433,72 @@ def _agent_usage(ws: Path, log: str, model: str) -> dict:
     return rec
 
 
+
+def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
+                         bug: str, model: str, opening: str) -> None:
+    """Give an external-agent cell the same paper trail every other arm leaves.
+
+    An episode costs money; it should not end with only a prose log. Copies the
+    agent's own step trace out of the workspace (which is deleted next), renders
+    it into the transcript schema report.py reads, and writes report.html. An
+    agent that leaves no trace still gets a transcript built from its
+    submissions, so every cell is browsable.
+    """
+    # 1. the agent's own trace, before the workspace goes away
+    src = ws / ".fbagent-trace.jsonl"
+    recs: list[dict] = []
+    if src.is_file():
+        shutil.copy(src, cell_dir / "trace.jsonl")
+        for line in src.read_text(errors="ignore").splitlines():
+            try:
+                recs.append(json.loads(line))
+            except ValueError:
+                pass
+
+    # 2. transcript.jsonl in report.py's event schema
+    ev: list[dict] = [{"event": "start", "model": model, "bug_id": bug,
+                       "system_prompt": "", "initial_user_message": opening}]
+    if recs:
+        pending: dict[int, list] = {}
+        for r in recs:
+            step = r.get("step", 0)
+            kind = r.get("kind")
+            if kind in ("text", "thinking"):
+                ev.append({"event": "assistant", "turn": step,
+                           "text": r.get("text", ""), "tool_calls": []})
+            elif kind == "tool_call":
+                tid = f"s{step}-{len(pending.get(step, []))}"
+                pending.setdefault(step, []).append(tid)
+                ev.append({"event": "assistant", "turn": step, "text": "",
+                           "tool_calls": [{"id": tid, "name": r.get("tool", "?"),
+                                           "input": r.get("input", {})}]})
+            elif kind == "tool_result":
+                ids = pending.get(step) or [f"s{step}-0"]
+                ev.append({"event": "tool_result", "turn": step,
+                           "id": ids.pop(0) if ids else f"s{step}-0",
+                           "tool": r.get("tool", "?"),
+                           "is_error": bool(r.get("is_error")),
+                           "result": r.get("content", r.get("text", ""))})
+    else:
+        # No trace: reconstruct what we do know -- every submission and verdict.
+        for i, e in enumerate(judge.log):
+            ev.append({"event": "assistant", "turn": i, "text": "",
+                       "tool_calls": [{"id": f"g{i}", "name": "submit",
+                                       "input": {"path": e.get("blob")}}]})
+            ev.append({"event": "tool_result", "turn": i, "id": f"g{i}",
+                       "tool": "submit", "is_error": False,
+                       "result": e.get("detail", "")})
+    (cell_dir / "transcript.jsonl").write_text(
+        "\n".join(json.dumps(e) for e in ev) + "\n")
+
+    # 3. report.html
+    try:
+        from fbbench.runner.report import write_report
+        write_report(cell_dir)
+    except Exception as e:  # noqa: BLE001
+        print(f"  note: report.html skipped: {e}", flush=True)
+
+
 def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
              max_turns: int = 100, *, manifest: Manifest, api_key: str | None = None,
              preserve_pocs: bool = True) -> dict | None:
@@ -488,6 +554,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
 
         cell_dir.mkdir(parents=True, exist_ok=True)
         (cell_dir / "agent.log").write_text(log)
+        _write_run_artifacts(cell_dir, ws, log, judge, bug, model, DEFAULT_OPENING)
         if preserve_pocs:
             for e in judge.log:
                 sub = cell_dir / "pocs" / ("crashed" if e["crashed"] else "clean")
