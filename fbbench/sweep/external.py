@@ -46,6 +46,7 @@ import os
 import shlex
 import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -542,6 +543,21 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
 
         started = time.time()
         terminated = "done"
+        interrupted = False
+
+        # A Ctrl-C or a SIGTERM used to throw the whole cell away: everything
+        # below is written only after the agent exits, and the `finally` clause
+        # then rmtree's the workspace. One terminated libpng-01 run lost 236
+        # graded candidates and its cost that way. The work is real and already
+        # on disk -- the judge graded every blob as it was submitted -- so treat
+        # an interrupt like the wall-clock case: fall through, persist the cell,
+        # and only then re-raise so the matrix still stops.
+        def _on_term(_signum, _frame):
+            raise KeyboardInterrupt
+        try:
+            prev_term = signal.signal(signal.SIGTERM, _on_term)
+        except (ValueError, OSError):   # not the main thread
+            prev_term = None
         try:
             proc = subprocess.run(argv, cwd=str(ws), env=env, capture_output=True,
                                   text=True, timeout=timeout_s + 300)
@@ -549,6 +565,18 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         except subprocess.TimeoutExpired as e:
             terminated = "wall-clock"
             log = (e.stdout or "") if isinstance(e.stdout, str) else ""
+        except KeyboardInterrupt:
+            # subprocess.run kills the child and re-raises, so its stdout is
+            # gone; the graded blobs are not.
+            terminated = "interrupted"
+            log = ""
+            interrupted = True
+        finally:
+            if prev_term is not None:
+                try:
+                    signal.signal(signal.SIGTERM, prev_term)
+                except (ValueError, OSError):
+                    pass
         duration = time.time() - started
         judge.stop()
 
@@ -593,6 +621,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         (cell_dir / "cost.json").write_text(json.dumps(
             {**usage, "agent": manifest.name,
              "pricing_source": f"external:{usage.get('basis')}"}, indent=2))
+        if interrupted:
+            # The cell is on disk now; let the interrupt do its job.
+            print(f"  interrupted: cell persisted to {cell_dir}", flush=True)
+            raise KeyboardInterrupt
         return score
     finally:
         if sandbox is not None:
