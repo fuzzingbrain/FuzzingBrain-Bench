@@ -208,15 +208,20 @@ def _start_episode_server(image: str, work: str, root: str) -> tuple:
     return proc, sock_path, relay_path, srv
 
 
-def stage_claude_env(real_bug_dir: str, model: str) -> tuple[str, str, str, str]:
+def stage_claude_env(
+    real_bug_dir: str, model: str
+) -> tuple[str, str, str, str, tuple]:
     """Stage an isolated workspace + a bench MCP config for the canonical image.
 
-    Returns (image, root, work, mcp_cfg):
+    Returns (image, root, work, mcp_cfg, (server, srv_sock)):
       - image:   docker.io/...-<alias> canonical challenge image
       - root:    cell temp dir (caller cleans it up)
       - work:    bind-mounted workspace (-> container /workspace) AND the claude
                  cwd — named by the NEUTRAL alias so the path leaks nothing.
       - mcp_cfg: path to bench.mcp.json wiring `docker run … mcp-server`.
+      - server, srv_sock: the per-episode relay. THE CALLER OWNS THESE — close
+                 the socket and terminate the process, or the run leaks a
+                 subprocess and a listening port per cell.
     """
     alias = _full_scan_alias(real_bug_dir)
     image = f"{IMAGE_PREFIX}{alias}"
