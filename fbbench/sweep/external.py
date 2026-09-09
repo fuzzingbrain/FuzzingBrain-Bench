@@ -286,6 +286,42 @@ def stage(image: str, workspace: Path) -> None:
         raise RuntimeError(f"answer files present in staged workspace: {strays[:3]}")
 
 
+_EXEC_MS = re.compile(r"Executed\s+\S+\s+in\s+(\d+)\s*ms")
+
+
+def _target_ms(verdict: dict) -> str:
+    """How long the target itself spent on this input, in its own words.
+
+    libFuzzer prints `Executed <file> in N ms` on every run, and being the
+    harness's own clock it excludes the container and grading overhead a
+    measurement here would fold in. That distinction is the whole point: the
+    signal worth reading is 0 ms (thrown out at the entry gate) against a few
+    hundred (the parser actually worked), and on a real challenge the grading
+    overhead around a 0 ms run measures 279 ms -- an order of magnitude larger
+    than the difference we are trying to show.
+
+    The verdict is flat rather than nested (`stderr` and friends sit at the top
+    level, whatever grade_blob's docstring says about `harness_output`), and the
+    shape has moved before, so every plausible field is searched.
+
+    Jazzer and other non-libFuzzer harnesses print no such line. There the
+    grader's own `duration_ms` is all there is; it is offered under a name that
+    says what it measures, because reporting overhead as the target's time would
+    be worse than admitting we do not know.
+    """
+    for key in ("stderr", "stdout", "harness_output", "output"):
+        raw = verdict.get(key)
+        if not raw:
+            continue
+        m = _EXEC_MS.search(raw if isinstance(raw, str) else str(raw))
+        if m:
+            return f"target ran {m.group(1)} ms"
+    graded = verdict.get("duration_ms")
+    if isinstance(graded, (int, float)):
+        return f"graded in {int(graded)} ms (harness clock unavailable)"
+    return "target time unknown"
+
+
 class Judge:
     """The `submit` the agent calls: grades a candidate on the sealed harness,
     returns the verdict live, and remembers every candidate for the score.
@@ -330,14 +366,24 @@ class Judge:
                 if not cand.is_file():
                     continue
                 shutil.copy2(cand, self.blobs / cand.name)
+                size = cand.stat().st_size
                 try:
                     verdict, _ = grade_blob(self.bug_dir, cand)
                     crashed = bool(verdict.get("crashed"))
                     sig = verdict.get("signature") or ""
-                    detail = (f"crash: {sig}" if crashed else "clean: no fault")
+                    # A clean verdict used to be the same fifteen characters for
+                    # every input, so a candidate that died at the magic gate and
+                    # one that drove the parser for half a second read identically.
+                    # An agent cannot climb a flat signal: one measured run wrote
+                    # 138 candidates, 47% of them constant bytes, and every reply
+                    # was "clean: no fault". The harness already reports how long
+                    # the target ran, and the size is already here -- carrying both
+                    # back is the difference between a verdict and a gradient.
+                    detail = (f"crash: {sig}" if crashed
+                              else f"clean: no fault | {_target_ms(verdict)} | {size} bytes")
                 except Exception as e:  # a grading failure must be visible, not a silent clean
                     crashed, sig, detail = False, "", f"error: {e}"
-                self.log.append({"blob": cand.name, "size": cand.stat().st_size,
+                self.log.append({"blob": cand.name, "size": size,
                                  "crashed": crashed, "signature": sig})
                 (self.res / cand.name).write_text(detail + "\n")
                 cand.unlink(missing_ok=True)
