@@ -565,6 +565,25 @@ class Judge:
 # ---------------------------------------------------------------- the cell
 
 
+def _agent_steps(ws: Path) -> int:
+    """How many tool calls the agent made, from its own trace.
+
+    report.py's header reads `turns_used` off score.json. The external arm never
+    wrote it, so every cell reported "0 turns used" beside a trajectory of two
+    hundred calls."""
+    src = ws / ".fbagent-trace.jsonl"
+    if not src.is_file():
+        return 0
+    n = 0
+    try:
+        for line in src.read_text(errors="replace").splitlines():
+            if '"tool_call"' in line:
+                n += 1
+    except OSError:
+        return 0
+    return n
+
+
 def _extract_report(log: str) -> dict | None:
     """The last JSON object an agent printed, if it carries usage or cost.
 
@@ -646,7 +665,9 @@ def _agent_usage(ws: Path, log: str, model: str) -> dict:
 
 
 def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
-                         bug: str, model: str, opening: str) -> None:
+                         bug: str, model: str, opening: str, *,
+                         score: dict | None = None, usage: dict | None = None,
+                         max_turns: int = 0, preserve_pocs: bool = True) -> None:
     """Give an external-agent cell the same paper trail every other arm leaves.
 
     An episode costs money; it should not end with only a prose log. Copies the
@@ -667,8 +688,16 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
                 pass
 
     # 2. transcript.jsonl in report.py's event schema
+    # report.py reads the header off `start` and `end`, and the distinct-crash
+    # table off `unique_crash`. The external arm emitted only a bare `start`, so
+    # every field in the header rendered as zero on a cell that had really spent
+    # half an hour and a dollar.
     ev: list[dict] = [{"event": "start", "model": model, "bug_id": bug,
-                       "system_prompt": "", "initial_user_message": opening}]
+                       "system_prompt": "", "initial_user_message": opening,
+                       "max_turns": max_turns, "preserve_pocs": preserve_pocs,
+                       "tools": sorted({r.get("tool") for r in (recs or [])
+                                        if r.get("kind") == "tool_call"
+                                        and r.get("tool")})}]
     if recs:
         pending: dict[int, list] = {}
         for r in recs:
@@ -699,6 +728,36 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
             ev.append({"event": "tool_result", "turn": i, "id": f"g{i}",
                        "tool": "submit", "is_error": False,
                        "result": e.get("detail", "")})
+    # One row per distinct fault, in the order the run first saw it.
+    seen: set[str] = set()
+    for i, e in enumerate(judge.log):
+        if not e.get("crashed"):
+            continue
+        sig = e.get("signature") or "crash|<unnamed>"
+        if sig in seen:
+            continue
+        seen.add(sig)
+        ev.append({"event": "unique_crash", "turn": i, "signature": sig,
+                   "blob": e.get("blob"), "size": e.get("size")})
+
+    if score is not None:
+        u = usage or {}
+        ev.append({"event": "end",
+                   "terminated_reason": score.get("terminated_reason"),
+                   "unique_crashes": score.get("unique_crashes"),
+                   "crash_signatures": score.get("crash_signatures"),
+                   "turns_used": sum(1 for r in (recs or [])
+                                     if r.get("kind") == "tool_call") or len(judge.log),
+                   "duration_s": score.get("duration_s"),
+                   "input_tokens": u.get("input_tokens", 0),
+                   "output_tokens": u.get("output_tokens", 0),
+                   "cache_read_tokens": u.get("cache_read_tokens", 0),
+                   "cache_write_tokens": u.get("cache_write_tokens", 0),
+                   "total_usd": score.get("total_usd"),
+                   "cost_basis": score.get("cost_basis"),
+                   "grading": score.get("grading"),
+                   "blobs_written": score.get("blobs_written")})
+
     (cell_dir / "transcript.jsonl").write_text(
         "\n".join(json.dumps(e) for e in ev) + "\n")
 
@@ -793,7 +852,6 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
 
         cell_dir.mkdir(parents=True, exist_ok=True)
         (cell_dir / "agent.log").write_text(log)
-        _write_run_artifacts(cell_dir, ws, log, judge, bug, model, DEFAULT_OPENING)
         if preserve_pocs:
             for e in judge.log:
                 sub = cell_dir / "pocs" / ("crashed" if e["crashed"] else "clean")
@@ -817,7 +875,22 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "terminated_reason": (terminated if judge.log else
                                   f"{terminated}: agent submitted nothing"),
             "duration_s": round(duration, 1),
+            "turns_used": _agent_steps(ws),
             "blobs_written": len(judge.log), "max_turns": max_turns,
+            # report.py reads mode/grading/preserve-PoCs out of `config`, the
+            # same shape the api arm writes. Without it a cell renders as
+            # "grading not recorded" whatever it actually did.
+            "config": {
+                "mode": "blind",
+                "max_turns": max_turns,
+                "timeout_s": timeout_s,
+                "stop_on_crash": False,
+                "preserve_pocs": preserve_pocs,
+                "grading": "in-image",
+                "image": image,
+                "agent": manifest.name,
+                "sandbox": sandbox_kind,
+            },
             "agent": manifest.name,
             "network": "allowed" if manifest.allow_network else "blocked",
             "sandbox": sandbox_kind,
@@ -829,12 +902,24 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # The score goes down first: nothing after the agent exits is worth
         # losing a completed run over.
         (cell_dir / "score.json").write_text(json.dumps(score, indent=2))
+        # Only now can the report be rendered: its header is the run's cost,
+        # duration, turn count and grading, and none of that existed until the
+        # score was built. Rendering it earlier is why every external cell's
+        # report read "0 turns used, $0.0000, duration 0.0s".
+
         # The running tally has done its job; score.json is authoritative and
         # two files claiming to be the score is how a reader gets misled.
         (cell_dir / "score.partial.json").unlink(missing_ok=True)
         (cell_dir / "cost.json").write_text(json.dumps(
             {**usage, "agent": manifest.name,
              "pricing_source": f"external:{usage.get('basis')}"}, indent=2))
+        # Only now can the report render: its header is read straight out of
+        # score.json and cost.json, and it used to be built before either
+        # existed -- which is why every external cell read "0 turns used,
+        # $0.0000, duration 0.0s" over a real half-hour run.
+        _write_run_artifacts(cell_dir, ws, log, judge, bug, model,
+                             DEFAULT_OPENING, score=score, usage=usage,
+                             max_turns=max_turns, preserve_pocs=preserve_pocs)
         if interrupted:
             # The cell is on disk now; let the interrupt do its job.
             print(f"  interrupted: cell persisted to {cell_dir}", flush=True)

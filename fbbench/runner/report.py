@@ -88,9 +88,11 @@ def _config_rows(score: dict, max_turns_fallback) -> list[tuple[str, str]]:
 
     rows.append(("stop-on-crash", _yn(cfg.get("stop_on_crash", False))))
     rows.append(("preserve PoCs", _yn(cfg.get("preserve_pocs", score.get("preserve_pocs", True)))))
-    # Older runs carry no `grading` key. Say so rather than letting a report
-    # state something the run never recorded.
-    rows.append(("grading", cfg.get("grading") or "not recorded"))
+    # `grading` lives under `config` for the api arm and at the top level for
+    # the external one. Read both before concluding a run never recorded it,
+    # or a cell that graded in-image reports "not recorded".
+    rows.append(("grading", cfg.get("grading") or score.get("grading")
+                 or "not recorded"))
     img = cfg.get("image")
     if img:
         rows.append(("challenge image", img))
@@ -266,7 +268,8 @@ def _findings_section(score: dict) -> tuple[str, str, str]:
         for i, s in enumerate(sigs, 1)
     ) or ('<tr><td colspan="2" class="muted">no crash was produced in this '
           'episode</td></tr>')
-    grading = ((score.get("config") or {}).get("grading")) or "local"
+    grading = ((score.get("config") or {}).get("grading")
+               or score.get("grading") or "local")
     html = (
         '<h2>Distinct crashes</h2>\n'
         f'<div class="sub">graded <b>{_esc(grading)}</b> &mdash; each row is one '
@@ -275,6 +278,29 @@ def _findings_section(score: dict) -> tuple[str, str, str]:
         f'<tbody>{rows}</tbody></table>'
     )
     return html, str(uniq), "distinct crashes"
+
+
+def _turns_from_transcript(tpath: Path) -> int:
+    """How many acting turns the transcript shows.
+
+    `turns_used` is written by the api arm and was never written by the external
+    one, so those cells rendered "0 turns used" beside a full trajectory. The
+    transcript always knows: count the assistant turns that called a tool.
+    """
+    try:
+        n = 0
+        for line in tpath.read_text(errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("event") == "assistant" and e.get("tool_calls"):
+                n += 1
+        return n
+    except OSError:
+        return 0
 
 
 def build_report_html(run_dir: Path) -> str:
@@ -287,9 +313,16 @@ def build_report_html(run_dir: Path) -> str:
                      else run_dir.name)
     model = score.get("model", "—")
     reason = score.get("terminated_reason", "—")
-    turns = score.get("turns_used", 0)
+    turns = score.get("turns_used") or _turns_from_transcript(tpath)
     dur = score.get("duration_s", 0.0)
-    usd = score.get("total_usd") or cost.get("total_usd") or 0.0
+    # An unknown cost is not a free run. The external arm can only price a cell
+    # from the summary an agent prints as it exits, so a killed or crashed run
+    # reports None -- and rendering that as $0.0000 claims something the run
+    # never measured. `_agent_usage` makes the same point about its own output.
+    _usd = score.get("total_usd")
+    if _usd is None:
+        _usd = cost.get("total_usd")
+    usd_known = _usd is not None
     err = score.get("error", "")
 
     # Header tags: the public build facts, straight from this challenge's
@@ -360,7 +393,11 @@ def build_report_html(run_dir: Path) -> str:
         bug=_esc(bug), model=_esc(model), tags=tag_html,
         headline=headline, headline_label=headline_label,
         findings=findings_html, verdict_cls=verdict_cls,
-        turns=turns, ncalls=len(nodes), usd=f"{usd:.4f}",
+        turns=turns, ncalls=len(nodes),
+        usd=(f"{_usd:.4f}" if usd_known else "0.0000"),
+        usd_stat=(f"${_usd:.4f}" if usd_known else
+                  '<span title="the agent exited without reporting usage">'
+                  'not reported</span>'),
         config=config_html,
         reason=_esc(reason), dur=f"{dur:.1f}",
         refus=score.get("refusal_retries", 0), malf=score.get("malformed_retries", 0),
@@ -462,7 +499,7 @@ color:#c9d1d9;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:4px
   <div class="stat"><div class="n {verdict_cls}">{headline}</div><div class="l">{headline_label}</div></div>
   <div class="stat"><div class="n">{turns}</div><div class="l">turns used</div></div>
   <div class="stat"><div class="n a">{ncalls}</div><div class="l">tool calls</div></div>
-  <div class="stat"><div class="n p">${usd}</div><div class="l">total cost</div></div>
+  <div class="stat"><div class="n p">{usd_stat}</div><div class="l">total cost</div></div>
 </div>
 
 <h2>Run configuration</h2>
@@ -479,7 +516,7 @@ reproducible from these parameters alone.</div>
       <tr><td>input</td><td class="r">{in_tok} tok</td><td class="r">${in_usd}</td></tr>
       <tr><td>output</td><td class="r">{out_tok} tok</td><td class="r">${out_usd}</td></tr>
       <tr><td>cache read</td><td class="r">{cache_r} tok</td><td class="r"></td></tr>
-      <tr><td><b>total</b></td><td class="r"></td><td class="r">${usd}</td></tr>
+      <tr><td><b>total</b></td><td class="r"></td><td class="r">{usd_stat}</td></tr>
     </table>
   </div>
   <div class="card"><h3>Tool calls</h3>
