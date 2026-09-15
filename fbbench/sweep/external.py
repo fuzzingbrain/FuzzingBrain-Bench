@@ -537,7 +537,13 @@ class Judge:
             (d / "_t.gdb").write_text(self._gdb_script(target))
             # The vuln binary is sealed inside the image; only ASan builds carry
             # the debug info the breakpoint needs.
-            sh = ("B=/opt/fbbench/oracle/binaries/vuln/asan/harness; "
+            # ASan must ABORT for gdb to see the fault: _parse_trace detects a
+            # crash by gdb's "received signal SIG..." line, and with
+            # abort_on_error=0 ASan prints its report and exits quietly -- so a
+            # crashing input came back "crashed: no". Caught against a known
+            # crashing harfbuzz-02 candidate that read clean until this was set.
+            sh = ("export ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=0; "
+                  "B=/opt/fbbench/oracle/binaries/vuln/asan/harness; "
                   "[ -x \"$B\" ] || B=$(command -v harness || echo /out/harness); "
                   "exec gdb -q -batch -x /tmp/_t.gdb --args \"$B\" /tmp/_cand.bin")
             try:
