@@ -331,7 +331,8 @@ class Judge:
     is given can never diverge.
     """
 
-    def __init__(self, workspace: Path, bug_dir: Path):
+    def __init__(self, workspace: Path, bug_dir: Path,
+                 cell_dir: Path | None = None, preserve_pocs: bool = True):
         self.ws = workspace
         self.bug_dir = bug_dir
         self.req = workspace / ".fbbench" / "req"
@@ -340,6 +341,63 @@ class Judge:
         self.log: list[dict] = []
         self._stop = threading.Event()
         self._t: threading.Thread | None = None
+        # Live reporting. The api arm flushes every record and copies every
+        # candidate out as it grades; this arm used to write nothing until the
+        # agent process exited, so a 30-minute cell was unobservable and a
+        # killed one lost everything. Same contract here: one flushed line and
+        # one preserved blob per graded candidate, as it happens.
+        self.cell_dir = Path(cell_dir) if cell_dir else None
+        self.preserve_pocs = preserve_pocs
+        self._t0 = time.time()
+        self._progress = None
+
+    def _open_progress(self) -> None:
+        if self.cell_dir is None:
+            return
+        try:
+            self.cell_dir.mkdir(parents=True, exist_ok=True)
+            self._progress = (self.cell_dir / "progress.jsonl").open("w", buffering=1)
+        except OSError:
+            self._progress = None
+
+    def _record(self, entry: dict, src: Path, verdict_detail: str) -> None:
+        """Persist one graded candidate the moment it is graded. Never raises:
+        a reporting failure must not cost the run its grading."""
+        if self.cell_dir is None:
+            return
+        try:
+            if self.preserve_pocs and src.is_file():
+                sub_d = self.cell_dir / "pocs" / ("crashed" if entry["crashed"] else "clean")
+                sub_d.mkdir(parents=True, exist_ok=True)
+                shutil.copy(src, sub_d / entry["blob"])
+                (sub_d / f"{entry['blob']}.json").write_text(json.dumps({
+                    "blob": entry["blob"], "size": entry["size"],
+                    "crashed": entry["crashed"],
+                    "crash_signature": entry["signature"] or None,
+                    "verdict": verdict_detail.strip(),
+                    "t": round(time.time() - self._t0, 1),
+                }, indent=2))
+            if self._progress is not None:
+                self._progress.write(json.dumps({
+                    "t": round(time.time() - self._t0, 1),
+                    "n": len(self.log), "blob": entry["blob"],
+                    "size": entry["size"], "crashed": entry["crashed"],
+                    "signature": entry["signature"] or None,
+                    "verdict": verdict_detail.strip()[:200],
+                    "unique_so_far": len(self.signatures()),
+                }) + "\n")
+                self._progress.flush()
+            # A running tally, rewritten each time, so score-so-far is readable
+            # without parsing the stream.
+            (self.cell_dir / "score.partial.json").write_text(json.dumps({
+                "in_progress": True,
+                "elapsed_s": round(time.time() - self._t0, 1),
+                "blobs_written": len(self.log),
+                "unique_crashes": len(self.signatures()),
+                "crash_signatures": sorted(self.signatures()),
+            }, indent=2))
+        except Exception:  # noqa: BLE001 - reporting never breaks grading
+            pass
 
     def start(self) -> None:
         for d in (self.req, self.res, self.blobs):
@@ -357,6 +415,7 @@ class Judge:
         s.chmod(0o755)
         (self.ws / "try_poc").write_text('#!/bin/bash\nexec "$(dirname "$0")/submit" "$@"\n')
         (self.ws / "try_poc").chmod(0o755)
+        self._open_progress()
         self._t = threading.Thread(target=self._serve, daemon=True)
         self._t.start()
 
@@ -383,9 +442,11 @@ class Judge:
                               else f"clean: no fault | {_target_ms(verdict)} | {size} bytes")
                 except Exception as e:  # a grading failure must be visible, not a silent clean
                     crashed, sig, detail = False, "", f"error: {e}"
-                self.log.append({"blob": cand.name, "size": size,
-                                 "crashed": crashed, "signature": sig})
+                entry = {"blob": cand.name, "size": size,
+                         "crashed": crashed, "signature": sig}
+                self.log.append(entry)
                 (self.res / cand.name).write_text(detail + "\n")
+                self._record(entry, self.blobs / cand.name, detail)
                 cand.unlink(missing_ok=True)
             self._stop.wait(0.2)
 
@@ -393,6 +454,11 @@ class Judge:
         self._stop.set()
         if self._t:
             self._t.join(timeout=10)
+        try:
+            if self._progress is not None:
+                self._progress.close()
+        except Exception:  # noqa: BLE001
+            pass
 
     def signatures(self) -> set[str]:
         return {e["signature"] or "crash|<unnamed>" for e in self.log if e["crashed"]}
@@ -566,7 +632,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         except RuntimeError as e:
             return {"error": str(e)}
 
-        judge = Judge(ws, Path(real))
+        judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs)
         judge.start()
         shell, sandbox_kind, sandbox = make_sandbox(
             root, ws, image, manifest.allow_network,
@@ -664,6 +730,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # The score goes down first: nothing after the agent exits is worth
         # losing a completed run over.
         (cell_dir / "score.json").write_text(json.dumps(score, indent=2))
+        # The running tally has done its job; score.json is authoritative and
+        # two files claiming to be the score is how a reader gets misled.
+        (cell_dir / "score.partial.json").unlink(missing_ok=True)
         (cell_dir / "cost.json").write_text(json.dumps(
             {**usage, "agent": manifest.name,
              "pricing_source": f"external:{usage.get('basis')}"}, indent=2))
