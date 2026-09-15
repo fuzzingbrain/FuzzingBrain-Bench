@@ -332,15 +332,26 @@ class Judge:
     """
 
     def __init__(self, workspace: Path, bug_dir: Path,
-                 cell_dir: Path | None = None, preserve_pocs: bool = True):
+                 cell_dir: Path | None = None, preserve_pocs: bool = True,
+                 image: str | None = None):
         self.ws = workspace
         self.bug_dir = bug_dir
+        self.image = image
+        # The `trace` channel. The agent has posted requests here since the tool
+        # was written and nothing has ever answered them: 18 calls across the
+        # recorded D5 runs returned 8 timeouts and zero reports, because no
+        # branch of this bench ever carried a responder. The agent runs on the
+        # host and has no graded binary, so only we can do this -- and the
+        # challenge image already ships gdb and a debug-info vuln binary.
+        self.treq = workspace / ".fbbench" / "trace_req"
+        self.tres = workspace / ".fbbench" / "trace_res"
         self.req = workspace / ".fbbench" / "req"
         self.res = workspace / ".fbbench" / "res"
         self.blobs = workspace / ".fbbench" / "blobs"
         self.log: list[dict] = []
         self._stop = threading.Event()
         self._t: threading.Thread | None = None
+        self._tt: threading.Thread | None = None
         # Live reporting. The api arm flushes every record and copies every
         # candidate out as it grades; this arm used to write nothing until the
         # agent process exited, so a 30-minute cell was unobservable and a
@@ -400,7 +411,7 @@ class Judge:
             pass
 
     def start(self) -> None:
-        for d in (self.req, self.res, self.blobs):
+        for d in (self.req, self.res, self.blobs, self.treq, self.tres):
             d.mkdir(parents=True, exist_ok=True)
         s = self.ws / "submit"
         s.write_text(
@@ -418,6 +429,8 @@ class Judge:
         self._open_progress()
         self._t = threading.Thread(target=self._serve, daemon=True)
         self._t.start()
+        self._tt = threading.Thread(target=self._serve_trace, daemon=True)
+        self._tt.start()
 
     def _serve(self) -> None:
         while not self._stop.is_set():
@@ -454,11 +467,96 @@ class Judge:
         self._stop.set()
         if self._t:
             self._t.join(timeout=10)
+        if self._tt:
+            self._tt.join(timeout=10)
         try:
             if self._progress is not None:
                 self._progress.close()
         except Exception:  # noqa: BLE001
             pass
+
+    # ------------------------------------------------------------- trace
+    # gdb against the graded binary, inside the challenge image. The agent's
+    # parser wants three things out of the raw output: an `@@REACHED <fn>@@`
+    # marker, `name = value` argument lines after it, and -- if it faulted --
+    # a `received signal SIG...` line followed by `#N func (...) at file:line`
+    # frames. gdb emits the last two natively; the marker we print ourselves.
+    _GDB_TIMEOUT_S = 150
+
+    def _gdb_script(self, target: str) -> str:
+        return (
+            "set confirm off\n"
+            "set pagination off\n"
+            "set backtrace past-main on\n"
+            f"break {target}\n"
+            "commands\n"
+            "silent\n"
+            f'printf "@@REACHED {target}@@\\n"\n'
+            "info args\n"
+            "continue\n"
+            "end\n"
+            "run /tmp/_cand.bin\n"
+            "bt\n"
+            "quit\n")
+
+    def _serve_trace(self) -> None:
+        while not self._stop.is_set():
+            # `.tgt` is written last by the agent, so its presence means ready.
+            for tgt_f in sorted(self.treq.glob("*.tgt")):
+                rid = tgt_f.stem
+                blob = self.treq / f"{rid}.bin"
+                try:
+                    target = tgt_f.read_text().strip()
+                except OSError:
+                    continue
+                # Claim the request the moment we pick it up, before the slow
+                # part. The agent decides the bridge is dead by seeing its
+                # request still unclaimed after a few seconds, so a gdb run that
+                # legitimately takes two minutes must not look like silence.
+                tgt_f.unlink(missing_ok=True)
+                try:
+                    out = self._run_gdb(blob, target)
+                except Exception as e:  # noqa: BLE001
+                    out = f"error: trace failed: {type(e).__name__}: {e}"
+                try:
+                    (self.tres / rid).write_text(out)
+                finally:
+                    blob.unlink(missing_ok=True)
+            self._stop.wait(0.2)
+
+    def _run_gdb(self, blob: Path, target: str) -> str:
+        if not self.image:
+            return "error: trace unavailable — no challenge image for this cell."
+        if not blob.is_file():
+            return "error: trace request carried no input file."
+        if not re.fullmatch(r"[A-Za-z_][\w:~<>.]{0,200}", target):
+            return f"error: refusing to break on {target!r}."
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            shutil.copy(blob, d / "_cand.bin")
+            (d / "_t.gdb").write_text(self._gdb_script(target))
+            # The vuln binary is sealed inside the image; only ASan builds carry
+            # the debug info the breakpoint needs.
+            sh = ("B=/opt/fbbench/oracle/binaries/vuln/asan/harness; "
+                  "[ -x \"$B\" ] || B=$(command -v harness || echo /out/harness); "
+                  "exec gdb -q -batch -x /tmp/_t.gdb --args \"$B\" /tmp/_cand.bin")
+            try:
+                p = subprocess.run(
+                    ["docker", "run", "--rm", "--network", "none",
+                     "--security-opt", "seccomp=unconfined",       # gdb needs ptrace
+                     "--cap-add", "SYS_PTRACE",
+                     "-v", f"{d}:/tmp:ro", "--entrypoint", "sh",
+                     self.image, "-c", sh],
+                    capture_output=True, text=True,
+                    timeout=self._GDB_TIMEOUT_S)
+            except subprocess.TimeoutExpired:
+                return f"error: gdb exceeded {self._GDB_TIMEOUT_S}s on {target}."
+            raw = (p.stdout or "") + ("\n" + p.stderr if p.stderr else "")
+            if "No symbol table" in raw or "Function \"" in raw and "not defined" in raw:
+                return (f"error: gdb could not resolve {target!r} in this build — "
+                        "check the spelling against the source, or pick a symbol "
+                        "the harness actually links.")
+            return raw
 
     def signatures(self) -> set[str]:
         return {e["signature"] or "crash|<unnamed>" for e in self.log if e["crashed"]}
@@ -632,7 +730,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         except RuntimeError as e:
             return {"error": str(e)}
 
-        judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs)
+        judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
+                      image=image)
         judge.start()
         shell, sandbox_kind, sandbox = make_sandbox(
             root, ws, image, manifest.allow_network,
