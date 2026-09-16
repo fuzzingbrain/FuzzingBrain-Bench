@@ -158,3 +158,36 @@ def test_a_slow_gdb_is_claimed_immediately_so_it_is_not_mistaken_for_silence(tmp
     time.sleep(0.2)
     assert not (j.treq / "rid2.tgt").exists(), "request must be claimed before the slow part"
     j._stop.set()
+
+
+# ------------------------------------------------------------- the turn budget
+# Every arm is budgeted the same way: a turn cap and a wall clock, no dollar cap.
+# The api arm bounds its own loop; claudecode passes --max-turns to the CLI and
+# trusts it. An external agent is the same shape, so it gets the same contract.
+
+def test_the_manifest_receives_the_turn_budget():
+    """An agent cannot honour a budget it is never told."""
+    from fbbench.sweep.external import Manifest
+    m = Manifest({"name": "x",
+                  "command": "run --timeout {timeout} --max-turns {max_turns}"},
+                 Path("."))
+    argv = m.render(workspace="/w", timeout="1800", opening="o", submit="./submit",
+                    max_turns="100")
+    assert "--max-turns" in argv and "100" in argv
+    assert not any("{max_turns}" in a for a in argv)
+
+
+def test_turns_come_from_the_agent_report_not_the_trace():
+    from fbbench.sweep.external import _agent_turns
+    ws = Path("/nonexistent")
+    assert _agent_turns({"turns": 70}, ws) == 70
+    assert _agent_turns({"steps": 55}, ws) == 55      # older field name
+    assert _agent_turns({"turns_used": 12}, ws) == 12
+
+
+def test_no_report_falls_back_to_the_trace_count(tmp_path):
+    from fbbench.sweep.external import _agent_turns
+    (tmp_path / ".fbagent-trace.jsonl").write_text(
+        '{"kind":"tool_call"}\n{"kind":"tool_result"}\n{"kind":"tool_call"}\n')
+    assert _agent_turns(None, tmp_path) == 2
+    assert _agent_turns({}, Path("/nonexistent")) == 0
