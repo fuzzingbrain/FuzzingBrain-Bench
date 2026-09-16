@@ -236,3 +236,13 @@ def test_no_grace_period_is_added_to_the_agent_wall_clock():
     src = inspect.getsource(external.run_cell)
     assert "_run_agent(argv, str(ws), env, timeout_s)" in src
     assert "timeout_s + " not in src, "the wall clock must be handed over intact"
+
+
+def test_the_manifest_is_told_which_model_to_run():
+    # The bench prices the cell with its own `model`; an agent that never hears
+    # it can run a different one, and the mismatch shows up as a cost, not as
+    # a failure. Both spellings of the field are the same value.
+    from fbbench.sweep.external import Manifest
+    m = Manifest({"name": "x", "command": "run --model {model} --max-turns {max_turns}"}, Path("."))
+    assert m.render(model="claude-opus-5", max_turns="100") == [
+        "run", "--model", "claude-opus-5", "--max-turns", "100"]

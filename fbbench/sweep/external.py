@@ -873,9 +873,14 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # manifest that ignores {max_turns} is running unbudgeted, and the
         # turn_budget_honoured field in score.json says so. The wall clock is
         # the half we CAN enforce, and _run_agent enforces it on the second.
+        # {model} is the arm's model, the same string the api arm instantiates
+        # and claudecode passes to `claude --model`. Without it an external
+        # manifest has to hardcode one, so `--model` on the command line would
+        # silently not reach the agent and every cell in a sweep would run
+        # whatever the manifest said -- the run would be mislabelled, not fail.
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
                                opening=DEFAULT_OPENING, submit="./submit",
-                               max_turns=str(max_turns))
+                               max_turns=str(max_turns), model=model)
         env = dict(os.environ)
         # The manifest's own directory goes on PYTHONPATH, so a Python agent can
         # `python3 -m its_package.run` from the staged workspace without knowing
