@@ -191,3 +191,48 @@ def test_no_report_falls_back_to_the_trace_count(tmp_path):
         '{"kind":"tool_call"}\n{"kind":"tool_result"}\n{"kind":"tool_call"}\n')
     assert _agent_turns(None, tmp_path) == 2
     assert _agent_turns({}, Path("/nonexistent")) == 0
+
+
+# ---- wall-clock parity ------------------------------------------------------
+# The external agent gets exactly the wall clock every other arm gets. The api
+# episode self-stops at its deadline; claudecode hard-kills `claude -p` on the
+# same one. This arm used to allow timeout_s+300 before the kill, which is real
+# working time nobody else has.
+
+def test_the_wall_clock_is_hard_and_takes_the_whole_process_group():
+    import sys as _sys
+    import time as _time
+    from fbbench.sweep.external import _run_agent
+    # The agent spawns a grandchild that outlives it and holds the pipe --
+    # subprocess.run(timeout=...) kills only the direct child and would hang
+    # here, letting the cell run past its budget.
+    prog = ("import subprocess,sys,time;"
+            "subprocess.Popen([sys.executable,'-c','import time;time.sleep(120)']);"
+            "print('started',flush=True); time.sleep(120)")
+    t0 = _time.time()
+    out, _err, timed_out = _run_agent([_sys.executable, "-c", prog], ".", None, 2)
+    elapsed = _time.time() - t0
+    assert timed_out
+    assert elapsed < 5, elapsed
+    # What the agent printed before the kill is still returned, not discarded.
+    assert "started" in out
+
+
+def test_an_agent_that_finishes_early_is_not_charged_the_clock():
+    import sys as _sys
+    import time as _time
+    from fbbench.sweep.external import _run_agent
+    t0 = _time.time()
+    out, _err, timed_out = _run_agent(
+        [_sys.executable, "-c", "print('done')"], ".", None, 60)
+    assert not timed_out
+    assert "done" in out
+    assert _time.time() - t0 < 10
+
+
+def test_no_grace_period_is_added_to_the_agent_wall_clock():
+    import inspect
+    from fbbench.sweep import external
+    src = inspect.getsource(external.run_cell)
+    assert "_run_agent(argv, str(ws), env, timeout_s)" in src
+    assert "timeout_s + " not in src, "the wall clock must be handed over intact"
