@@ -786,6 +786,56 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
         print(f"  note: report.html skipped: {e}", flush=True)
 
 
+def _kill_pg(proc: subprocess.Popen) -> None:
+    """SIGKILL the child's whole process group, falling back to the child."""
+    try:
+        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+    except Exception:  # noqa: BLE001
+        try:
+            proc.kill()
+        except Exception:  # noqa: BLE001
+            pass
+
+
+def _run_agent(argv: list[str], cwd: str, env: dict,
+               timeout_s: int) -> tuple[str, str, bool]:
+    """Run the agent under a HARD wall clock of exactly `timeout_s`.
+
+    The other arms get no grace: claudecode hard-kills `claude -p` on its
+    t0+timeout_s watchdog, and the api episode checks the same deadline between
+    turns and stops itself (its orchestrator backstop is writeout headroom the
+    loop can never spend). This arm used to allow timeout_s+300 before the kill,
+    which is 300 seconds of real working time nobody else has -- an agent that
+    ignores the {timeout} it was handed simply kept going. Killing on the second
+    costs nothing now: the judge persists every candidate as it grades it, and
+    turns fall back to the trace when the agent never printed its report.
+
+    The child gets its own process group so the kill takes its descendants with
+    it. `subprocess.run(timeout=...)` kills only the direct child, so a docker
+    or gdb grandchild would hold the pipe open and hang the cell past its budget.
+
+    Returns (stdout, stderr, timed_out).
+    """
+    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, start_new_session=True)
+    try:
+        out, err = proc.communicate(timeout=timeout_s)
+        return out or "", err or "", False
+    except subprocess.TimeoutExpired:
+        _kill_pg(proc)
+    except BaseException:                      # Ctrl-C / SIGTERM handler
+        _kill_pg(proc)
+        raise
+    # Drain whatever the agent had already printed. The group is dead, so this
+    # returns as soon as the pipes close; the bound is only for a wedged pipe.
+    try:
+        out, err = proc.communicate(timeout=30)
+    except subprocess.TimeoutExpired:
+        out, err = "", ""
+    return out or "", err or "", True
+
+
 def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
              max_turns: int = 100, *, manifest: Manifest, api_key: str | None = None,
              preserve_pocs: bool = True) -> dict | None:
@@ -821,7 +871,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # gets the same contract: the budget is handed over as {max_turns} and
         # the agent must honour it and report turns_used in its summary. A
         # manifest that ignores {max_turns} is running unbudgeted, and the
-        # turn_budget_honoured field in score.json says so.
+        # turn_budget_honoured field in score.json says so. The wall clock is
+        # the half we CAN enforce, and _run_agent enforces it on the second.
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
                                opening=DEFAULT_OPENING, submit="./submit",
                                max_turns=str(max_turns))
@@ -856,15 +907,13 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         except (ValueError, OSError):   # not the main thread
             prev_term = None
         try:
-            proc = subprocess.run(argv, cwd=str(ws), env=env, capture_output=True,
-                                  text=True, timeout=timeout_s + 300)
-            log = (proc.stdout or "") + "\n--- stderr ---\n" + (proc.stderr or "")
-        except subprocess.TimeoutExpired as e:
-            terminated = "wall-clock"
-            log = (e.stdout or "") if isinstance(e.stdout, str) else ""
+            out, err, timed_out = _run_agent(argv, str(ws), env, timeout_s)
+            log = out + "\n--- stderr ---\n" + err
+            if timed_out:
+                terminated = "wall-clock"
         except KeyboardInterrupt:
-            # subprocess.run kills the child and re-raises, so its stdout is
-            # gone; the graded blobs are not.
+            # _run_agent kills the group and re-raises, so its stdout is gone;
+            # the graded blobs are not.
             terminated = "interrupted"
             log = ""
             interrupted = True
