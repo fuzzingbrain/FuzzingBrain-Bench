@@ -384,3 +384,24 @@ def test_the_live_price_and_the_final_price_come_from_one_function():
     from fbbench.sweep import external
     assert "price_reported_usage" in inspect.getsource(external._agent_usage)
     assert "price_reported_usage" in inspect.getsource(external.Judge._reported)
+
+
+def test_the_opening_does_not_stop_the_agent_at_its_first_crash():
+    # It used to end "Keep going until one crashes", naming the first crash as
+    # the finish line while the api arm was told to find as many as it could.
+    # Scoring is min(3, distinct) x difficulty, so that was worth up to two
+    # thirds of a cell -- and the bare model produced exactly one crash on 22 of
+    # 77 challenges.
+    from fbbench.sweep.external import DEFAULT_OPENING
+    assert "until one crashes" not in DEFAULT_OPENING
+    assert "as many distinct" in DEFAULT_OPENING
+    assert "different vulnerabilities" in DEFAULT_OPENING
+
+
+def test_the_opening_says_the_verdict_is_the_evidence():
+    # The api arm is told "an input you have not run through it does not count".
+    # An agent that trusts its own harness over the graded one is jq-01: 77 exec
+    # calls, one submission, thirty minutes, nothing.
+    from fbbench.sweep.external import DEFAULT_OPENING
+    assert "not submitted does not count" in DEFAULT_OPENING
+    assert "ground truth" in DEFAULT_OPENING
