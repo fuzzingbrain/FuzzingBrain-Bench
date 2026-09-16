@@ -333,7 +333,7 @@ class Judge:
 
     def __init__(self, workspace: Path, bug_dir: Path,
                  cell_dir: Path | None = None, preserve_pocs: bool = True,
-                 image: str | None = None):
+                 image: str | None = None, header: dict | None = None):
         self.ws = workspace
         self.bug_dir = bug_dir
         self.image = image
@@ -362,6 +362,10 @@ class Judge:
         self._t0 = time.time()
         self._progress = None
         self._mirrored: dict[str, int] = {}
+        # Enough of the run's identity to render a report from a cell that never
+        # finished: without it a killed cell's report has no bug, no model and
+        # no turn budget, which is most of the header.
+        self._header = header or {}
 
     def _open_progress(self) -> None:
         if self.cell_dir is None:
@@ -398,8 +402,24 @@ class Judge:
                     continue
                 shutil.copy2(src, self.cell_dir / name)
                 self._mirrored[rel] = mtime
+                if name == "trace.jsonl":
+                    self._write_live_transcript()
             except OSError:
                 pass  # mirroring never breaks grading
+
+    def _write_live_transcript(self) -> None:
+        """transcript.jsonl as the run goes, so report.py can render a cell that
+        died. No `end` event -- the run has not ended, and claiming otherwise
+        would put a terminated_reason on a report for a run still in flight.
+        _write_run_artifacts overwrites this with the complete version."""
+        recs = _read_trace(self.cell_dir / "trace.jsonl")
+        ev = [{"event": "start", "system_prompt": "", "preserve_pocs": self.preserve_pocs,
+               "tools": sorted({r.get("tool") for r in recs
+                                if r.get("kind") == "tool_call" and r.get("tool")}),
+               **self._header}]
+        ev += _events_from_trace(recs)
+        (self.cell_dir / "transcript.jsonl").write_text(
+            "\n".join(json.dumps(e) for e in ev) + "\n")
 
     def _reported(self) -> dict | None:
         """Whatever the agent last wrote to .fbbench/usage.json, or None."""
@@ -438,6 +458,7 @@ class Judge:
             # A running tally, rewritten each time, so score-so-far is readable
             # without parsing the stream.
             (self.cell_dir / "score.partial.json").write_text(json.dumps({
+                **self._header,
                 "in_progress": True,
                 "elapsed_s": round(time.time() - self._t0, 1),
                 "blobs_written": len(self.log),
@@ -726,6 +747,53 @@ def _agent_usage(ws: Path, log: str, model: str) -> dict:
 
 
 
+def _events_from_trace(recs: list[dict]) -> list[dict]:
+    """The agent's own trace, in report.py's event schema.
+
+    Split out of _write_run_artifacts so the judge can rebuild transcript.jsonl
+    as the run goes. The api arm flushes its transcript every record, so a cell
+    that dies still renders its dialogue; built only at exit, this arm's report
+    came out empty on exactly the runs worth looking at.
+    """
+    ev: list[dict] = []
+    pending: dict[int, list] = {}
+    for r in recs:
+        step = r.get("step", 0)
+        kind = r.get("kind")
+        if kind in ("text", "thinking"):
+            ev.append({"event": "assistant", "turn": step,
+                       "text": r.get("text", ""), "tool_calls": []})
+        elif kind == "tool_call":
+            tid = f"s{step}-{len(pending.get(step, []))}"
+            pending.setdefault(step, []).append(tid)
+            ev.append({"event": "assistant", "turn": step, "text": "",
+                       "tool_calls": [{"id": tid, "name": r.get("tool", "?"),
+                                       "input": r.get("input", {})}]})
+        elif kind == "tool_result":
+            ids = pending.get(step) or [f"s{step}-0"]
+            ev.append({"event": "tool_result", "turn": step,
+                       "id": ids.pop(0) if ids else f"s{step}-0",
+                       "tool": r.get("tool", "?"),
+                       "is_error": bool(r.get("is_error")),
+                       "result": r.get("content", r.get("text", ""))})
+    return ev
+
+
+def _read_trace(path: Path) -> list[dict]:
+    recs: list[dict] = []
+    if not path.is_file():
+        return recs
+    try:
+        for line in path.read_text(errors="ignore").splitlines():
+            try:
+                recs.append(json.loads(line))
+            except ValueError:
+                pass
+    except OSError:
+        pass
+    return recs
+
+
 def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
                          bug: str, model: str, opening: str, *,
                          score: dict | None = None, usage: dict | None = None,
@@ -761,26 +829,7 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
                                         if r.get("kind") == "tool_call"
                                         and r.get("tool")})}]
     if recs:
-        pending: dict[int, list] = {}
-        for r in recs:
-            step = r.get("step", 0)
-            kind = r.get("kind")
-            if kind in ("text", "thinking"):
-                ev.append({"event": "assistant", "turn": step,
-                           "text": r.get("text", ""), "tool_calls": []})
-            elif kind == "tool_call":
-                tid = f"s{step}-{len(pending.get(step, []))}"
-                pending.setdefault(step, []).append(tid)
-                ev.append({"event": "assistant", "turn": step, "text": "",
-                           "tool_calls": [{"id": tid, "name": r.get("tool", "?"),
-                                           "input": r.get("input", {})}]})
-            elif kind == "tool_result":
-                ids = pending.get(step) or [f"s{step}-0"]
-                ev.append({"event": "tool_result", "turn": step,
-                           "id": ids.pop(0) if ids else f"s{step}-0",
-                           "tool": r.get("tool", "?"),
-                           "is_error": bool(r.get("is_error")),
-                           "result": r.get("content", r.get("text", ""))})
+        ev += _events_from_trace(recs)
     else:
         # No trace: reconstruct what we do know -- every submission and verdict.
         for i, e in enumerate(judge.log):
@@ -913,7 +962,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             return {"error": str(e)}
 
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
-                      image=image)
+                      image=image,
+                      header={"bug_id": bug, "model": model, "max_turns": max_turns,
+                              "initial_user_message": DEFAULT_OPENING})
         judge.start()
         shell, sandbox_kind, sandbox = make_sandbox(
             root, ws, image, manifest.allow_network,

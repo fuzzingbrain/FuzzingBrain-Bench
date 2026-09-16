@@ -312,3 +312,31 @@ def test_the_judge_mirrors_the_agents_files_out_of_the_doomed_workspace(tmp_path
     (ws / ".fbagent-trace.jsonl").write_text('{"kind":"text","text":"hello"}\n{"kind":"text","text":"later"}\n')
     judge._mirror()
     assert '"later"' in (cell / "trace.jsonl").read_text()
+
+
+def test_a_report_can_be_rendered_from_a_cell_that_never_finished(tmp_path):
+    # The api arm flushes transcript.jsonl every record, so a killed cell still
+    # renders its dialogue. This arm built the transcript at exit, so the one
+    # run worth looking at -- the expensive one that died -- rendered empty.
+    from fbbench.runner.report import build_report_html
+    from fbbench.sweep.external import Judge
+
+    ws, cell = tmp_path / "ws", tmp_path / "cell"
+    (ws / ".fbbench").mkdir(parents=True)
+    cell.mkdir()
+    judge = Judge(ws, tmp_path / "bug", cell_dir=cell,
+                  header={"bug_id": "avro-03", "model": "claude-opus-5", "max_turns": 100})
+    (ws / ".fbagent-trace.jsonl").write_text(
+        '{"step":1,"kind":"text","text":"Reading the harness."}\n'
+        '{"step":1,"kind":"tool_call","tool":"bash","input":{"command":"./submit c1"}}\n'
+        '{"step":1,"kind":"tool_result","tool":"bash","content":"crash: abrt|parse|main"}\n')
+    judge._mirror()
+    judge._record({"blob": "b1", "size": 8, "crashed": True, "signature": "abrt|parse|main"},
+                  tmp_path / "missing", "crash: abrt|parse|main")
+
+    html = build_report_html(cell)
+    assert "avro-03" in html and "claude-opus-5" in html
+    assert "Reading the harness." in html
+    assert "./submit c1" in html
+    assert "abrt|parse|main" in html
+    assert "run did not finish" in html
