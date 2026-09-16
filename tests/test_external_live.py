@@ -340,3 +340,47 @@ def test_a_report_can_be_rendered_from_a_cell_that_never_finished(tmp_path):
     assert "./submit c1" in html
     assert "abrt|parse|main" in html
     assert "run did not finish" in html
+
+
+def test_an_unfinished_run_reports_what_it_spent(tmp_path):
+    # Tokens without dollars is not a cost report: it asks the reader to price
+    # the run themselves, and an empty field reads as zero to anyone skimming.
+    # A run that died is exactly when the number matters -- the money is gone
+    # and the only open question is how much.
+    from fbbench.runner.report import build_report_html
+    from fbbench.sweep.external import Judge
+
+    ws, cell = tmp_path / "ws", tmp_path / "cell"
+    (ws / ".fbbench").mkdir(parents=True)
+    cell.mkdir()
+    judge = Judge(ws, tmp_path / "bug", cell_dir=cell,
+                  header={"bug_id": "avro-03", "model": "claude-opus-5", "max_turns": 100})
+    (ws / ".fbbench" / "usage.json").write_text(json.dumps({
+        "model": "claude-opus-5", "input_tokens": 35217, "output_tokens": 6376,
+        "cache_read_tokens": 537296, "cache_write_tokens": 29186,
+        "input_is_total": False}))
+
+    judge._record({"blob": "b1", "size": 8, "crashed": False, "signature": ""},
+                  tmp_path / "missing", "clean: no fault")
+    partial = json.loads((cell / "score.partial.json").read_text())
+
+    # Priced by the bench's own table, through the one function that prices.
+    from fbbench.sweep.external import price_reported_usage
+    expected = price_reported_usage(json.loads((ws / ".fbbench" / "usage.json").read_text()),
+                                    "claude-opus-5")["total_usd"]
+    assert partial["total_usd"] == expected > 0
+    assert partial["agent_reported"]["partial"] is True
+
+    # And it has to reach the report, which reads cost off the top level.
+    html = build_report_html(cell)
+    assert f"{expected:.4f}" in html or f"{expected:.2f}" in html, expected
+    assert "not reported" not in html
+
+
+def test_the_live_price_and_the_final_price_come_from_one_function():
+    # Two places computing money is how two numbers start disagreeing. That was
+    # the reason not to price live; the answer is one function, not a blank field.
+    import inspect
+    from fbbench.sweep import external
+    assert "price_reported_usage" in inspect.getsource(external._agent_usage)
+    assert "price_reported_usage" in inspect.getsource(external.Judge._reported)

@@ -422,11 +422,22 @@ class Judge:
             "\n".join(json.dumps(e) for e in ev) + "\n")
 
     def _reported(self) -> dict | None:
-        """Whatever the agent last wrote to .fbbench/usage.json, or None."""
+        """What the run has spent so far, tokens AND dollars, priced with the
+        bench's own table by the same function that prices the final number.
+
+        A run that dies is exactly when this matters: the money is gone and the
+        only question left is how much. Reporting tokens and leaving the dollars
+        blank asks the reader to price it themselves, and a blank field reads as
+        zero to anyone skimming."""
         try:
-            return json.loads((self.ws / ".fbbench" / "usage.json").read_text())
+            raw = json.loads((self.ws / ".fbbench" / "usage.json").read_text())
         except (OSError, ValueError):
             return None
+        try:
+            priced = price_reported_usage(raw, self._header.get("model", ""))
+        except Exception:  # noqa: BLE001 - pricing never breaks grading
+            return raw
+        return {**priced, "partial": True}
 
     def _record(self, entry: dict, src: Path, verdict_detail: str) -> None:
         """Persist one graded candidate the moment it is graded. Never raises:
@@ -468,7 +479,12 @@ class Judge:
                 # having cost money should say so here rather than leave the
                 # reader to guess, and `in_progress: true` is what marks the
                 # whole file as a run that never finished.
-                "agent_reported": self._reported(),
+                "agent_reported": (spend := self._reported()),
+                # Lifted to the top level as well, because report.py reads cost
+                # from score.total_usd -- nested, a killed cell's report still
+                # printed "not reported" over a number that was right there.
+                "total_usd": (spend or {}).get("total_usd"),
+                "cost_basis": (spend or {}).get("basis"),
             }, indent=2))
         except Exception:  # noqa: BLE001 - reporting never breaks grading
             pass
@@ -712,6 +728,20 @@ def _agent_usage(ws: Path, log: str, model: str) -> dict:
     if not raw:
         return {"basis": "unreported", "total_usd": None}
 
+    return price_reported_usage(raw, model)
+
+
+def price_reported_usage(raw: dict, model: str) -> dict:
+    """Turn one agent-reported usage record into tokens + USD.
+
+    The single pricing site. The judge calls it every time it rewrites the
+    running tally, so a cell that dies still says what it spent; _agent_usage
+    calls it once at the end for the authoritative number. Both go through here
+    because two places computing money is how two numbers start disagreeing --
+    which was the reason not to price live, and is not a reason to leave the
+    field blank. An unfinished run that burned tokens has a cost; refusing to
+    name it does not make it smaller.
+    """
     u = raw.get("usage") if isinstance(raw.get("usage"), dict) else raw
     def _n(*names):
         for n in names:
