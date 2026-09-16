@@ -209,8 +209,10 @@ def test_the_wall_clock_is_hard_and_takes_the_whole_process_group():
     prog = ("import subprocess,sys,time;"
             "subprocess.Popen([sys.executable,'-c','import time;time.sleep(120)']);"
             "print('started',flush=True); time.sleep(120)")
+    import tempfile
+    log = Path(tempfile.mkdtemp()) / "agent.log"
     t0 = _time.time()
-    out, _err, timed_out = _run_agent([_sys.executable, "-c", prog], ".", None, 2)
+    out, timed_out = _run_agent([_sys.executable, "-c", prog], ".", None, 2, log)
     elapsed = _time.time() - t0
     assert timed_out
     assert elapsed < 5, elapsed
@@ -222,9 +224,11 @@ def test_an_agent_that_finishes_early_is_not_charged_the_clock():
     import sys as _sys
     import time as _time
     from fbbench.sweep.external import _run_agent
+    import tempfile
+    log = Path(tempfile.mkdtemp()) / "agent.log"
     t0 = _time.time()
-    out, _err, timed_out = _run_agent(
-        [_sys.executable, "-c", "print('done')"], ".", None, 60)
+    out, timed_out = _run_agent(
+        [_sys.executable, "-c", "print('done')"], ".", None, 60, log)
     assert not timed_out
     assert "done" in out
     assert _time.time() - t0 < 10
@@ -234,7 +238,7 @@ def test_no_grace_period_is_added_to_the_agent_wall_clock():
     import inspect
     from fbbench.sweep import external
     src = inspect.getsource(external.run_cell)
-    assert "_run_agent(argv, str(ws), env, timeout_s)" in src
+    assert "_run_agent(argv, str(ws), env, timeout_s, agent_log)" in src
     assert "timeout_s + " not in src, "the wall clock must be handed over intact"
 
 
@@ -246,3 +250,65 @@ def test_the_manifest_is_told_which_model_to_run():
     m = Manifest({"name": "x", "command": "run --model {model} --max-turns {max_turns}"}, Path("."))
     assert m.render(model="claude-opus-5", max_turns="100") == [
         "run", "--model", "claude-opus-5", "--max-turns", "100"]
+
+
+# ---- evidence survives the run dying ----------------------------------------
+# A bare-model cell flushes its dialogue every record, so whatever happens --
+# the host goes down, the sweep is SIGKILLed, a connection drops -- there is a
+# directory saying what was done and what it cost. An external cell used to hold
+# its log in a pipe and its trace in a temp dir, both of which die with the
+# process, in exactly the case where the money is already spent.
+
+def test_the_agent_log_is_on_disk_while_the_agent_is_still_running(tmp_path):
+    import subprocess as sp
+    import sys
+    import threading
+    import time as t
+    from fbbench.sweep.external import _run_agent
+
+    log = tmp_path / "agent.log"
+    prog = "import sys,time\nprint('turn 1', flush=True)\ntime.sleep(30)\n"
+    seen = []
+
+    def watch():
+        for _ in range(100):
+            if log.is_file() and "turn 1" in log.read_text():
+                seen.append(True)
+                return
+            t.sleep(0.1)
+
+    w = threading.Thread(target=watch)
+    w.start()
+    _run_agent([sys.executable, "-c", prog], str(tmp_path), None, 3, log)
+    w.join()
+    assert seen, "nothing was readable until the process exited"
+
+
+def test_a_killed_agent_still_leaves_what_it_printed(tmp_path):
+    import sys
+    from fbbench.sweep.external import _run_agent
+    log = tmp_path / "agent.log"
+    prog = "import time\nprint('spent $4.10', flush=True)\ntime.sleep(60)\n"
+    text, timed_out = _run_agent([sys.executable, "-c", prog], str(tmp_path), None, 2, log)
+    assert timed_out
+    assert "spent $4.10" in text
+    assert "spent $4.10" in log.read_text()
+
+
+def test_the_judge_mirrors_the_agents_files_out_of_the_doomed_workspace(tmp_path):
+    from fbbench.sweep.external import Judge
+    ws, cell = tmp_path / "ws", tmp_path / "cell"
+    (ws / ".fbbench").mkdir(parents=True)
+    cell.mkdir()
+    judge = Judge(ws, tmp_path / "bug", cell_dir=cell)
+
+    (ws / ".fbagent-trace.jsonl").write_text('{"kind":"text","text":"hello"}\n')
+    (ws / ".fbbench" / "usage.json").write_text('{"model":"m","input_tokens":7}')
+    judge._mirror()
+    assert '"hello"' in (cell / "trace.jsonl").read_text()
+    assert '"input_tokens": 7' in (cell / "usage.json").read_text().replace('"input_tokens":7', '"input_tokens": 7')
+
+    # A later turn appends; the mirror has to follow, not stop at the first copy.
+    (ws / ".fbagent-trace.jsonl").write_text('{"kind":"text","text":"hello"}\n{"kind":"text","text":"later"}\n')
+    judge._mirror()
+    assert '"later"' in (cell / "trace.jsonl").read_text()

@@ -361,6 +361,7 @@ class Judge:
         self.preserve_pocs = preserve_pocs
         self._t0 = time.time()
         self._progress = None
+        self._mirrored: dict[str, int] = {}
 
     def _open_progress(self) -> None:
         if self.cell_dir is None:
@@ -370,6 +371,42 @@ class Judge:
             self._progress = (self.cell_dir / "progress.jsonl").open("w", buffering=1)
         except OSError:
             self._progress = None
+
+    # What an agent writes in the workspace, and where it lands in the cell.
+    # The workspace is a temp dir that is rmtree'd at the end of a clean run and
+    # orphaned in /tmp after a kill, so neither survives as evidence on its own.
+    _MIRROR = {".fbagent-trace.jsonl": "trace.jsonl",
+               ".fbbench/usage.json": "usage.json"}
+
+    def _mirror(self) -> None:
+        """Copy the agent's live files into the cell as they change.
+
+        Without this, a cell killed mid-run keeps its graded candidates but
+        loses the reasoning and the spend -- which is the wrong half to lose,
+        because the money is already gone. Copy-on-mtime, so the common case is
+        two stat() calls per poll.
+        """
+        if self.cell_dir is None:
+            return
+        for rel, name in self._MIRROR.items():
+            src = self.ws / rel
+            try:
+                if not src.is_file():
+                    continue
+                mtime = src.stat().st_mtime_ns
+                if self._mirrored.get(rel) == mtime:
+                    continue
+                shutil.copy2(src, self.cell_dir / name)
+                self._mirrored[rel] = mtime
+            except OSError:
+                pass  # mirroring never breaks grading
+
+    def _reported(self) -> dict | None:
+        """Whatever the agent last wrote to .fbbench/usage.json, or None."""
+        try:
+            return json.loads((self.ws / ".fbbench" / "usage.json").read_text())
+        except (OSError, ValueError):
+            return None
 
     def _record(self, entry: dict, src: Path, verdict_detail: str) -> None:
         """Persist one graded candidate the moment it is graded. Never raises:
@@ -406,6 +443,11 @@ class Judge:
                 "blobs_written": len(self.log),
                 "unique_crashes": len(self.signatures()),
                 "crash_signatures": sorted(self.signatures()),
+                # Spend so far, as the agent last reported it. A run that dies
+                # having cost money should say so here rather than leave the
+                # reader to guess, and `in_progress: true` is what marks the
+                # whole file as a run that never finished.
+                "agent_reported": self._reported(),
             }, indent=2))
         except Exception:  # noqa: BLE001 - reporting never breaks grading
             pass
@@ -461,9 +503,11 @@ class Judge:
                 (self.res / cand.name).write_text(detail + "\n")
                 self._record(entry, self.blobs / cand.name, detail)
                 cand.unlink(missing_ok=True)
+            self._mirror()
             self._stop.wait(0.2)
 
     def stop(self) -> None:
+        self._mirror()
         self._stop.set()
         if self._t:
             self._t.join(timeout=10)
@@ -797,8 +841,8 @@ def _kill_pg(proc: subprocess.Popen) -> None:
             pass
 
 
-def _run_agent(argv: list[str], cwd: str, env: dict,
-               timeout_s: int) -> tuple[str, str, bool]:
+def _run_agent(argv: list[str], cwd: str, env: dict, timeout_s: int,
+               log_path: Path) -> tuple[str, bool]:
     """Run the agent under a HARD wall clock of exactly `timeout_s`.
 
     The other arms get no grace: claudecode hard-kills `claude -p` on its
@@ -814,26 +858,38 @@ def _run_agent(argv: list[str], cwd: str, env: dict,
     it. `subprocess.run(timeout=...)` kills only the direct child, so a docker
     or gdb grandchild would hold the pipe open and hang the cell past its budget.
 
-    Returns (stdout, stderr, timed_out).
+    Output goes STRAIGHT TO `log_path`, not to a pipe we read at the end. The
+    api arm flushes its dialogue every record, so a cell that dies -- the host
+    going down, the sweep being SIGKILLed, a dropped connection -- still shows
+    what the run had done and what it had spent. Captured at exit, an external
+    agent's log is held in a pipe that dies with the process: exactly the case
+    where the money is already gone and the evidence is what is left.
+
+    stderr is merged into the same file rather than kept apart, so the two
+    interleave in real time; concatenating them afterwards loses which output
+    came before which error.
+
+    Returns (log_text, timed_out).
     """
-    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
-                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                            text=True, start_new_session=True)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    with log_path.open("w", buffering=1) as fh:
+        proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                                stdout=fh, stderr=subprocess.STDOUT,
+                                text=True, start_new_session=True)
+        try:
+            proc.wait(timeout=timeout_s)
+            timed_out = False
+        except subprocess.TimeoutExpired:
+            _kill_pg(proc)
+            proc.wait(timeout=30)
+            timed_out = True
+        except BaseException:                  # Ctrl-C / SIGTERM handler
+            _kill_pg(proc)
+            raise
     try:
-        out, err = proc.communicate(timeout=timeout_s)
-        return out or "", err or "", False
-    except subprocess.TimeoutExpired:
-        _kill_pg(proc)
-    except BaseException:                      # Ctrl-C / SIGTERM handler
-        _kill_pg(proc)
-        raise
-    # Drain whatever the agent had already printed. The group is dead, so this
-    # returns as soon as the pipes close; the bound is only for a wedged pipe.
-    try:
-        out, err = proc.communicate(timeout=30)
-    except subprocess.TimeoutExpired:
-        out, err = "", ""
-    return out or "", err or "", True
+        return log_path.read_text(errors="replace"), timed_out
+    except OSError:
+        return "", timed_out
 
 
 def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
@@ -911,16 +967,17 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             prev_term = signal.signal(signal.SIGTERM, _on_term)
         except (ValueError, OSError):   # not the main thread
             prev_term = None
+        cell_dir.mkdir(parents=True, exist_ok=True)
+        agent_log = cell_dir / "agent.log"
         try:
-            out, err, timed_out = _run_agent(argv, str(ws), env, timeout_s)
-            log = out + "\n--- stderr ---\n" + err
+            log, timed_out = _run_agent(argv, str(ws), env, timeout_s, agent_log)
             if timed_out:
                 terminated = "wall-clock"
         except KeyboardInterrupt:
-            # _run_agent kills the group and re-raises, so its stdout is gone;
-            # the graded blobs are not.
+            # _run_agent kills the group and re-raises. The log is on disk
+            # either way now, so read back what the agent had printed.
             terminated = "interrupted"
-            log = ""
+            log = agent_log.read_text(errors="replace") if agent_log.is_file() else ""
             interrupted = True
         finally:
             if prev_term is not None:
@@ -931,8 +988,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         duration = time.time() - started
         judge.stop()
 
-        cell_dir.mkdir(parents=True, exist_ok=True)
-        (cell_dir / "agent.log").write_text(log)
+        # agent.log is already on disk -- _run_agent wrote it as the agent ran.
+        # Rewriting it here would only risk replacing a complete log with a
+        # truncated re-read on the one path where it matters.
         if preserve_pocs:
             for e in judge.log:
                 sub = cell_dir / "pocs" / ("crashed" if e["crashed"] else "clean")
