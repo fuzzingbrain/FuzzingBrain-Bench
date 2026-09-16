@@ -30,7 +30,7 @@ the bench's own `grade_blob`, the same number every arm reports.
 name: fbagent
 
 # How the bench invokes the agent, run in the staged directory.
-# Template fields: {workspace} {timeout} {opening} {submit}
+# Template fields: {workspace} {timeout} {opening} {submit} {max_turns} {model}
 # @path inlines a file next to the manifest (e.g. a long system prompt).
 command: >
   omp -p "{opening}" --tools read,glob,grep,bash
