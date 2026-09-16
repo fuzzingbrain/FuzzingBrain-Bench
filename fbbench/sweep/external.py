@@ -571,12 +571,24 @@ class Judge:
 # ---------------------------------------------------------------- the cell
 
 
-def _agent_steps(ws: Path) -> int:
-    """How many tool calls the agent made, from its own trace.
+def _agent_turns(report: dict | None, ws: Path) -> int:
+    """Turns the agent reports, falling back to counting its trace.
 
-    report.py's header reads `turns_used` off score.json. The external arm never
-    wrote it, so every cell reported "0 turns used" beside a trajectory of two
-    hundred calls."""
+    A turn is one model call -- the same unit the api arm bounds with
+    `for turn in range(max_turns)` and claudecode passes as --max-turns. An
+    agent reports it as `turns` (or the older `steps`) in the summary JSON it
+    already prints for cost. Where it reports nothing, the trace's tool_call
+    count is a lower bound, not the real figure: a turn may carry several tool
+    calls, and one bash call can drive hundreds of submissions."""
+    for key in ("turns", "turns_used", "steps"):
+        v = (report or {}).get(key)
+        if isinstance(v, int) and v >= 0:
+            return v
+    return _trace_tool_calls(ws)
+
+
+def _trace_tool_calls(ws: Path) -> int:
+    """Tool calls in the agent's own trace -- the fallback for turns."""
     src = ws / ".fbagent-trace.jsonl"
     if not src.is_file():
         return 0
@@ -752,8 +764,7 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
                    "terminated_reason": score.get("terminated_reason"),
                    "unique_crashes": score.get("unique_crashes"),
                    "crash_signatures": score.get("crash_signatures"),
-                   "turns_used": sum(1 for r in (recs or [])
-                                     if r.get("kind") == "tool_call") or len(judge.log),
+                   "turns_used": score.get("turns_used"),
                    "duration_s": score.get("duration_s"),
                    "input_tokens": u.get("input_tokens", 0),
                    "output_tokens": u.get("output_tokens", 0),
@@ -802,8 +813,18 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             root, ws, image, manifest.allow_network,
             os.environ.get("FBBENCH_SANDBOX", "auto"))
 
+        # Every arm is budgeted the same way: a turn cap and a wall clock, and
+        # no dollar cap (the api arm has none, so neither may we). The api arm
+        # owns its loop and bounds it directly; claudecode passes --max-turns to
+        # the CLI and trusts it to obey. An external agent is the same shape as
+        # claudecode -- a black box we cannot count model calls inside -- so it
+        # gets the same contract: the budget is handed over as {max_turns} and
+        # the agent must honour it and report turns_used in its summary. A
+        # manifest that ignores {max_turns} is running unbudgeted, and the
+        # turn_budget_honoured field in score.json says so.
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
-                               opening=DEFAULT_OPENING, submit="./submit")
+                               opening=DEFAULT_OPENING, submit="./submit",
+                               max_turns=str(max_turns))
         env = dict(os.environ)
         # The manifest's own directory goes on PYTHONPATH, so a Python agent can
         # `python3 -m its_package.run` from the staged workspace without knowing
@@ -869,6 +890,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             usage = _agent_usage(ws, log, model)
         except Exception as e:  # noqa: BLE001
             usage = {"basis": f"cost failed: {type(e).__name__}", "total_usd": None}
+        # Turns come from the same summary JSON the agent prints for cost.
+        turns_used = _agent_turns(_extract_report(log), ws)
         sigs = judge.signatures()
         best = next((judge.blobs / e["blob"] for e in judge.log if e["crashed"]), None)
         if best and best.is_file():
@@ -881,7 +904,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "terminated_reason": (terminated if judge.log else
                                   f"{terminated}: agent submitted nothing"),
             "duration_s": round(duration, 1),
-            "turns_used": _agent_steps(ws),
+            "turns_used": turns_used,
+            "turn_budget_honoured": turns_used <= max_turns,
             "blobs_written": len(judge.log), "max_turns": max_turns,
             # report.py reads mode/grading/preserve-PoCs out of `config`, the
             # same shape the api arm writes. Without it a cell renders as
