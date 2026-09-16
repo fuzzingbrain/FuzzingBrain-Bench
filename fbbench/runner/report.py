@@ -303,8 +303,13 @@ def _turns_from_transcript(tpath: Path) -> int:
         return 0
 
 
-def build_report_html(run_dir: Path) -> str:
-    score = _load(run_dir / "score.json")
+def build_report_html(run_dir: str | Path) -> str:
+    run_dir = Path(run_dir)   # write_report coerces; callers of this one did not
+    # A cell that never finished has no score.json, only the running tally the
+    # judge keeps. Falling back to it is the difference between a report that
+    # names the bug, the model and the crashes found so far, and one that says
+    # nothing at all about the run that just cost real money.
+    score = _load(run_dir / "score.json") or _load(run_dir / "score.partial.json")
     cost = _load(run_dir / "cost.json")
     tpath = run_dir / "transcript.jsonl"
     nodes = build_traj(tpath) if tpath.is_file() else []
@@ -312,7 +317,8 @@ def build_report_html(run_dir: Path) -> str:
     bug = score.get("bug_id", run_dir.parent.parent.name if run_dir.name.startswith("seed")
                      else run_dir.name)
     model = score.get("model", "—")
-    reason = score.get("terminated_reason", "—")
+    reason = score.get("terminated_reason") or ("interrupted (run did not finish)"
+                                                if score.get("in_progress") else "—")
     turns = score.get("turns_used") or _turns_from_transcript(tpath)
     dur = score.get("duration_s", 0.0)
     # An unknown cost is not a free run. The external arm can only price a cell
