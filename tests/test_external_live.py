@@ -405,3 +405,43 @@ def test_the_opening_says_the_verdict_is_the_evidence():
     from fbbench.sweep.external import DEFAULT_OPENING
     assert "not submitted does not count" in DEFAULT_OPENING
     assert "ground truth" in DEFAULT_OPENING
+
+
+def test_coverage_reach_parses_a_hit_without_a_debugger(tmp_path, monkeypatch):
+    # The reach tool used to need gdb inside the challenge image, and half the
+    # images ship none. Every libFuzzer target is built with coverage
+    # instrumentation, so -print_coverage=1 answers the same question with
+    # nothing extra -- and answers a better one, since it lists what WAS
+    # reached rather than confirming a name guessed in advance.
+    import subprocess
+    from fbbench.sweep.external import Judge
+    (tmp_path / "ws" / ".fbbench").mkdir(parents=True)
+    blob = tmp_path / "c.bin"; blob.write_bytes(b"x")
+    j = Judge(tmp_path / "ws", tmp_path / "bug", image="img")
+
+    out = ("COVERED_FUNC: hits: 1 edges: 3/4 xmlTextReaderRead /src/xmlreader.c:1200\n"
+           "COVERED_FUNC: hits: 1 edges: 1/1 xmlFuzzReadString /src/fuzz.c:88\n")
+    monkeypatch.setattr(subprocess, "run",
+                        lambda *a, **k: subprocess.CompletedProcess(a, 0, "", out))
+    r = j._run_coverage(blob, "xmlTextReaderRead")
+    assert r.startswith("REACHED xmlTextReaderRead /src/xmlreader.c:1200")
+    assert "2 functions executed" in r
+
+    r2 = j._run_coverage(blob, "somethingElse")
+    assert r2.startswith("NOT REACHED somethingElse")
+    assert "xmlTextReaderRead" in r2, "a miss must still list what WAS reached"
+
+
+def test_coverage_reach_declines_when_the_image_cannot_symbolize(tmp_path, monkeypatch):
+    # skia-01 collects coverage (cov: 733) but has no working symbolizer, so
+    # every line reads "<can not symbolize>". Returning None lets the caller
+    # fall back to gdb rather than reporting a confident nothing.
+    import subprocess
+    from fbbench.sweep.external import Judge
+    (tmp_path / "ws" / ".fbbench").mkdir(parents=True)
+    blob = tmp_path / "c.bin"; blob.write_bytes(b"x")
+    j = Judge(tmp_path / "ws", tmp_path / "bug", image="img")
+    unsym = "COVERAGE:\n==9==WARNING: invalid path to external symbolizer!\n"
+    monkeypatch.setattr(subprocess, "run",
+                        lambda *a, **k: subprocess.CompletedProcess(a, 0, "", unsym))
+    assert j._run_coverage(blob, "anything") is None
