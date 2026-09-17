@@ -621,7 +621,67 @@ class Judge:
                     blob.unlink(missing_ok=True)
             self._stop.wait(0.2)
 
+    def _run_coverage(self, blob: Path, target: str) -> str | None:
+        """Which functions did this input execute? None if the image cannot say.
+
+        Preferred over gdb because it needs nothing that is not already in the
+        binary: every libFuzzer target is built with coverage instrumentation,
+        so `-print_coverage=1` lists the functions the run touched, with file
+        and line. It answers a better question than a breakpoint does -- gdb can
+        only confirm a name the caller guessed in advance, this returns what was
+        actually reached -- and it needs no debugger, so it works on the images
+        that ship none. About half of them do not.
+
+        Two invocation details, both of which cost me a wrong conclusion:
+        libFuzzer wants a corpus DIRECTORY (a file path yields zero covered
+        functions), and it prints the coverage report to STDERR.
+
+        Returns None when the image cannot symbolize -- skia-01 collects the
+        coverage (`cov: 733`) but has no working symbolizer, so every line comes
+        back "<can not symbolize>". The caller then falls back to gdb.
+        """
+        with tempfile.TemporaryDirectory() as td:
+            d = Path(td)
+            (d / "corp").mkdir()
+            shutil.copy(blob, d / "corp" / "in.bin")
+            sh = ("B=/opt/fbbench/oracle/binaries/vuln/asan/harness; "
+                  "[ -x \"$B\" ] || B=$(command -v harness || echo /out/harness); "
+                  "export ASAN_OPTIONS=detect_leaks=0; "
+                  "export LD_LIBRARY_PATH=/opt/fbbench/oracle/binaries/vuln/sharedlibs:"
+                  "/opt/fbbench/oracle/binaries/vuln/asan:$LD_LIBRARY_PATH; "
+                  "exec \"$B\" -print_coverage=1 -runs=0 /tmp/corp")
+            try:
+                p = subprocess.run(
+                    ["docker", "run", "--rm", "--network", "none",
+                     "-v", f"{d}:/tmp:ro", "--entrypoint", "sh", self.image, "-c", sh],
+                    capture_output=True, text=True, timeout=self._GDB_TIMEOUT_S)
+            except subprocess.TimeoutExpired:
+                return None
+            raw = (p.stdout or "") + "\n" + (p.stderr or "")
+            covered = [l for l in raw.splitlines() if l.startswith("COVERED_FUNC")]
+            if not covered:
+                return None
+            hit = [l.split()[5] for l in covered if len(l.split()) > 5]
+            if target and target in hit:
+                where = next((" ".join(l.split()[5:7]) for l in covered
+                              if len(l.split()) > 6 and l.split()[5] == target), target)
+                return (f"REACHED {where}\n"
+                        f"{len(hit)} functions executed by this input.")
+            head = ", ".join(sorted(hit)[:40])
+            miss = f"NOT REACHED {target}\n" if target else ""
+            return (f"{miss}{len(hit)} functions executed by this input"
+                    f"{' (' + target + ' is not among them)' if target else ''}:\n{head}"
+                    f"{' ...' if len(hit) > 40 else ''}")
+
     def _run_gdb(self, blob: Path, target: str) -> str:
+        # Coverage first: no debugger needed, and it reports what was reached
+        # rather than only confirming a guess. Falls through to gdb when the
+        # image cannot symbolize its own coverage.
+        try:
+            if (cov := self._run_coverage(blob, target)) is not None:
+                return cov
+        except Exception:  # noqa: BLE001 - a broken fast path must not lose the slow one
+            pass
         if not self.image:
             return "error: trace unavailable — no challenge image for this cell."
         if not blob.is_file():
@@ -655,6 +715,14 @@ class Judge:
             except subprocess.TimeoutExpired:
                 return f"error: gdb exceeded {self._GDB_TIMEOUT_S}s on {target}."
             raw = (p.stdout or "") + ("\n" + p.stderr if p.stderr else "")
+            if "gdb: not found" in raw or "exec: gdb" in raw:
+                # Coverage already declined (no symbolizer) and this image ships
+                # no debugger. Say so, rather than handing the model a shell
+                # error it will waste turns trying to work around.
+                return ("error: reach is unavailable on this challenge — its "
+                        "image can neither symbolize its own coverage nor run a "
+                        "debugger. Use ./submit verdicts to judge how far an "
+                        "input gets; do not retry ./reach here.")
             if "No symbol table" in raw or "Function \"" in raw and "not defined" in raw:
                 return (f"error: gdb could not resolve {target!r} in this build — "
                         "check the spelling against the source, or pick a symbol "
