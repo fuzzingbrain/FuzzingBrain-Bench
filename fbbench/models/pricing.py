@@ -1,9 +1,24 @@
 """Per-model API pricing -> USD cost for an episode.
 
-Rates are USD per 1,000,000 tokens (standard tier, <=200k context where
-providers tier by context length), sourced from public list prices as of
-May 2026. EDIT FREELY — prices change; verify against the provider before
-quoting these numbers.
+Rates are USD per 1,000,000 tokens (standard tier). EDIT FREELY — prices change;
+verify against the provider before quoting these numbers.
+
+Anthropic rates VERIFIED 2026-09-16 against
+https://platform.claude.com/docs/en/about-claude/pricing — every Claude entry
+below matches the published list price on that date. The other providers are
+still the May 2026 figures and several are marked ESTIMATE; they have not been
+re-checked, so treat a non-Anthropic total as indicative.
+
+Three published modifiers this file does NOT model, because nothing here uses
+them. Each would make a real run cost MORE than we report, so they are named
+rather than silently assumed away:
+  * 1-hour cache writes are 2x base input, not the 1.25x of a 5-minute write.
+    We use 5-minute caching (an `ephemeral` cache_control with no ttl), so 1.25
+    is right for our runs and wrong for anyone who switches.
+  * Fast mode (Opus 5 / Opus 4.8) is $10/$50, double standard. Reported cost
+    would be half the truth on a fast-mode run.
+  * inference_geo="us" is 1.1x on Claude 4.6 and later. Global is the default.
+Batch (-50%) is likewise not modelled and would make a run cost LESS.
 
 cost_usd() prices prompt-caching correctly when the backend reports cache
 buckets: fresh input at 1x, cache WRITE at the provider's write multiplier,
@@ -27,6 +42,12 @@ from fbbench.models.catalog import LOCAL_PROVIDERS, provider_for
 # Open-model API providers auto-cache like DeepSeek/OpenAI (cheap read, no write
 # surcharge); ollama is local (free) so its multipliers are irrelevant. Unlisted
 # providers fall back to the 0.10 read / 1.0 write defaults in cost_usd().
+# Per-MODEL overrides, for the cases a per-provider multiplier cannot express.
+# Fable 5.1 and Mythos 5.1 read cache at 0.025x, not the 0.1x every other Claude
+# model uses. Without this, adding Fable 5.1 to PRICES would overprice its cache
+# reads fourfold -- and on a cached agent run, cache reads ARE the bill.
+CACHE_READ_MULT_BY_MODEL = {"claude-fable-5-1": 0.025, "claude-mythos-5-1": 0.025}
+
 CACHE_READ_MULT = {"anthropic": 0.10, "openai": 0.10, "gemini": 0.25,
                    "deepseek": 0.25, "dashscope": 0.25, "moonshot": 0.10,
                    "zhipu": 0.10, "openrouter": 0.10, "ollama": 0.0}
@@ -36,11 +57,25 @@ CACHE_WRITE_MULT = {"anthropic": 1.25, "openai": 1.0, "gemini": 1.0,
 
 # model_id -> (input_usd_per_mtok, output_usd_per_mtok)
 PRICES: dict[str, tuple[float, float]] = {
-    # Anthropic
-    "claude-opus-4-8":   (5.0, 25.0),  # Opus tier (same as 4.7); verify list price
+    # Anthropic — verified 2026-09-16 against platform.claude.com pricing.
+    "claude-fable-5-1":  (10.0, 50.0),   # cache read 0.025x, see above
+    "claude-mythos-5-1": (10.0, 50.0),   # cache read 0.025x, see above
+    "claude-fable-5":    (10.0, 50.0),
+    "claude-mythos-5":   (10.0, 50.0),
+    "claude-opus-5":     (5.0, 25.0),
+    "claude-opus-4-8":   (5.0, 25.0),
     "claude-opus-4-7":   (5.0, 25.0),
+    "claude-opus-4-6":   (5.0, 25.0),
+    "claude-opus-4-5":   (5.0, 25.0),
+    "claude-sonnet-5":   (2.0, 10.0),    # the Sep 2026 rise to 3/15 was cancelled
     "claude-sonnet-4-6": (3.0, 15.0),
+    "claude-sonnet-4-5": (3.0, 15.0),
     "claude-haiku-4-5":  (1.0, 5.0),
+    # Retired, but old result directories still need pricing.
+    "claude-opus-4-1":   (15.0, 75.0),
+    "claude-opus-4":     (15.0, 75.0),
+    "claude-sonnet-4":   (3.0, 15.0),
+    "claude-haiku-3-5":  (0.8, 4.0),
     # OpenAI
     "gpt-5.5":      (5.0, 30.0),
     "gpt-5.4":      (2.5, 15.0),
@@ -102,7 +137,8 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int,
                 "note": f"no price for {model!r} in pricing.py — edit to add"}
     in_rate, out_rate = rates
     provider = provider_for(model)
-    read_mult = CACHE_READ_MULT.get(provider, 0.10)
+    read_mult = CACHE_READ_MULT_BY_MODEL.get(
+        model, CACHE_READ_MULT.get(provider, 0.10))
     write_mult = CACHE_WRITE_MULT.get(provider, 1.0)
     in_usd = input_tokens / 1e6 * in_rate
     read_usd = cache_read_tokens / 1e6 * in_rate * read_mult

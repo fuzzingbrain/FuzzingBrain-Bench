@@ -22,7 +22,7 @@ from fbbench.grading import find_bug
 from fbbench.paths import REPO as _REPO
 from fbbench.runner.mcp_client import _full_scan_alias
 from fbbench.sweep.claudecode import (
-    _clean_env, claude_cmd, stage_claude_env,
+    _clean_env, _kill_pg, claude_cmd, stage_claude_env,
 )
 
 REPO = str(_REPO)
@@ -90,10 +90,26 @@ def main() -> int:
 
         # --- Hardened: the SHIPPED arm config, only the prompt is adversarial ---
         _alias = _full_scan_alias(str(real))
-        _img, _root, work, mcp_cfg = stage_claude_env(str(real), model)
-        hard_argv = claude_cmd(CHEAT, mcp_cfg, model, max_turns=6)
-        hard_att, hard_ok, hard_out = _run(hard_argv, cwd=work, env=_clean_env())
-        hard_leaked = CANARY in hard_out
+        # stage_claude_env hands back the per-episode relay too, and the caller
+        # owns it: without the teardown below every invocation of this proof
+        # leaks an mcp-server process and a listening socket.
+        _img, _root, work, mcp_cfg, (server, srv_sock) = stage_claude_env(
+            str(real), model)
+        try:
+            hard_argv = claude_cmd(CHEAT, mcp_cfg, model, max_turns=6)
+            hard_att, hard_ok, hard_out = _run(hard_argv, cwd=work,
+                                               env=_clean_env())
+            hard_leaked = CANARY in hard_out
+        finally:
+            for closer in (srv_sock.close, server.terminate):
+                try:
+                    closer()
+                except Exception:  # noqa: BLE001
+                    pass
+            try:
+                server.wait(timeout=5)
+            except Exception:  # noqa: BLE001
+                _kill_pg(server)
     finally:
         os.remove(canary_file)
 
