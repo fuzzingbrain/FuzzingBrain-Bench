@@ -120,92 +120,10 @@ def model_label(model: str) -> str:
 # Keep ONE server process for the whole episode and hand each claude session a
 # relay that connects to it over a unix socket. Sessions are sequential, so the
 # relay serves one client at a time.
-_RELAY_SRC = """import os, socket, sys, select
-s = socket.socket(socket.AF_UNIX); s.connect(sys.argv[1])
-i, o = sys.stdin.buffer, sys.stdout.buffer
-while True:
-    r, _, _ = select.select([i, s], [], [])
-    if i in r:
-        b = os.read(i.fileno(), 65536)
-        if not b: break
-        s.sendall(b)
-    if s in r:
-        b = s.recv(65536)
-        if not b: break
-        o.write(b); o.flush()
-"""
-
-
-def _start_episode_server(image: str, work: str, root: str) -> tuple:
-    """Start one mcp-server for the episode and expose it on a unix socket.
-
-    Returns (proc, sock_path, relay_path, thread) — the caller must terminate
-    proc when the episode ends.
-    """
-    import socket as _socket
-    import threading
-
-    proc = subprocess.Popen(
-        ["docker", "run", "-i", "--rm", "--pull=always",
-         "--security-opt", "seccomp=unconfined",
-         "-v", f"{work}:/workspace", image, "mcp-server"],
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.DEVNULL, bufsize=0)
-
-    sock_path = os.path.join(root, "bench.sock")
-    relay_path = os.path.join(root, "relay.py")
-    with open(relay_path, "w") as f:
-        f.write(_RELAY_SRC)
-
-    srv = _socket.socket(_socket.AF_UNIX)
-    srv.bind(sock_path)
-    srv.listen(1)
-
-    # One long-lived pump for server -> client, writing to whichever session is
-    # currently connected. Joining a per-connection reader instead deadlocks:
-    # it blocks on the server's stdout after the client has gone.
-    state = {"conn": None}
-
-    def _pump_out():
-        while True:
-            try:
-                b = os.read(proc.stdout.fileno(), 65536)
-            except OSError:
-                return
-            if not b:
-                return
-            c = state["conn"]
-            if c is not None:
-                try:
-                    c.sendall(b)
-                except OSError:
-                    state["conn"] = None
-
-    def _serve():
-        while proc.poll() is None:
-            try:
-                conn, _ = srv.accept()
-            except OSError:
-                return
-            state["conn"] = conn
-            try:
-                while True:
-                    b = conn.recv(65536)
-                    if not b:
-                        break
-                    proc.stdin.write(b)
-                    proc.stdin.flush()
-            except OSError:
-                pass
-            state["conn"] = None
-            try:
-                conn.close()
-            except OSError:
-                pass
-
-    threading.Thread(target=_pump_out, daemon=True).start()
-    threading.Thread(target=_serve, daemon=True).start()
-    return proc, sock_path, relay_path, srv
+# The per-episode MCP server and its stdio<->socket relay now live in
+# mcp_episode.py, so the external arm serves the SAME tools from the SAME
+# server instead of a parallel implementation.
+from fbbench.sweep.mcp_episode import _RELAY_SRC, _start_episode_server  # noqa: E402,F401
 
 
 def stage_claude_env(

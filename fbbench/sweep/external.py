@@ -56,6 +56,8 @@ from pathlib import Path
 from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
 from fbbench.images import challenge_image
+from fbbench.sweep.codex import _candidate_blobs, _crash_signatures
+from fbbench.sweep.mcp_episode import _start_episode_server
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets. Deliberately close to the api
@@ -165,142 +167,18 @@ class Manifest:
         return rendered  # a list argv, already split
 
 
-# ------------------------------------------------------------- the sandbox
-
-def _userns_available() -> bool:
-    """Whether this host lets an unprivileged process create a user namespace.
-
-    Ubuntu 24.04+ ships kernel.apparmor_restrict_unprivileged_userns=1, and
-    hardened kernels and most CI runners refuse it too, so this is a common no.
-    """
-    try:
-        r = subprocess.run(["unshare", "--mount", "--user", "--map-root-user",
-                            "/bin/true"], capture_output=True, timeout=15)
-        return r.returncode == 0
-    except (OSError, subprocess.SubprocessError):
-        return False
-
-
-def _write_userns_shell(root: Path, allow_network: bool) -> Path:
-    """A shell in a user namespace: Docker socket masked, network optional."""
-    sh = root / "sandbox-sh"
-    net = "1" if not allow_network else "0"
-    sh.write_text(
-        "#!/bin/bash\n"
-        "set -u\n"
-        "inner='\n"
-        "  mount --bind /dev/null /var/run/docker.sock 2>/dev/null || true\n"
-        f"  if [ \"{net}\" = \"1\" ]; then ip link set lo up 2>/dev/null || true; fi\n"
-        "  exec /bin/bash \"$@\"\n"
-        "'\n"
-        f"if [ \"{net}\" = \"1\" ]; then\n"
-        "  exec unshare --mount --net --user --map-root-user /bin/bash -c \"$inner\" -- \"$@\"\n"
-        "fi\n"
-        "exec unshare --mount --user --map-root-user /bin/bash -c \"$inner\" -- \"$@\"\n"
-    )
-    sh.chmod(0o755)
-    return sh
-
-
-class ContainerShell:
-    """The agent's shell, inside a container of the challenge image.
-
-    The user-namespace sandbox needs a host capability the bench does not
-    otherwise require, and a host that refuses it does not fail loudly -- every
-    bash call dies with "unshare: write failed /proc/self/uid_map" and the agent
-    spends its whole budget unable to write a file. Observed on Ubuntu 24.04.
-
-    Docker, by contrast, is something the bench cannot run without. So sandbox
-    with that: one container per episode, the workspace bind-mounted, no Docker
-    socket inside, `--network none` unless the manifest allows network. The
-    image is the challenge's own -- answer-free by design, and the same
-    environment the codex and claudecode arms hand their agents through exec().
-
-    One container per episode, `docker exec` per command: `docker run` per call
-    would add ~300ms to every command an agent issues.
-    """
-
-    def __init__(self, root: Path, workspace: Path, image: str, allow_network: bool):
-        self.root, self.ws, self.image = root, workspace, image
-        self.allow_network = allow_network
-        self.cid: str | None = None
-
-    def start(self) -> Path:
-        argv = ["docker", "run", "-d", "--rm", "--entrypoint", "sleep",
-                "--security-opt", "seccomp=unconfined",
-                "-v", f"{self.ws}:{self.ws}", "-w", str(self.ws)]
-        if not self.allow_network:
-            argv += ["--network", "none"]
-        argv += [self.image, "infinity"]
-        r = subprocess.run(argv, capture_output=True, text=True, timeout=300)
-        if r.returncode != 0 or not r.stdout.strip():
-            raise RuntimeError(f"sandbox container failed to start: {r.stderr.strip()[:200]}")
-        self.cid = r.stdout.strip()
-        sh = self.root / "sandbox-sh"
-        # The workspace is mounted at the same path inside, so a path the agent
-        # builds on the host resolves identically in the container.
-        sh.write_text("#!/bin/bash\n"
-                      "set -u\n"
-                      f"exec docker exec -i -w \"$PWD\" {self.cid} /bin/bash \"$@\"\n")
-        sh.chmod(0o755)
-        return sh
-
-    def stop(self) -> None:
-        if self.cid:
-            subprocess.run(["docker", "rm", "-f", self.cid],
-                           capture_output=True, timeout=60)
-            self.cid = None
-
-
-def make_sandbox(root: Path, workspace: Path, image: str, allow_network: bool,
-                 mode: str = "auto") -> tuple[Path | None, str, ContainerShell | None]:
-    """Return (shell_path, sandbox_kind, container_to_stop).
-
-    Order: container (portable, the bench already requires Docker) -> user
-    namespace (if the host allows and the mode asks) -> none. The kind is
-    recorded in score.json, so a run can never claim isolation it did not have.
-    """
-    if mode in ("auto", "container"):
-        try:
-            cs = ContainerShell(root, workspace, image, allow_network)
-            return cs.start(), "container", cs
-        except Exception as e:  # noqa: BLE001
-            if mode == "container":
-                raise
-            print(f"  note: container sandbox unavailable ({e}); trying userns", flush=True)
-    if mode in ("auto", "userns") and _userns_available():
-        return _write_userns_shell(root, allow_network), "userns", None
-    if mode == "none" or mode == "auto":
-        print("  note: no sandbox available -- the agent's shell is unconfined "
-              "(recorded as sandbox: none in score.json)", flush=True)
-        return None, "none", None
-    raise RuntimeError(f"sandbox mode {mode!r} unavailable on this host")
-
-
-# ------------------------------------------------------------- stage + submit
-
-def stage(image: str, workspace: Path) -> None:
-    """Copy the public challenge out of the sealed image, and refuse to proceed
-    if the answer came with it."""
-    workspace.mkdir(parents=True, exist_ok=True)
-    cid = subprocess.run(["docker", "create", image], capture_output=True,
-                         text=True, timeout=120)
-    if cid.returncode != 0:
-        raise RuntimeError(f"docker create {image}: {cid.stderr.strip()[:200]}")
-    container = cid.stdout.strip()
-    try:
-        cp = subprocess.run(["docker", "cp", f"{container}:/challenge/.",
-                             str(workspace)], capture_output=True, text=True, timeout=300)
-        if cp.returncode != 0:
-            raise RuntimeError(f"docker cp: {cp.stderr.strip()[:200]}")
-    finally:
-        subprocess.run(["docker", "rm", "-f", container], capture_output=True, timeout=120)
-    strays = []
-    for pat in ("**/oracle.yaml", "**/expected.yaml", "**/binaries/vuln/**"):
-        strays += [str(p) for p in workspace.glob(pat)]
-    if strays:
-        raise RuntimeError(f"answer files present in staged workspace: {strays[:3]}")
-
+# ---------------------------------------------------- the challenge container
+# There is no host-side sandbox and no staged copy any more. Every agent arm --
+# claudecode, codex and any external agent -- drives the SAME per-episode
+# mcp-server (fbbench/sweep/mcp_episode.py) inside the challenge image, so the
+# tool surface is identical by construction rather than by two implementations
+# agreeing. What used to live here (a userns/container shell, `stage()` copying
+# /challenge onto the host, and the ./submit request bridge) existed only to
+# give an external agent a DIFFERENT surface, and that was the asymmetry.
+#
+# Consequence for an agent: cwd is /challenge and it is read-only; /workspace
+# and /tmp are writable; candidates are graded with run_poc_on_harness, not a
+# script. Exactly what claudecode has had all along.
 
 _EXEC_MS = re.compile(r"Executed\s+\S+\s+in\s+(\d+)\s*ms")
 
@@ -353,17 +231,10 @@ class Judge:
         self.ws = workspace
         self.bug_dir = bug_dir
         self.image = image
-        # The `trace` channel. The agent has posted requests here since the tool
-        # was written and nothing has ever answered them: 18 calls across the
-        # recorded D5 runs returned 8 timeouts and zero reports, because no
-        # branch of this bench ever carried a responder. The agent runs on the
-        # host and has no graded binary, so only we can do this -- and the
-        # challenge image already ships gdb and a debug-info vuln binary.
-        self.treq = workspace / ".fbbench" / "trace_req"
-        self.tres = workspace / ".fbbench" / "trace_res"
-        self.req = workspace / ".fbbench" / "req"
-        self.res = workspace / ".fbbench" / "res"
-        self.blobs = workspace / ".fbbench" / "blobs"
+        # Graded candidates, filled in after the episode by the same
+        # post-hoc pass claudecode and codex use. Nothing is graded during the
+        # run any more: the agent calls run_poc_on_harness itself and gets the
+        # in-image verdict directly, exactly as the other arms do.
         self.log: list[dict] = []
         self._stop = threading.Event()
         self._t: threading.Thread | None = None
@@ -505,161 +376,47 @@ class Judge:
         except Exception:  # noqa: BLE001 - reporting never breaks grading
             pass
 
-    def start(self) -> None:
-        for d in (self.req, self.res, self.blobs, self.treq, self.tres):
-            d.mkdir(parents=True, exist_ok=True)
-        s = self.ws / "submit"
-        s.write_text(
-            "#!/bin/bash\n"
-            "# Run a candidate input against the challenge harness: ./submit <file>\n"
-            "set -u\n"
-            'if [ $# -ne 1 ] || [ ! -f "$1" ]; then echo \"usage: ./submit <file>\" >&2; exit 2; fi\n'
-            'h="$(cd "$(dirname "$0")" && pwd)"; id="$(date +%s%N)-$$"\n'
-            'cp -- "$1" "$h/.fbbench/req/$id"\n'
-            'for _ in $(seq 1 900); do [ -f "$h/.fbbench/res/$id" ] && { cat "$h/.fbbench/res/$id"; exit 0; }; sleep 0.2; done\n'
-            'echo "submit: no verdict in time" >&2; exit 1\n')
-        s.chmod(0o755)
-        (self.ws / "try_poc").write_text('#!/bin/bash\nexec "$(dirname "$0")/submit" "$@"\n')
-        (self.ws / "try_poc").chmod(0o755)
-        self._open_progress()
-        self._t = threading.Thread(target=self._serve, daemon=True)
-        self._t.start()
-        self._tt = threading.Thread(target=self._serve_trace, daemon=True)
-        self._tt.start()
+    # The ./submit request bridge and the gdb/trace responder used to live here.
+    # Both are gone: an agent now calls run_poc_on_harness on the same
+    # mcp-server every other arm uses, and runs gdb itself inside the
+    # container. The judge no longer grades anything during the episode -- it
+    # observes, so a killed run still leaves evidence on disk.
 
-    def _serve(self) -> None:
+    def start(self) -> None:
+        self._open_progress()
+        self._stop.clear()
+        self._t = threading.Thread(target=self._watch, daemon=True)
+        self._t.start()
+
+    def _watch(self) -> None:
+        """Mirror the agent's own artefacts as it writes them.
+
+        The external arm is the only one that can be killed mid-episode and
+        still owe the reader everything it spent. Nothing here touches the
+        challenge; it copies what the agent has already written.
+        """
         while not self._stop.is_set():
-            for cand in sorted(self.req.glob("*")):
-                if not cand.is_file():
-                    continue
-                shutil.copy2(cand, self.blobs / cand.name)
-                size = cand.stat().st_size
-                try:
-                    verdict, _ = grade_blob(self.bug_dir, cand)
-                    crashed = bool(verdict.get("crashed"))
-                    sig = verdict.get("signature") or ""
-                    # A clean verdict used to be the same fifteen characters for
-                    # every input, so a candidate that died at the magic gate and
-                    # one that drove the parser for half a second read identically.
-                    # An agent cannot climb a flat signal: one measured run wrote
-                    # 138 candidates, 47% of them constant bytes, and every reply
-                    # was "clean: no fault". The harness already reports how long
-                    # the target ran, and the size is already here -- carrying both
-                    # back is the difference between a verdict and a gradient.
-                    detail = (f"crash: {sig}" if crashed
-                              else f"clean: no fault | {_target_ms(verdict)} | {size} bytes")
-                except Exception as e:  # a grading failure must be visible, not a silent clean
-                    crashed, sig, detail = False, "", f"error: {e}"
-                entry = {"blob": cand.name, "size": size,
-                         "crashed": crashed, "signature": sig}
-                self.log.append(entry)
-                (self.res / cand.name).write_text(detail + "\n")
-                self._record(entry, self.blobs / cand.name, detail)
-                cand.unlink(missing_ok=True)
-            self._mirror()
-            self._stop.wait(0.2)
+            try:
+                self._mirror()
+                self._write_live_transcript()
+            except Exception:  # noqa: BLE001 - observation never breaks a run
+                pass
+            self._stop.wait(2.0)
 
     def stop(self) -> None:
-        self._mirror()
         self._stop.set()
-        if self._t:
+        if self._t is not None:
             self._t.join(timeout=10)
-        if self._tt:
-            self._tt.join(timeout=10)
+        try:
+            self._mirror()
+            self._write_live_transcript()
+        except Exception:  # noqa: BLE001
+            pass
         try:
             if self._progress is not None:
                 self._progress.close()
         except Exception:  # noqa: BLE001
             pass
-
-    # ------------------------------------------------------------- trace
-    # gdb against the graded binary, inside the challenge image. The agent's
-    # parser wants three things out of the raw output: an `@@REACHED <fn>@@`
-    # marker, `name = value` argument lines after it, and -- if it faulted --
-    # a `received signal SIG...` line followed by `#N func (...) at file:line`
-    # frames. gdb emits the last two natively; the marker we print ourselves.
-    _GDB_TIMEOUT_S = 150
-
-    def _gdb_script(self, target: str) -> str:
-        return (
-            "set confirm off\n"
-            "set pagination off\n"
-            "set backtrace past-main on\n"
-            f"break {target}\n"
-            "commands\n"
-            "silent\n"
-            f'printf "@@REACHED {target}@@\\n"\n'
-            "info args\n"
-            "continue\n"
-            "end\n"
-            "run /tmp/_cand.bin\n"
-            "bt\n"
-            "quit\n")
-
-    def _serve_trace(self) -> None:
-        while not self._stop.is_set():
-            # `.tgt` is written last by the agent, so its presence means ready.
-            for tgt_f in sorted(self.treq.glob("*.tgt")):
-                rid = tgt_f.stem
-                blob = self.treq / f"{rid}.bin"
-                try:
-                    target = tgt_f.read_text().strip()
-                except OSError:
-                    continue
-                # Claim the request the moment we pick it up, before the slow
-                # part. The agent decides the bridge is dead by seeing its
-                # request still unclaimed after a few seconds, so a gdb run that
-                # legitimately takes two minutes must not look like silence.
-                tgt_f.unlink(missing_ok=True)
-                try:
-                    out = self._run_gdb(blob, target)
-                except Exception as e:  # noqa: BLE001
-                    out = f"error: trace failed: {type(e).__name__}: {e}"
-                try:
-                    (self.tres / rid).write_text(out)
-                finally:
-                    blob.unlink(missing_ok=True)
-            self._stop.wait(0.2)
-
-    def _run_gdb(self, blob: Path, target: str) -> str:
-        if not self.image:
-            return "error: trace unavailable — no challenge image for this cell."
-        if not blob.is_file():
-            return "error: trace request carried no input file."
-        if not re.fullmatch(r"[A-Za-z_][\w:~<>.]{0,200}", target):
-            return f"error: refusing to break on {target!r}."
-        with tempfile.TemporaryDirectory() as td:
-            d = Path(td)
-            shutil.copy(blob, d / "_cand.bin")
-            (d / "_t.gdb").write_text(self._gdb_script(target))
-            # The vuln binary is sealed inside the image; only ASan builds carry
-            # the debug info the breakpoint needs.
-            # ASan must ABORT for gdb to see the fault: _parse_trace detects a
-            # crash by gdb's "received signal SIG..." line, and with
-            # abort_on_error=0 ASan prints its report and exits quietly -- so a
-            # crashing input came back "crashed: no". Caught against a known
-            # crashing harfbuzz-02 candidate that read clean until this was set.
-            sh = ("export ASAN_OPTIONS=detect_leaks=0:abort_on_error=1:symbolize=0; "
-                  "B=/opt/fbbench/oracle/binaries/vuln/asan/harness; "
-                  "[ -x \"$B\" ] || B=$(command -v harness || echo /out/harness); "
-                  "exec gdb -q -batch -x /tmp/_t.gdb --args \"$B\" /tmp/_cand.bin")
-            try:
-                p = subprocess.run(
-                    ["docker", "run", "--rm", "--network", "none",
-                     "--security-opt", "seccomp=unconfined",       # gdb needs ptrace
-                     "--cap-add", "SYS_PTRACE",
-                     "-v", f"{d}:/tmp:ro", "--entrypoint", "sh",
-                     self.image, "-c", sh],
-                    capture_output=True, text=True,
-                    timeout=self._GDB_TIMEOUT_S)
-            except subprocess.TimeoutExpired:
-                return f"error: gdb exceeded {self._GDB_TIMEOUT_S}s on {target}."
-            raw = (p.stdout or "") + ("\n" + p.stderr if p.stderr else "")
-            if "No symbol table" in raw or "Function \"" in raw and "not defined" in raw:
-                return (f"error: gdb could not resolve {target!r} in this build — "
-                        "check the spelling against the source, or pick a symbol "
-                        "the harness actually links.")
-            return raw
 
     def signatures(self) -> set[str]:
         return {e["signature"] or "crash|<unnamed>" for e in self.log if e["crashed"]}
@@ -998,23 +755,23 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     alias = _full_scan_alias(str(real))
     image = challenge_image(alias)
 
-    sandbox: ContainerShell | None = None
     root = Path(tempfile.mkdtemp(prefix=f"ext-{alias}-"))
     ws = root / "workspace"
+    ws.mkdir(parents=True, exist_ok=True)
+    server = None
     try:
-        try:
-            stage(image, ws)
-        except RuntimeError as e:
-            return {"error": str(e)}
 
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
                       image=image,
                       header={"bug_id": bug, "model": model, "max_turns": max_turns,
                               "initial_user_message": DEFAULT_OPENING})
         judge.start()
-        shell, sandbox_kind, sandbox = make_sandbox(
-            root, ws, image, manifest.allow_network,
-            os.environ.get("FBBENCH_SANDBOX", "auto"))
+        # The SAME per-episode mcp-server every other agent arm drives. The
+        # agent speaks MCP to it over `relay.py`; cwd inside is /challenge
+        # (read-only), /workspace is the bind-mounted dir above.
+        server, sock_path, relay_path, _srv = _start_episode_server(
+            image, str(ws), str(root))
+        sandbox_kind = "container"
 
         # Every arm is budgeted the same way: a turn cap and a wall clock, and
         # no dollar cap (the api arm has none, so neither may we). The api arm
@@ -1032,7 +789,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # silently not reach the agent and every cell in a sweep would run
         # whatever the manifest said -- the run would be mislabelled, not fail.
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
-                               opening=DEFAULT_OPENING, submit="./submit",
+                               opening=DEFAULT_OPENING,
+                               mcp_socket=sock_path, relay=relay_path,
                                max_turns=str(max_turns), model=model)
         env = dict(os.environ)
         # The manifest's own directory goes on PYTHONPATH, so a Python agent can
@@ -1040,10 +798,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # an absolute path. Harmless to agents that do not import anything.
         env["PYTHONPATH"] = os.pathsep.join(
             p for p in (str(manifest.base), env.get("PYTHONPATH", "")) if p)
-        if shell is not None:
-            if manifest.shell_env:
-                env[manifest.shell_env] = str(shell)
-            env["SHELL"] = str(shell)
+        # How an agent reaches the bench tools, for a manifest that would rather
+        # read them from the environment than from its command template.
+        env["FBBENCH_MCP_SOCKET"] = sock_path
+        env["FBBENCH_MCP_RELAY"] = relay_path
         if api_key:
             env["ANTHROPIC_API_KEY"] = api_key
 
@@ -1101,21 +859,28 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             usage = {"basis": f"cost failed: {type(e).__name__}", "total_usd": None}
         # Turns come from the same summary JSON the agent prints for cost.
         turns_used = _agent_turns(_extract_report(log), ws)
-        sigs = judge.signatures()
-        best = next((judge.blobs / e["blob"] for e in judge.log if e["crashed"]), None)
-        if best and best.is_file():
+        # Graded exactly the way claudecode and codex are graded: every
+        # candidate the agent left in /workspace, run once through the image's
+        # own harness after the episode. Same helper, same heuristic, same
+        # in-image grader -- so three arms cannot report numbers that diverge
+        # for a reason no one can see.
+        blobs = _candidate_blobs(str(ws))
+        pocs_dir = str(cell_dir / "pocs") if preserve_pocs else None
+        sigs, best = _crash_signatures(Path(real), blobs, pocs_dir)
+        judge.log = [{"blob": os.path.basename(b), "crashed": b == best} for b in blobs]
+        if best and Path(best).is_file():
             shutil.copy(best, cell_dir / "best_blob")
 
         score = {
             "bug_id": bug, "model": model, "seed": 0,
             "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
             "score": len(sigs), "grading": "in-image",
-            "terminated_reason": (terminated if judge.log else
+            "terminated_reason": (terminated if blobs else
                                   f"{terminated}: agent submitted nothing"),
             "duration_s": round(duration, 1),
             "turns_used": turns_used,
             "turn_budget_honoured": turns_used <= max_turns,
-            "blobs_written": len(judge.log), "max_turns": max_turns,
+            "blobs_written": len(blobs), "max_turns": max_turns,
             # report.py reads mode/grading/preserve-PoCs out of `config`, the
             # same shape the api arm writes. Without it a cell renders as
             # "grading not recorded" whatever it actually did.
@@ -1165,8 +930,13 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             raise KeyboardInterrupt
         return score
     finally:
-        if sandbox is not None:
-            sandbox.stop()
+        if server is not None:
+            try:
+                server.terminate()
+                server.wait(timeout=15)
+            except Exception:  # noqa: BLE001
+                try: server.kill()
+                except Exception: pass
         shutil.rmtree(root, ignore_errors=True)
 
 
