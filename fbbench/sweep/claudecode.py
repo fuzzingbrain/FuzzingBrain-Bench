@@ -45,7 +45,7 @@ import time
 from pathlib import Path
 
 from fbbench.grading import find_bug
-from fbbench.prompts import CODEX_TASK_PROMPT
+from fbbench.prompts import CODEX_TASK_PROMPT, system_prompt  # noqa: F401
 from fbbench.runner.mcp_client import _full_scan_alias
 # Reuse the Codex arm's host-side helpers verbatim so the two arms grade and
 # select PoCs identically (same in-image grader, same blob heuristic).
@@ -75,14 +75,21 @@ _DENY_TOOLS = ",".join((
 
 
 def claude_task_prompt() -> str:
-    """The shared CLI task prompt, re-pointed from Codex's `harness` MCP server to
-    Claude Code's `bench` server (mcp__harness__* -> mcp__bench__*). Everything
-    else — including the fuzz-harness references (./harness etc.) and the generic
-    "your own built-in tools are not available" line — is identical for both arms.
+    """The BENCH's task prompt -- the same text the api arm is given.
+
+    It used to be CODEX_TASK_PROMPT, a second brief written for the codex arm:
+    64 lines different from the api arm's, with a different goal sentence and a
+    different definition of a crash. Since every arm now drives the same three
+    tools, there is nothing left for two prompts to express. The api arm is the
+    baseline everything is measured against, so its text is the one that wins.
+
+    The only substitution is mechanical and forced: Claude Code namespaces MCP
+    tools, so `setup()` is `mcp__bench__setup()` to it and nowhere else.
     """
-    return (CODEX_TASK_PROMPT
-            .replace("MCP `harness`", "MCP `bench`")
-            .replace("mcp__harness__", "mcp__bench__"))
+    p = system_prompt()
+    for tool in ("setup", "exec", "run_poc_on_harness"):
+        p = p.replace(f"{tool}()", f"mcp__bench__{tool}()")
+    return p
 
 
 def _budget_text(max_turns: int) -> str:

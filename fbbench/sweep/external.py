@@ -57,7 +57,7 @@ from typing import Callable
 from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
 from fbbench.images import challenge_image
-from fbbench.sweep.claudecode import claude_task_prompt
+from fbbench.prompts import system_prompt
 from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server)
@@ -74,15 +74,16 @@ from fbbench.runner.mcp_client import _full_scan_alias
 # it could. Scoring is min(3, distinct) x difficulty, so that sentence was worth
 # up to two thirds of a cell, and it contradicted the system prompt arriving
 # with it. The bare model produced exactly one crash on 22 of 77 challenges.
-# The task text is the bench's, not the arm's. claudecode and codex are both
-# handed CODEX_TASK_PROMPT (re-pointed to whichever MCP server name they use);
-# an external agent is now driving the SAME six tools on the SAME server, so it
-# is handed the same text. It used to get a shorter bespoke opening that told it
-# to "verify every candidate with ./submit <file>" -- a tool that no longer
-# exists, and a different brief besides. Two arms told different things are not
-# two agents being compared.
+# The task text is the bench's, not the arm's -- and it is the API ARM's text,
+# because that is the baseline every agent is measured against. An external
+# agent drives the same three tools under the same bare names the api arm uses,
+# so it needs no substitution at all and gets the prompt verbatim.
+#
+# This went through two wrong anchors first: a short bespoke opening naming
+# ./submit, then CODEX_TASK_PROMPT, which matched claudecode but not the
+# baseline. Two arms told different things are not two agents being compared.
 def default_opening() -> str:
-    return claude_task_prompt()
+    return system_prompt()
 
 
 DEFAULT_OPENING = default_opening()

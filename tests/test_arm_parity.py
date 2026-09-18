@@ -41,8 +41,22 @@ def test_neither_arm_builds_its_own_container():
         assert '"docker", "run"' not in src
 
 
-def test_both_arms_are_handed_the_same_task_text():
-    assert ex.DEFAULT_OPENING == cc.claude_task_prompt()
+def test_every_arm_is_handed_the_api_arm_s_task_text():
+    """One brief. The api arm is the baseline every agent is measured against,
+    so its prompt is the one that wins -- not CODEX_TASK_PROMPT, a second brief
+    written for the codex arm whose goal sentence and crash definition differed
+    from the baseline's by 64 lines."""
+    from fbbench.prompts import system_prompt
+    api = system_prompt()
+    # An external agent calls the tools by their bare names, as the api arm
+    # does, so it gets the text verbatim.
+    assert ex.DEFAULT_OPENING == api
+    # Claude Code namespaces MCP tools, so it gets exactly one substitution --
+    # mechanical, forced by the client, and nothing else may differ.
+    claude = cc.claude_task_prompt()
+    assert claude != api
+    undone = claude.replace("mcp__bench__", "")
+    assert undone == api, "claudecode's prompt differs by more than the tool prefix"
 
 
 def test_both_arms_observe_candidates_with_the_same_observer():

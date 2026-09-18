@@ -261,14 +261,13 @@ def test_the_live_price_and_the_final_price_come_from_one_function():
     from fbbench.sweep import external
     assert "price_reported_usage" in inspect.getsource(external._agent_usage)
     assert "price_reported_usage" in inspect.getsource(external.Judge._reported)
-def test_every_agent_arm_is_handed_the_same_task_text():
-    """The v2 invariant. Two arms told different things are not two agents being
-    compared, they are two briefs. The external arm used to get a short bespoke
-    opening pointing at ./submit; it now gets the bench's own task prompt,
-    byte-identical to the one claudecode is handed."""
+def test_the_external_arm_is_handed_the_api_arm_s_task_text():
+    """One brief across the bench. The api arm is the baseline every agent is
+    measured against, so its prompt is the one that wins. The external arm calls
+    the tools by their bare names, as the api arm does, so it gets it verbatim."""
+    from fbbench.prompts import system_prompt
     from fbbench.sweep.external import DEFAULT_OPENING
-    from fbbench.sweep.claudecode import claude_task_prompt
-    assert DEFAULT_OPENING == claude_task_prompt()
+    assert DEFAULT_OPENING == system_prompt()
     assert "./submit" not in DEFAULT_OPENING   # a tool this arm no longer has
 
 
@@ -280,8 +279,8 @@ def test_the_opening_does_not_stop_the_agent_at_its_first_crash():
     # 77 challenges.
     from fbbench.sweep.external import DEFAULT_OPENING
     assert "until one crashes" not in DEFAULT_OPENING
-    assert "as many vulnerabilities as possible" in DEFAULT_OPENING
-    assert "additional distinct one counts" in DEFAULT_OPENING
+    assert "Find ALL distinct vulnerabilities" in DEFAULT_OPENING
+    assert "Maximize the total count" in DEFAULT_OPENING
 
 
 def test_the_opening_says_the_graded_harness_is_the_evidence():
