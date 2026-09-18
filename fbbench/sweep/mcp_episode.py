@@ -22,6 +22,59 @@ import threading
 from pathlib import Path
 
 
+# ------------------------------------------------------------- the agent tools
+# Where v2 differs from v1 on purpose: an AGENT arm may be given tools the bare
+# api arm does not have. gdb is the first, and deliberately not the last, so
+# this is a place to put them rather than a special case for one binary.
+#
+# Every executable in the toolbox directory is bind-mounted read-only into
+# /usr/local/bin inside the challenge image, which is already on PATH, so an
+# agent reaches it with exec like any other command -- no new MCP tool, no
+# wrapper, nothing to keep in sync. Adding a tool is dropping a file in.
+#
+# Mounted FILE BY FILE, never as a directory: /usr/local/bin holds the
+# challenge's own mcp-server and llvm-symbolizer, and mounting over the
+# directory would hide them and break the episode.
+#
+# The api arm does not start its server here -- it has its own MCPClient -- so
+# it is untouched by construction, not by a flag anyone has to remember.
+#
+# Binaries must be STATICALLY linked. The gdb the images ship is 10 MB against
+# 59 shared libraries; copied into an image that lacks it, it will not start.
+AGENT_TOOLS_DIR = os.environ.get(
+    "FBBENCH_AGENT_TOOLS",
+    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                 "agent_tools", "bin"))
+
+# Names the image needs for itself. Shadowing one would break the run in a way
+# that looks like the agent's fault.
+_RESERVED = {"mcp-server", "llvm-symbolizer", "sh", "bash", "env"}
+
+
+def agent_tool_mounts(tools_dir: str | None = None) -> tuple[list[str], list[str]]:
+    """(docker -v arguments, tool names) for the agent toolbox.
+
+    Empty when the directory does not exist, so a checkout without the binaries
+    still runs -- the agents simply have whatever the image itself ships.
+    """
+    d = tools_dir or AGENT_TOOLS_DIR
+    args: list[str] = []
+    names: list[str] = []
+    try:
+        entries = sorted(os.listdir(d))
+    except OSError:
+        return args, names
+    for name in entries:
+        src = os.path.join(d, name)
+        if not os.path.isfile(src) or not os.access(src, os.X_OK):
+            continue
+        if name in _RESERVED or name.startswith("."):
+            continue
+        args += ["-v", f"{src}:/usr/local/bin/{name}:ro"]
+        names.append(name)
+    return args, names
+
+
 # ---------------------------------------------------------------- the policy
 # Fuzzing is forbidden to EVERY agent arm, and the bench is where that belongs.
 # It used to live in fb-agent's own coach, which meant one arm was refused a
@@ -283,7 +336,7 @@ def _start_episode_server(image: str, work: str, root: str,
     proc = subprocess.Popen(
         ["docker", "run", "-i", "--rm", "--pull=always",
          "--security-opt", "seccomp=unconfined",
-         "-v", f"{work}:/workspace", image, "mcp-server"],
+         "-v", f"{work}:/workspace", *agent_tool_mounts()[0], image, "mcp-server"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, bufsize=0)
 
