@@ -259,7 +259,13 @@ class Judge:
         # no turn budget, which is most of the header.
         self._header = header or {}
 
+    # progress.jsonl belongs to CandidateLog now: it is the thing that sees a
+    # candidate graded. The judge kept an open handle here and never wrote to
+    # it, which only risked truncating the observer's file.
     def _open_progress(self) -> None:
+        return
+
+    def _open_progress_unused(self) -> None:
         if self.cell_dir is None:
             return
         try:
@@ -852,13 +858,11 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # agent.log is already on disk -- _run_agent wrote it as the agent ran.
         # Rewriting it here would only risk replacing a complete log with a
         # truncated re-read on the one path where it matters.
-        if preserve_pocs:
-            for e in judge.log:
-                sub = cell_dir / "pocs" / ("crashed" if e["crashed"] else "clean")
-                sub.mkdir(parents=True, exist_ok=True)
-                src = judge.blobs / e["blob"]
-                if src.is_file():
-                    shutil.copy(src, sub / e["blob"])
+        #
+        # PoCs are not copied here any more. CandidateLog wrote each one as the
+        # agent graded it, and _crash_signatures writes them again below; the
+        # block that used to live here read judge.blobs, a directory deleted
+        # with the request bridge, so it would have raised on the first run.
         try:
             usage = _agent_usage(ws, log, model)
         except Exception as e:  # noqa: BLE001
@@ -877,7 +881,12 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         blobs = candidates.host_blobs()
         pocs_dir = str(cell_dir / "pocs") if preserve_pocs else None
         sigs, best = _crash_signatures(Path(real), blobs, pocs_dir)
-        judge.log = [{"blob": os.path.basename(b), "crashed": b == best} for b in blobs]
+        # Per-candidate crashed/clean comes from the live verdicts, not from
+        # `b == best`: several candidates can crash, and marking only the first
+        # would understate every summary row built from this.
+        _crashed = {e["path"].rsplit("/", 1)[-1] for e in candidates.entries if e["crashed"]}
+        judge.log = [{"blob": os.path.basename(b),
+                      "crashed": os.path.basename(b) in _crashed} for b in blobs]
         if best and Path(best).is_file():
             shutil.copy(best, cell_dir / "best_blob")
 
