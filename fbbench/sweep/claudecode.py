@@ -128,7 +128,7 @@ from fbbench.sweep.mcp_episode import (  # noqa: F401
 
 
 def stage_claude_env(
-    real_bug_dir: str, model: str
+    real_bug_dir: str, model: str, cell_dir=None, preserve_pocs: bool = True
 ) -> tuple[str, str, str, str, tuple]:
     """Stage an isolated workspace + a bench MCP config for the canonical image.
 
@@ -150,13 +150,18 @@ def stage_claude_env(
     os.chmod(work, 0o777)  # the container (root) writes candidate inputs here
     # One server for the whole episode; every claude session reaches it through
     # the relay, so the image's crash-signature memory survives a resume.
-    server, sock_path, relay_path, srv_sock = _start_episode_server(image, work, root)
+    # Watch the relay, so this arm keeps its candidates as it grades them
+    # instead of only sweeping the workspace afterwards. Same observer the
+    # external arm uses -- one implementation, so the two cannot drift.
+    candidates = CandidateLog(cell_dir, work, preserve=preserve_pocs)
+    server, sock_path, relay_path, srv_sock = _start_episode_server(
+        image, work, root, candidates)
     mcp_cfg = os.path.join(root, "bench.mcp.json")
     with open(mcp_cfg, "w") as f:
         json.dump({"mcpServers": {"bench": {
             "command": sys.executable,
             "args": [relay_path, sock_path]}}}, f)
-    return image, root, work, mcp_cfg, (server, srv_sock)
+    return image, root, work, mcp_cfg, (server, srv_sock, candidates)
 
 
 def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
@@ -616,12 +621,18 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     if not real:
         return {"error": f"bug not found: {bug}"}
     alias = _full_scan_alias(str(real))
-    _image, root, work, mcp_cfg, (server, srv_sock) = stage_claude_env(str(real), model)
+    _image, root, work, mcp_cfg, (server, srv_sock, candidates) = stage_claude_env(
+        str(real), model, cell_dir=cell_dir, preserve_pocs=preserve_pocs)
     try:
         r = run_claude(work, mcp_cfg, model, timeout_s, max_turns,
                        auth=auth, api_key=api_key)
         r["max_turns"] = max_turns
-        blobs = sorted(set(_candidate_blobs(work)
+        # What the agent actually ran through run_poc_on_harness, seen live on
+        # the relay. The workspace sweep and the log scrape are kept as a
+        # fallback for a transcript the observer never saw (a resumed session).
+        candidates.close()
+        blobs = sorted(set(candidates.host_blobs()
+                           + _candidate_blobs(work)
                            + _graded_paths(r["log_path"], work)
                            + _candidate_blobs(r.get("snap_dir", ""))))
         score = _persist(cell_dir, bug=bug, model=model, real=str(real),
