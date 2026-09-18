@@ -24,42 +24,95 @@ from pathlib import Path
 
 # ------------------------------------------------------------- the agent tools
 # Where v2 differs from v1 on purpose: an AGENT arm may be given tools the bare
-# api arm does not have. gdb is the first, and deliberately not the last, so
-# this is a place to put them rather than a special case for one binary.
+# api arm does not have. gdb is the first and deliberately not the last.
 #
-# Every executable in the toolbox directory is bind-mounted read-only into
-# /usr/local/bin inside the challenge image, which is already on PATH, so an
-# agent reaches it with exec like any other command -- no new MCP tool, no
-# wrapper, nothing to keep in sync. Adding a tool is dropping a file in.
+# The binaries come from a PINNED IMAGE, not from a directory someone fills in.
+# That is the whole point: a gitignored bin/ means a second machine runs a
+# different benchmark and nothing says so. Pull one image by digest and every
+# machine has identical bits, while the challenge images stay untouched.
 #
-# Mounted FILE BY FILE, never as a directory: /usr/local/bin holds the
-# challenge's own mcp-server and llvm-symbolizer, and mounting over the
-# directory would hide them and break the episode.
+#   tools image  ->  cache dir on this host  ->  bind-mounted file by file
+#                    (derived, disposable)       into /usr/local/bin
 #
-# The api arm does not start its server here -- it has its own MCPClient -- so
-# it is untouched by construction, not by a flag anyone has to remember.
+# File by file, never as a directory: /usr/local/bin holds the challenge's own
+# mcp-server and llvm-symbolizer, and mounting over it would hide them.
 #
-# Binaries must be STATICALLY linked. The gdb the images ship is 10 MB against
-# 59 shared libraries; copied into an image that lacks it, it will not start.
-AGENT_TOOLS_DIR = os.environ.get(
-    "FBBENCH_AGENT_TOOLS",
-    os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                 "agent_tools", "bin"))
+# The api arm starts its own container through MCPClient and never calls this,
+# so it is untouched by construction rather than by a flag.
+#
+# Binaries in the image must be STATICALLY linked -- the gdb the challenge
+# images ship is 10 MB against 59 shared libraries and will not start anywhere
+# else.
+AGENT_TOOLS_IMAGE = os.environ.get("FBBENCH_AGENT_TOOLS_IMAGE", "")
+"""Image holding the agent toolbox under /tools/bin. Empty disables the whole
+mechanism, and agents then have whatever the challenge image itself ships --
+exactly v1 behaviour, so a fresh clone runs with no download."""
 
-# Names the image needs for itself. Shadowing one would break the run in a way
-# that looks like the agent's fault.
 _RESERVED = {"mcp-server", "llvm-symbolizer", "sh", "bash", "env"}
+_CACHE_ROOT = os.environ.get(
+    "FBBENCH_AGENT_TOOLS_CACHE",
+    os.path.join(os.path.expanduser("~"), ".cache", "fbbench", "agent-tools"))
+_tools_lock = threading.Lock()
+
+
+def agent_tools_digest(image: str | None = None) -> str:
+    """The image id, so a cell can record WHICH toolbox it ran with."""
+    img = AGENT_TOOLS_IMAGE if image is None else image
+    if not img:
+        return ""
+    try:
+        r = subprocess.run(["docker", "image", "inspect", img, "--format", "{{.Id}}"],
+                           capture_output=True, text=True, timeout=60)
+        return (r.stdout or "").strip()
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def ensure_agent_tools(image: str | None = None) -> str:
+    """Materialise the toolbox for this host and return its directory.
+
+    Cached per image id, so the copy happens once per machine per version and a
+    version bump repopulates rather than silently reusing stale binaries.
+    """
+    img = AGENT_TOOLS_IMAGE if image is None else image
+    if not img:
+        return ""
+    with _tools_lock:
+        digest = agent_tools_digest(img)
+        if not digest:
+            try:
+                subprocess.run(["docker", "pull", "-q", img],
+                               capture_output=True, timeout=1800)
+            except Exception:  # noqa: BLE001
+                return ""
+            digest = agent_tools_digest(img)
+            if not digest:
+                return ""
+        d = os.path.join(_CACHE_ROOT, digest.replace(":", "_"))
+        stamp = os.path.join(d, ".complete")
+        if os.path.exists(stamp):
+            return os.path.join(d, "bin")
+        os.makedirs(os.path.join(d, "bin"), exist_ok=True)
+        try:
+            r = subprocess.run(
+                ["docker", "run", "--rm", "-v", f"{os.path.join(d, 'bin')}:/out",
+                 "--entrypoint", "sh", img, "-c", "cp -a /tools/bin/. /out/"],
+                capture_output=True, text=True, timeout=1800)
+            if r.returncode != 0:
+                return ""
+            open(stamp, "w").close()
+        except Exception:  # noqa: BLE001
+            return ""
+        return os.path.join(d, "bin")
 
 
 def agent_tool_mounts(tools_dir: str | None = None) -> tuple[list[str], list[str]]:
-    """(docker -v arguments, tool names) for the agent toolbox.
-
-    Empty when the directory does not exist, so a checkout without the binaries
-    still runs -- the agents simply have whatever the image itself ships.
-    """
-    d = tools_dir or AGENT_TOOLS_DIR
+    """(docker -v arguments, tool names) for the agent toolbox."""
+    d = ensure_agent_tools() if tools_dir is None else tools_dir
     args: list[str] = []
     names: list[str] = []
+    if not d:
+        return args, names
     try:
         entries = sorted(os.listdir(d))
     except OSError:

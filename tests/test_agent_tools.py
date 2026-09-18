@@ -65,6 +65,29 @@ def test_both_arms_record_what_was_available():
     assert '"agent_tools"' in inspect.getsource(cc._persist)
 
 
-def test_the_directory_is_overridable_for_large_binaries():
-    """Static debuggers are tens of megabytes and do not belong in a clone."""
-    assert "FBBENCH_AGENT_TOOLS" in inspect.getsource(ep)
+def test_the_binaries_come_from_a_pinned_image_not_a_local_directory():
+    """The reproducibility rule. A gitignored bin/ means a second machine runs a
+    different benchmark and nothing says so; the numbers stop being comparable,
+    which is the only thing a benchmark is for. One pinned image, identical bits
+    everywhere, and the challenge images untouched."""
+    src = inspect.getsource(ep)
+    assert "FBBENCH_AGENT_TOOLS_IMAGE" in src
+    assert "docker" in inspect.getsource(ep.ensure_agent_tools)
+    # cache keyed by image id, so a version bump repopulates
+    assert "digest" in inspect.getsource(ep.ensure_agent_tools)
+
+
+def test_it_is_off_by_default_so_a_fresh_clone_runs():
+    """Unset means agents get whatever the challenge image ships -- v1
+    behaviour -- and nobody has to download anything to run the bench."""
+    assert ep.AGENT_TOOLS_IMAGE == "" or ep.AGENT_TOOLS_IMAGE
+    assert ep.agent_tool_mounts("") == ([], [])
+    assert ep.ensure_agent_tools("") == ""
+
+
+def test_a_cell_records_which_toolbox_produced_it():
+    """Two runs that disagree must be tellable apart."""
+    from fbbench.sweep import claudecode as cc, external as ex
+    for src in (inspect.getsource(ex.run_cell), inspect.getsource(cc._persist)):
+        assert '"agent_tools"' in src
+        assert '"agent_tools_digest"' in src

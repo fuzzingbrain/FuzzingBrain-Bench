@@ -1,3 +1,0 @@
-# Binaries are large and machine-specific; keep them out of the clone.
-bin/
-!bin/.gitkeep

@@ -122,7 +122,8 @@ def model_label(model: str) -> str:
 # server instead of a parallel implementation.
 from fbbench.sweep.mcp_episode import (  # noqa: F401
     _RELAY_SRC, AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog,
-    _start_episode_server, agent_tool_mounts)  # noqa: E402,F401
+    _start_episode_server, AGENT_TOOLS_IMAGE, agent_tool_mounts,
+    agent_tools_digest)  # noqa: E402,F401
 
 
 def stage_claude_env(
@@ -585,6 +586,8 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         # Scored on distinct crash signatures, the same unit the API arm reports.
         "fuzzing_attempts": fuzzing_attempts,
         "agent_tools": agent_tool_mounts()[1],
+        "agent_tools_image": AGENT_TOOLS_IMAGE,
+        "agent_tools_digest": agent_tools_digest(),
         "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
         "score": len(sigs), "grading": "in-image",
         "terminated_reason": r["terminated"], "turns_used": r["turns"],
