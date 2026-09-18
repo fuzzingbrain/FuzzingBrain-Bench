@@ -260,6 +260,15 @@ def test_the_live_price_and_the_final_price_come_from_one_function():
     from fbbench.sweep import external
     assert "price_reported_usage" in inspect.getsource(external._agent_usage)
     assert "price_reported_usage" in inspect.getsource(external.Judge._reported)
+def test_every_agent_arm_is_handed_the_same_task_text():
+    """The v2 invariant. Two arms told different things are not two agents being
+    compared, they are two briefs. The external arm used to get a short bespoke
+    opening pointing at ./submit; it now gets the bench's own task prompt,
+    byte-identical to the one claudecode is handed."""
+    from fbbench.sweep.external import DEFAULT_OPENING
+    from fbbench.sweep.claudecode import claude_task_prompt
+    assert DEFAULT_OPENING == claude_task_prompt()
+    assert "./submit" not in DEFAULT_OPENING   # a tool this arm no longer has
 
 
 def test_the_opening_does_not_stop_the_agent_at_its_first_crash():
@@ -270,14 +279,13 @@ def test_the_opening_does_not_stop_the_agent_at_its_first_crash():
     # 77 challenges.
     from fbbench.sweep.external import DEFAULT_OPENING
     assert "until one crashes" not in DEFAULT_OPENING
-    assert "as many distinct" in DEFAULT_OPENING
-    assert "different vulnerabilities" in DEFAULT_OPENING
+    assert "as many vulnerabilities as possible" in DEFAULT_OPENING
+    assert "additional distinct one counts" in DEFAULT_OPENING
 
 
-def test_the_opening_says_the_verdict_is_the_evidence():
-    # The api arm is told "an input you have not run through it does not count".
+def test_the_opening_says_the_graded_harness_is_the_evidence():
     # An agent that trusts its own harness over the graded one is jq-01: 77 exec
     # calls, one submission, thirty minutes, nothing.
     from fbbench.sweep.external import DEFAULT_OPENING
-    assert "not submitted does not count" in DEFAULT_OPENING
-    assert "ground truth" in DEFAULT_OPENING
+    assert "run_poc_on_harness() is your only ground-truth" in DEFAULT_OPENING
+    assert "Do not build a harness" in DEFAULT_OPENING

@@ -56,6 +56,7 @@ from pathlib import Path
 from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
 from fbbench.images import challenge_image
+from fbbench.sweep.claudecode import claude_task_prompt
 from fbbench.sweep.codex import _candidate_blobs, _crash_signatures
 from fbbench.sweep.mcp_episode import _start_episode_server
 from fbbench.runner.mcp_client import _full_scan_alias
@@ -71,16 +72,18 @@ from fbbench.runner.mcp_client import _full_scan_alias
 # it could. Scoring is min(3, distinct) x difficulty, so that sentence was worth
 # up to two thirds of a cell, and it contradicted the system prompt arriving
 # with it. The bare model produced exactly one crash on 22 of 77 challenges.
-DEFAULT_OPENING = (
-    "Audit the harness and the code it reaches and find as many distinct "
-    "crashes as you can, each one an input that makes the sanitizer-instrumented "
-    "build fault. Verify every candidate with ./submit <file>: an input you have "
-    "not submitted does not count, and its one-line verdict is the only ground "
-    "truth you get -- it says whether the input faulted, and when it did not, "
-    "how long the target actually spent on it. Crashes at different locations, "
-    "or of different types, count as different vulnerabilities; another variant "
-    "of one you already have adds nothing."
-)
+# The task text is the bench's, not the arm's. claudecode and codex are both
+# handed CODEX_TASK_PROMPT (re-pointed to whichever MCP server name they use);
+# an external agent is now driving the SAME six tools on the SAME server, so it
+# is handed the same text. It used to get a shorter bespoke opening that told it
+# to "verify every candidate with ./submit <file>" -- a tool that no longer
+# exists, and a different brief besides. Two arms told different things are not
+# two agents being compared.
+def default_opening() -> str:
+    return claude_task_prompt()
+
+
+DEFAULT_OPENING = default_opening()
 
 
 # --------------------------------------------------------------- the manifest
@@ -93,6 +96,8 @@ class Manifest:
         self.name = str(data.get("name") or base.stem)
         self.command = str(data["command"]).strip()
         self.network = str(data.get("network", "blocked")).lower()
+        # shell_env is accepted and ignored: v2 has no host-side shell to
+        # point at a sandbox. Left parsed so an old manifest still loads.
         self.shell_env = data.get("shell_env")
         if "command" not in data:
             raise ValueError(f"{base}: manifest has no `command`")
