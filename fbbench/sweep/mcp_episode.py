@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import threading
@@ -103,9 +104,15 @@ class CandidateLog:
     def _record(self, path: str, result) -> None:
         blob = json.dumps(result) if result is not None else ""
         crashed = ('"crash_novelty"' in blob) or ('"signal": "SIG' in blob)
+        # The sanitizer's SUMMARY line names the fault AND where it happened, so
+        # two different faults stay two rows in the paper trail. Without it every
+        # crash collapsed into one "crash|<unnamed>" row.
+        m = re.search(r"SUMMARY:\s*\w*(?:Sanitizer|libFuzzer):\s*([^\\\"]+)", blob)
+        signature = (m.group(1).strip() if m else None)
         with self._lock:
             n = len(self.entries) + 1
-            entry = {"n": n, "path": path, "crashed": crashed}
+            entry = {"n": n, "path": path, "crashed": crashed,
+                     "signature": signature}
             self.entries.append(entry)
             if self.dir is None:
                 return

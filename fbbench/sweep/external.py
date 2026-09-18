@@ -884,9 +884,11 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # Per-candidate crashed/clean comes from the live verdicts, not from
         # `b == best`: several candidates can crash, and marking only the first
         # would understate every summary row built from this.
-        _crashed = {e["path"].rsplit("/", 1)[-1] for e in candidates.entries if e["crashed"]}
+        _seen = {e["path"].rsplit("/", 1)[-1]: e for e in candidates.entries}
         judge.log = [{"blob": os.path.basename(b),
-                      "crashed": os.path.basename(b) in _crashed} for b in blobs]
+                      "crashed": bool(_seen.get(os.path.basename(b), {}).get("crashed")),
+                      "signature": _seen.get(os.path.basename(b), {}).get("signature")}
+                     for b in blobs]
         if best and Path(best).is_file():
             shutil.copy(best, cell_dir / "best_blob")
 
