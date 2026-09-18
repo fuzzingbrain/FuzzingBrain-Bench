@@ -147,3 +147,34 @@ def test_the_budget_line_is_the_api_arm_s_own_function():
     # facts only: no instruction about what to do with them
     for word in ("must", "now", "Write your best"):
         assert word not in line
+
+
+def test_there_is_exactly_one_container_for_the_agent_arms():
+    """Verified live on libavif-01 through the shared relay:
+
+        TOOLS      ['exec', 'run_poc_on_harness', 'setup']
+        cwd        /challenge
+        identity   root
+        writable   /challenge=ro  /workspace=rw  /tmp=rw
+        gdb        /usr/bin/gdb, ptrace works
+        network    DOWN
+        graded bin /opt/fbbench/oracle/binaries/vuln/asan/harness  -rwx---r-x
+
+    Both arms get that because there is ONE `docker run` between them, in the
+    module they share. A second invocation in either arm is how the cwd, the
+    read-only /challenge and the isolation drifted apart in v1.
+    """
+    import pathlib
+    from fbbench.sweep import mcp_episode as ep
+
+    assert '"docker", "run"' in inspect.getsource(ep._start_episode_server)
+    for arm in (ex, cc):
+        src = inspect.getsource(arm)
+        assert '"docker"' not in src, f"{arm.__name__} starts its own container"
+
+    # ...and both reach it through the same object, with the same argument shape.
+    for fn in (ex.run_cell, cc.stage_claude_env):
+        calls = _calls(fn, "_start_episode_server")
+        assert len(calls) == 1, fn.__name__
+        # (image, workspace, root, candidates) -- the observer is not optional
+        assert len(calls[0].args) == 4, f"{fn.__name__} passes {len(calls[0].args)} args"
