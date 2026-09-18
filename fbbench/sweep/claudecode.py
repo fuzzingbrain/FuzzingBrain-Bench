@@ -123,7 +123,8 @@ def model_label(model: str) -> str:
 # The per-episode MCP server and its stdio<->socket relay now live in
 # mcp_episode.py, so the external arm serves the SAME tools from the SAME
 # server instead of a parallel implementation.
-from fbbench.sweep.mcp_episode import _RELAY_SRC, _start_episode_server  # noqa: E402,F401
+from fbbench.sweep.mcp_episode import (  # noqa: F401
+    _RELAY_SRC, CandidateLog, _start_episode_server)  # noqa: E402,F401
 
 
 def stage_claude_env(

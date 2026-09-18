@@ -57,8 +57,8 @@ from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
 from fbbench.images import challenge_image
 from fbbench.sweep.claudecode import claude_task_prompt
-from fbbench.sweep.codex import _candidate_blobs, _crash_signatures
-from fbbench.sweep.mcp_episode import _start_episode_server
+from fbbench.sweep.codex import _crash_signatures
+from fbbench.sweep.mcp_episode import CandidateLog, _start_episode_server
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets. Deliberately close to the api
@@ -774,8 +774,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # The SAME per-episode mcp-server every other agent arm drives. The
         # agent speaks MCP to it over `relay.py`; cwd inside is /challenge
         # (read-only), /workspace is the bind-mounted dir above.
+        candidates = CandidateLog(cell_dir, str(ws), preserve=preserve_pocs)
         server, sock_path, relay_path, _srv = _start_episode_server(
-            image, str(ws), str(root))
+            image, str(ws), str(root), candidates)
         sandbox_kind = "container"
 
         # Every arm is budgeted the same way: a turn cap and a wall clock, and
@@ -869,7 +870,11 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # own harness after the episode. Same helper, same heuristic, same
         # in-image grader -- so three arms cannot report numbers that diverge
         # for a reason no one can see.
-        blobs = _candidate_blobs(str(ws))
+        # What the agent SUBMITTED, seen live on the relay -- not whatever it
+        # left in the workspace. A workspace sweep grades `gen.py` as a PoC and
+        # charges three in-image rounds for the privilege.
+        candidates.close()
+        blobs = candidates.host_blobs()
         pocs_dir = str(cell_dir / "pocs") if preserve_pocs else None
         sigs, best = _crash_signatures(Path(real), blobs, pocs_dir)
         judge.log = [{"blob": os.path.basename(b), "crashed": b == best} for b in blobs]
