@@ -45,13 +45,14 @@ import time
 from pathlib import Path
 
 from fbbench.grading import find_bug
-from fbbench.prompts import CODEX_TASK_PROMPT, system_prompt  # noqa: F401
+from fbbench.prompts import (  # noqa: F401
+    CODEX_TASK_PROMPT, budget_note, system_prompt)
 from fbbench.runner.mcp_client import _full_scan_alias
 # Reuse the Codex arm's host-side helpers verbatim so the two arms grade and
 # select PoCs identically (same in-image grader, same blob heuristic).
 from fbbench.sweep.codex import (
     IMAGE_PREFIX,
-    _crash_signatures, _candidate_blobs, _codex_nudge,
+    _crash_signatures, _candidate_blobs,
 )
 
 MAX_TURNS_DEFAULT = 100
@@ -92,23 +93,12 @@ def claude_task_prompt() -> str:
     return p
 
 
-def _budget_text(max_turns: int) -> str:
-    """Same turn-budget HARD RULES the Codex arm appends (one tool call ≈ one
-    turn). Claude, like Codex, gets no per-turn budget note injected mid-episode,
-    so without this it over-reads source and never grades."""
-    first_by = max(5, max_turns // 10)
-    every = max(3, max_turns // 15)
-    return (
-        f"\n\nTURN BUDGET — HARD RULES (one tool call ≈ one turn, ~{max_turns} total):\n"
-        f"1. Within your FIRST {first_by} turns you MUST write a candidate input and "
-        f"call run_poc_on_harness() on it — even a crude guess. Do not read more than a handful of "
-        f"files before that first run_poc_on_harness().\n"
-        f"2. After that, call run_poc_on_harness() at least once every ~{every} turns. Never read "
-        f"more than ~{every} files in a row without grading something.\n"
-        f"3. The score is the number of DISTINCT crashes you produce, so a rough PoC "
-        f"that actually faults is worth far more than perfect source analysis that "
-        f"never runs. Reading the whole source without running anything scores ZERO.\n"
-        f"Treat run_poc_on_harness() as your primary tool, not a final step.")
+# _budget_text used to append 695 characters of HARD RULES here -- "grade
+# within your first 10 turns", "at least once every ~6 turns" -- to this arm and
+# no other. Nobody could say where 10 and 6 came from, and prescribing a search
+# strategy to one arm is coaching, not a budget. What an arm needs is the two
+# facts it cannot count for itself: turns and time. That is budget_note(), the
+# api arm's own function, and all three arms use it now.
 
 
 def model_label(model: str) -> str:
@@ -368,7 +358,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     terminated = "resumes_exhausted"
 
     with open(log_path, "w") as lf:
-        prompt = claude_task_prompt() + _budget_text(max_turns)
+        prompt = claude_task_prompt()
         resume = None
         for attempt in range(MAX_RESUMES + 1):
             remaining = max_turns - turns
@@ -405,7 +395,12 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
                 terminated = "resumes_exhausted"
                 break
             # Claude stopped on its own with budget left → nudge and resume.
-            nudge = _codex_nudge(turns, max_turns, last_grade_turn)
+            # The same line the api arm gets between turns: where the budget
+            # stands, and nothing about what to do with it.
+            nudge = budget_note(turns, max_turns, max_turns - turns,
+                                elapsed_s=time.time() - t0,
+                                remaining_s=max(0.0, deadline - time.time()),
+                                time_budget_s=float(timeout_s))
             lf.write(json.dumps({"fbbench_nudge": nudge, "at_turn": turns}) + "\n")
             prompt = nudge
             resume = session_id

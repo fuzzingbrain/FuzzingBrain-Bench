@@ -113,3 +113,37 @@ def test_the_api_arm_is_not_given_a_dollar_cap():
     agent arms are being compared against."""
     from fbbench.runner import episode
     assert "AGENT_USD_CAP" not in inspect.getsource(episode)
+
+
+def test_no_arm_is_told_a_search_strategy_the_others_are_not():
+    """claudecode used to get 695 characters of HARD RULES appended to its
+    prompt -- "grade within your first 10 turns", "at least once every ~6" --
+    and no other arm did. Nobody could say where 10 and 6 came from. An arm
+    should be told what it cannot count for itself (turns, time) and nothing
+    about what to do with it."""
+    import inspect
+    from fbbench.prompts import system_prompt
+
+    # What reaches a model is what matters -- the source may still explain in a
+    # comment why this was removed, and that is not a prompt.
+    for text in (system_prompt(), ex.DEFAULT_OPENING, cc.claude_task_prompt()):
+        assert "HARD RULES" not in text
+        assert "MUST write a candidate" not in text
+
+    # ...and neither arm may reach for the generators that produced them.
+    for arm in (ex, cc):
+        assert not hasattr(arm, "_budget_text"), arm.__name__
+        assert not hasattr(arm, "_codex_nudge"), arm.__name__
+
+
+def test_the_budget_line_is_the_api_arm_s_own_function():
+    """One implementation of 'where the budget stands', not three that agree."""
+    import inspect
+    from fbbench import prompts
+    assert "budget_note" in inspect.getsource(cc.run_claude)
+    line = prompts.budget_note(30, 100, 70, elapsed_s=600.0,
+                               remaining_s=1200.0, time_budget_s=1800.0)
+    assert "turn 30/100" in line and "70 turns left" in line
+    # facts only: no instruction about what to do with them
+    for word in ("must", "now", "Write your best"):
+        assert word not in line
