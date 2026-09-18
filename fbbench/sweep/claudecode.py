@@ -566,7 +566,8 @@ def _graded_paths(log_path: str, work: str) -> list[str]:
 
 
 def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
-             r: dict, blobs: list[str], alias: str, preserve_pocs: bool = True) -> dict:
+             r: dict, blobs: list[str], alias: str, preserve_pocs: bool = True,
+             fuzzing_attempts: int = 0) -> dict:
     """Re-grade blobs in the challenge image, write score.json + report.
     With preserve_pocs, every graded candidate is kept under pocs/{crashed,clean}/
     (same forensic record as the API arm)."""
@@ -580,6 +581,7 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
     score = {
         "bug_id": bug, "model": model_label(model), "seed": 0,
         # Scored on distinct crash signatures, the same unit the API arm reports.
+        "fuzzing_attempts": fuzzing_attempts,
         "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
         "score": len(sigs), "grading": "in-image",
         "terminated_reason": r["terminated"], "turns_used": r["turns"],
@@ -642,7 +644,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
                            + _graded_paths(r["log_path"], work)
                            + _candidate_blobs(r.get("snap_dir", ""))))
         score = _persist(cell_dir, bug=bug, model=model, real=str(real),
-                         r=r, blobs=blobs, alias=alias, preserve_pocs=preserve_pocs)
+                         r=r, blobs=blobs, alias=alias, fuzzing_attempts=len(candidates.blocked), preserve_pocs=preserve_pocs)
     finally:
         for closer in (srv_sock.close, server.terminate):
             try:

@@ -940,6 +940,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
                 "sandbox": sandbox_kind,
             },
             "agent": manifest.name,
+            # Screened, not assumed: a result should be readable knowing whether
+            # the agent reached for a fuzzer. Zero is the expected value; a
+            # nonzero one is not a disqualification, it is information.
+            "fuzzing_attempts": len(candidates.blocked),
             "network": "allowed" if manifest.allow_network else "blocked",
             "sandbox": sandbox_kind,
             "tokens_used": (usage.get("input_tokens", 0)
