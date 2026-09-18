@@ -69,3 +69,33 @@ def test_the_external_arm_offers_no_tool_the_others_lack():
         assert gone not in src, f"{gone} is back"
     assert "./submit" not in ex.DEFAULT_OPENING
     assert "./reach" not in ex.DEFAULT_OPENING
+
+
+def test_every_agent_arm_shares_one_budget_ceiling():
+    """A new rule, and it applies to agents only.
+
+    The api arm drives its own loop and the bench counts its tokens between
+    turns, so it keeps no dollar cap. Claude Code, codex and any external agent
+    are black boxes that can run away, so each gets the same hard ceiling on
+    both axes -- from one constant, not two that happen to match.
+    """
+    from fbbench.sweep import mcp_episode as ep
+
+    assert ep.AGENT_WALL_CAP_S == 3600          # 1 hour per challenge
+    assert ep.AGENT_USD_CAP == 10.0             # $10 per challenge
+    for arm in (ex, cc):
+        assert arm.AGENT_WALL_CAP_S is ep.AGENT_WALL_CAP_S
+        assert arm.AGENT_USD_CAP is ep.AGENT_USD_CAP
+
+    # and each arm must actually clamp with it, not merely import it
+    assert "AGENT_WALL_CAP_S" in inspect.getsource(ex.run_cell)
+    assert "AGENT_USD_CAP" in inspect.getsource(ex._run_agent)
+    assert "AGENT_WALL_CAP_S" in inspect.getsource(cc.run_claude)
+    assert "AGENT_USD_CAP" in inspect.getsource(cc.run_claude)
+
+
+def test_the_api_arm_is_not_given_a_dollar_cap():
+    """The rule is for agents. Capping the bare model would change what the
+    agent arms are being compared against."""
+    from fbbench.runner import episode
+    assert "AGENT_USD_CAP" not in inspect.getsource(episode)

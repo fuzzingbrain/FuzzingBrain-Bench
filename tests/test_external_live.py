@@ -114,8 +114,9 @@ def test_no_grace_period_is_added_to_the_agent_wall_clock():
     import inspect
     from fbbench.sweep import external
     src = inspect.getsource(external.run_cell)
-    assert "_run_agent(argv, str(ws), env, timeout_s, agent_log)" in src
-    assert "timeout_s + " not in src, "the wall clock must be handed over intact"
+    assert "timeout_s + " not in src, "the wall clock must never be extended"
+    # It may only be CLAMPED DOWN, by the ceiling every agent arm shares.
+    assert "min(timeout_s, AGENT_WALL_CAP_S)" in src
 
 
 def test_the_manifest_is_told_which_model_to_run():

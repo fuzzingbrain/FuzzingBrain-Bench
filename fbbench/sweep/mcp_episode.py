@@ -22,6 +22,18 @@ import threading
 from pathlib import Path
 
 
+# The agent arms' safety net, in the module every agent arm already shares.
+#
+# The api arm drives its own loop and the bench counts its tokens between
+# turns, so it needs none of this and keeps no dollar cap. An agent -- Claude
+# Code, codex, or any external one -- is a black box that can run away, so it
+# gets a hard ceiling on BOTH axes. Deliberately generous: the recorded cells
+# ran 30 minutes and $6-10, so this is a guard against a runaway, not a budget
+# the work is meant to feel.
+AGENT_WALL_CAP_S = 3600        # 1 hour per challenge
+AGENT_USD_CAP = 10.0           # $10 per challenge
+
+
 class CandidateLog:
     """Every candidate an agent grades, preserved as it grades it.
 

@@ -52,13 +52,15 @@ import tempfile
 import threading
 import time
 from pathlib import Path
+from typing import Callable
 
 from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
 from fbbench.images import challenge_image
 from fbbench.sweep.claudecode import claude_task_prompt
 from fbbench.sweep.codex import _crash_signatures
-from fbbench.sweep.mcp_episode import CandidateLog, _start_episode_server
+from fbbench.sweep.mcp_episode import (
+    AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server)
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets. Deliberately close to the api
@@ -705,7 +707,8 @@ def _kill_pg(proc: subprocess.Popen) -> None:
 
 
 def _run_agent(argv: list[str], cwd: str, env: dict, timeout_s: int,
-               log_path: Path) -> tuple[str, bool]:
+               log_path: Path, spend: "Callable[[], float | None] | None" = None,
+               usd_cap: float = AGENT_USD_CAP) -> tuple[str, bool | str]:
     """Run the agent under a HARD wall clock of exactly `timeout_s`.
 
     The other arms get no grace: claudecode hard-kills `claude -p` on its
@@ -739,13 +742,29 @@ def _run_agent(argv: list[str], cwd: str, env: dict, timeout_s: int,
         proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                                 stdout=fh, stderr=subprocess.STDOUT,
                                 text=True, start_new_session=True)
+        deadline = time.time() + timeout_s
+        timed_out: bool | str = False
         try:
-            proc.wait(timeout=timeout_s)
-            timed_out = False
-        except subprocess.TimeoutExpired:
-            _kill_pg(proc)
-            proc.wait(timeout=30)
-            timed_out = True
+            while True:
+                left = deadline - time.time()
+                if left <= 0:
+                    _kill_pg(proc); proc.wait(timeout=30); timed_out = True
+                    break
+                try:
+                    # Poll rather than one long wait, so the dollar cap can be
+                    # checked while the agent is still spending. Reading what the
+                    # agent reports is the only cost signal this arm has; an
+                    # agent that reports nothing is bounded by the clock alone.
+                    proc.wait(timeout=min(left, 10))
+                    break
+                except subprocess.TimeoutExpired:
+                    pass
+                if spend is not None and usd_cap:
+                    now = spend()
+                    if now is not None and now >= usd_cap:
+                        _kill_pg(proc); proc.wait(timeout=30)
+                        timed_out = "cost-cap"
+                        break
         except BaseException:                  # Ctrl-C / SIGTERM handler
             _kill_pg(proc)
             raise
@@ -837,8 +856,12 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         cell_dir.mkdir(parents=True, exist_ok=True)
         agent_log = cell_dir / "agent.log"
         try:
-            log, timed_out = _run_agent(argv, str(ws), env, timeout_s, agent_log)
-            if timed_out:
+            log, timed_out = _run_agent(
+                argv, str(ws), env, min(timeout_s, AGENT_WALL_CAP_S), agent_log,
+                spend=lambda: (judge._reported() or {}).get("total_usd"))
+            if timed_out == "cost-cap":
+                terminated = "cost-cap"
+            elif timed_out:
                 terminated = "wall-clock"
         except KeyboardInterrupt:
             # _run_agent kills the group and re-raises. The log is on disk

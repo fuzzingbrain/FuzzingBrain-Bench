@@ -124,7 +124,8 @@ def model_label(model: str) -> str:
 # mcp_episode.py, so the external arm serves the SAME tools from the SAME
 # server instead of a parallel implementation.
 from fbbench.sweep.mcp_episode import (  # noqa: F401
-    _RELAY_SRC, CandidateLog, _start_episode_server)  # noqa: E402,F401
+    _RELAY_SRC, AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog,
+    _start_episode_server)  # noqa: E402,F401
 
 
 def stage_claude_env(
@@ -349,7 +350,9 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     log_path = os.path.join(work, "claude.log")
     snap_dir = os.path.join(os.path.dirname(work), "graded")
     t0 = time.time()
-    deadline = t0 + timeout_s
+    # Same ceiling every agent arm gets: a black box the bench cannot count
+    # tokens inside needs a hard stop on both axes. See external.AGENT_*_CAP.
+    deadline = t0 + min(timeout_s, AGENT_WALL_CAP_S)
     turns = grade_calls = tokens = 0
     in_tok = out_tok = cr_tok = cw_tok = 0
     usd = 0.0
@@ -384,6 +387,9 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
                 break
             if turns >= max_turns:
                 terminated = "turn_budget"
+                break
+            if usd >= AGENT_USD_CAP:
+                terminated = "cost-cap"
                 break
             if st["ended"] == "deadline" or time.time() > deadline:
                 terminated = "timeout"
