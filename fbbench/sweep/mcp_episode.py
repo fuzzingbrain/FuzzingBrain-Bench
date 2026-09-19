@@ -93,16 +93,36 @@ def ensure_agent_tools(image: str | None = None) -> str:
         if os.path.exists(stamp):
             return os.path.join(d, "bin")
         os.makedirs(os.path.join(d, "bin"), exist_ok=True)
+        # `docker create` + `docker cp`, not `docker run`: the toolbox image is
+        # FROM scratch and holds nothing but the binaries -- no shell, no cp,
+        # nothing to run. `create` only registers a container, so the command
+        # given here is never executed, and `cp` reads the filesystem from the
+        # outside. Copying with `docker run ... sh -c cp` would fail on every
+        # machine, which is exactly the class of breakage this image exists to
+        # avoid.
+        cid = ""
         try:
+            c = subprocess.run(["docker", "create", img, "/nonexistent"],
+                               capture_output=True, text=True, timeout=300)
+            cid = (c.stdout or "").strip()
+            if c.returncode != 0 or not cid:
+                return ""
             r = subprocess.run(
-                ["docker", "run", "--rm", "-v", f"{os.path.join(d, 'bin')}:/out",
-                 "--entrypoint", "sh", img, "-c", "cp -a /tools/bin/. /out/"],
+                ["docker", "cp", f"{cid}:/tools/bin/.", os.path.join(d, "bin")],
                 capture_output=True, text=True, timeout=1800)
             if r.returncode != 0:
                 return ""
+            for name in os.listdir(os.path.join(d, "bin")):
+                f = os.path.join(d, "bin", name)
+                if os.path.isfile(f):
+                    os.chmod(f, 0o755)
             open(stamp, "w").close()
         except Exception:  # noqa: BLE001
             return ""
+        finally:
+            if cid:
+                subprocess.run(["docker", "rm", "-f", cid],
+                               capture_output=True, timeout=300)
         return os.path.join(d, "bin")
 
 

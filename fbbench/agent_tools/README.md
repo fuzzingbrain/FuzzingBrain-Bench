@@ -34,21 +34,54 @@ image ships, exactly v1 behaviour, and a fresh clone runs with no download.
 
 ## Building the tools image
 
-```dockerfile
-FROM debian:bookworm-slim AS build
-# …build statically linked binaries…
-FROM scratch
-COPY --from=build /out/gdb /tools/bin/gdb
+`Dockerfile` beside this file builds it. One command, no arguments, and it
+refuses to produce anything that would not run everywhere:
+
+```bash
+docker build -t <registry>/fbbench-agent-tools:v1 fbbench/agent_tools/
+docker push  <registry>/fbbench-agent-tools:v1
+export FBBENCH_AGENT_TOOLS_IMAGE=<registry>/fbbench-agent-tools@sha256:…
 ```
 
-Anything executable under `/tools/bin` becomes available. Publish it, pin it by
-digest, and record that digest wherever you record the benchmark version.
+Currently one tool: **gdb 14.2, statically linked, 10.4 MB, no dynamic loader.**
+Verified to start and set source-level breakpoints inside `skia-01` and
+`libxml2-04`, two challenge images that ship no debugger at all.
+
+Two things about that build are worth knowing before changing it.
+
+**It is built on Alpine, not Debian.** Alpine's C library (musl) is designed to
+be baked into a program; Debian's (glibc) is not, and parts of it load more
+pieces at runtime no matter what you ask for. Seven Debian attempts shed expat,
+gmp and mpfr and still could not shake libc, libm and libstdc++. A musl-built
+gdb debugging a glibc-built harness is fine — gdb inspects the target from the
+outside and shares nothing with it.
+
+**gdb links itself through libtool, not through the compiler**, and to libtool
+`-static` means "prefer static archives when resolving `-l` flags", not
+"produce a self-contained executable". libtool consumes the flag instead of
+passing it on. Five builds oscillated — musl libc dynamic, then libstdc++
+dynamic, then musl again — because the flag was being addressed to the wrong
+program. The flag libtool understands is `-all-static`, and it belongs on the
+final link only: `configure` link-tests with the compiler directly and would
+reject an option gcc does not have.
+
+The build ends by reading gdb's own ELF headers and **failing** if a dynamic
+loader is named there. Note that `ldd` cannot answer this on Alpine — `ldd`
+*is* the musl loader and prints a `libc.musl-x86_64.so.1 => …` line even for a
+fully static binary. Four good builds were thrown away on that false positive
+before `readelf -l` settled it. A dynamic executable carries an `INTERP`
+program header; a static one has none.
+
+Anything executable under `/tools/bin` becomes available. The image is `FROM
+scratch` — binaries and nothing else, no shell — so the benchmark extracts them
+with `docker create` + `docker cp` rather than running anything inside it.
 
 ## Rules for what goes in
 
 - **Static only.** The gdb the challenge images ship is 10 MB against 59 shared
-  libraries; copied into an image that lacks it, it will not start. `file` must
-  say "statically linked".
+  libraries; copied into an image that lacks it, it will not start.
+  `readelf -l` must show no `INTERP` header — and `tests/test_agent_tools.py`
+  checks every binary in a built image, so a dynamic one cannot slip through.
 - **Nothing that reads the answer.** These run inside the challenge container,
   next to `/opt/fbbench/oracle`. A tool is for observing the target, not for
   discovering what the planted bug is.

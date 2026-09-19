@@ -5,6 +5,7 @@ only what the image shipped, and gdb is in 45 of the 78 challenge images and
 absent from 33, for no reason anyone chose. This is the place those extras go,
 built so the next one is a file drop rather than a special case.
 """
+import subprocess
 import inspect
 import os
 import stat
@@ -91,3 +92,47 @@ def test_a_cell_records_which_toolbox_produced_it():
     for src in (inspect.getsource(ex.run_cell), inspect.getsource(cc._persist)):
         assert '"agent_tools"' in src
         assert '"agent_tools_digest"' in src
+
+
+# --------------------------------------------------------- provisioning it
+# The toolbox image is FROM scratch: the binaries and nothing else. No shell,
+# no cp, no libc. The first version of ensure_agent_tools() copied them out
+# with `docker run --entrypoint sh ... -c "cp -a /tools/bin/. /out/"`, which
+# cannot work against such an image and would have failed on every machine --
+# the toolbox exists to remove exactly that kind of per-machine surprise, so
+# it must not be the thing that introduces one.
+def test_the_toolbox_is_extracted_without_running_anything_inside_it():
+    src = inspect.getsource(ep.ensure_agent_tools)
+    assert "docker" in src and "create" in src and "cp" in src
+    assert "--entrypoint" not in src, (
+        "extraction must not execute a program inside the toolbox image: it is "
+        "FROM scratch and has none")
+
+
+@pytest.mark.skipif(
+    subprocess.run(["docker", "image", "inspect", "fbbench-agent-tools:v1"],
+                   capture_output=True).returncode != 0,
+    reason="toolbox image not built on this machine")
+def test_a_built_toolbox_extracts_and_every_binary_is_self_contained(tmp_path, monkeypatch):
+    """The real thing: pull it out of the image and check it needs no loader.
+
+    A dynamically linked tool would start here and fail on the 33 challenge
+    images that ship no debugger -- the failure this whole mechanism exists to
+    prevent, and one nobody would attribute to the toolbox.
+    """
+    # Point the cache at tmp_path by patching the module attribute, NOT by
+    # reloading the module: the parity tests assert that both agent arms hold
+    # the *same function objects* as this module, and a reload silently
+    # replaces them, failing three unrelated tests further down the run.
+    monkeypatch.setattr(ep, "_CACHE_ROOT", str(tmp_path))
+    d = ep.ensure_agent_tools("fbbench-agent-tools:v1")
+    assert d and os.path.isdir(d)
+    names = sorted(os.listdir(d))
+    assert names, "toolbox came out empty"
+    for name in names:
+        p = os.path.join(d, name)
+        assert os.access(p, os.X_OK), f"{name} is not executable"
+        hdr = subprocess.run(["readelf", "-l", p], capture_output=True, text=True)
+        if hdr.returncode == 0:
+            assert "INTERP" not in hdr.stdout, (
+                f"{name} needs a dynamic loader and will not run on every image")
