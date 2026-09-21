@@ -60,7 +60,7 @@ MAX_TURNS_DEFAULT = 100
 MODEL_DEFAULT = "sonnet"
 MAX_RESUMES = 30  # parity with the Codex arm's resume cap
 
-from fbbench.sweep.mcp_episode import BENCH_TOOL_NAMES
+from fbbench.sweep.mcp_episode import BENCH_TOOL_NAMES, agent_tools_note
 
 # The only tools the agent may call: the bench MCP tools, named from the one
 # list every arm shares. Everything else is a host-side cheat/contamination
@@ -89,8 +89,11 @@ def claude_task_prompt() -> str:
     The only substitution is mechanical and forced: Claude Code namespaces MCP
     tools, so `setup()` is `mcp__bench__setup()` to it and nowhere else.
     """
-    p = system_prompt()
-    for tool in ("setup", "exec", "run_poc_on_harness"):
+    # The note is substituted too: it names run_poc_on_harness(), and a prompt
+    # that says mcp__bench__run_poc_on_harness() everywhere else and the bare
+    # name here would be pointing this arm at a tool it cannot call.
+    p = system_prompt() + agent_tools_note()
+    for tool in BENCH_TOOL_NAMES:
         p = p.replace(f"{tool}()", f"mcp__bench__{tool}()")
     return p
 

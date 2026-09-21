@@ -61,7 +61,7 @@ from fbbench.prompts import system_prompt
 from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
-    AGENT_TOOLS_IMAGE, agent_tool_mounts, agent_tools_digest)
+    AGENT_TOOLS_IMAGE, agent_tool_mounts, agent_tools_digest, agent_tools_note)
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets. Deliberately close to the api
@@ -88,6 +88,14 @@ def default_opening() -> str:
 
 
 DEFAULT_OPENING = default_opening()
+"""The api arm's text, unmodified -- what every arm shares."""
+
+
+def agent_opening() -> str:
+    """What an agent arm is actually handed: the shared text plus the one
+    toolbox line. Computed per cell, not at import, because resolving the
+    toolbox can pull an image and importing a module must not."""
+    return DEFAULT_OPENING + agent_tools_note()
 
 
 # --------------------------------------------------------------- the manifest
@@ -796,7 +804,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
                       image=image,
                       header={"bug_id": bug, "model": model, "max_turns": max_turns,
-                              "initial_user_message": DEFAULT_OPENING})
+                              "initial_user_message": agent_opening()})
         judge.start()
         # The SAME per-episode mcp-server every other agent arm drives. The
         # agent speaks MCP to it over `relay.py`; cwd inside is /challenge
@@ -822,7 +830,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # silently not reach the agent and every cell in a sweep would run
         # whatever the manifest said -- the run would be mislabelled, not fail.
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
-                               opening=DEFAULT_OPENING,
+                               opening=agent_opening(),
                                mcp_socket=sock_path, relay=relay_path,
                                max_turns=str(max_turns), model=model)
         env = dict(os.environ)
@@ -977,7 +985,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # existed -- which is why every external cell read "0 turns used,
         # $0.0000, duration 0.0s" over a real half-hour run.
         _write_run_artifacts(cell_dir, ws, log, judge, bug, model,
-                             DEFAULT_OPENING, score=score, usage=usage,
+                             agent_opening(), score=score, usage=usage,
                              max_turns=max_turns, preserve_pocs=preserve_pocs)
         if interrupted:
             # The cell is on disk now; let the interrupt do its job.

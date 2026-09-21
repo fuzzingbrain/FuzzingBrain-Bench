@@ -247,3 +247,50 @@ def test_the_shared_tool_list_matches_what_a_live_server_advertises():
     assert names == set(mcp_episode.BENCH_TOOL_NAMES), (
         f"the image advertises {names}, the bench believes "
         f"{set(mcp_episode.BENCH_TOOL_NAMES)}")
+
+
+# ------------------------------------------------- knowing the tools exist
+def test_both_agent_arms_are_told_about_the_toolbox_in_the_same_words():
+    """An asymmetry in information is the same unfairness as one in tools.
+
+    fb-agent's own config described gdb while claudecode was told nothing, so
+    one arm knew it had a debugger and the other had to guess -- and a toolbox
+    nobody is told about may as well not be mounted.
+    """
+    import unittest.mock as m
+    with m.patch.object(mcp_episode, "agent_tool_mounts",
+                        lambda *a, **k: ([], ["gdb"])):
+        a, b = ex.agent_opening(), cc.claude_task_prompt()
+    note = mcp_episode.agent_tools_note(["gdb"])
+    assert note and note in a
+    expect = a
+    for t in mcp_episode.BENCH_TOOL_NAMES:
+        expect = expect.replace(f"{t}()", f"mcp__bench__{t}()")
+    assert b == expect, "the arms differ by more than the forced tool prefix"
+
+
+def test_the_toolbox_line_never_reaches_the_api_arm():
+    """prompts.system_prompt() is the baseline every agent is measured
+    against. Changing it makes v1 api results incomparable, and the api arm
+    has no toolbox to be told about."""
+    from fbbench import prompts
+    assert prompts.system_prompt() == ex.DEFAULT_OPENING
+    for word in ("gdb", "Also available on PATH"):
+        assert word not in prompts.system_prompt()
+
+
+def test_the_note_cannot_promise_a_tool_that_is_not_mounted():
+    """Generated from what is actually mounted. With the toolbox off both
+    agent arms fall back to the api arm's text exactly."""
+    assert mcp_episode.agent_tools_note([]) == ""
+    import unittest.mock as m
+    with m.patch.object(mcp_episode, "agent_tool_mounts", lambda *a, **k: ([], [])):
+        from fbbench import prompts
+        assert ex.agent_opening() == prompts.system_prompt()
+
+
+def test_the_opening_is_built_per_cell_not_at_import():
+    """Resolving the toolbox can pull an image; importing a module must not."""
+    src = inspect.getsource(ex)
+    assert "DEFAULT_OPENING = default_opening()" in src
+    assert "agent_tools_note()" not in src.split("def agent_opening")[0]
