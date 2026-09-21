@@ -43,7 +43,9 @@ from pathlib import Path
 # Binaries in the image must be STATICALLY linked -- the gdb the challenge
 # images ship is 10 MB against 59 shared libraries and will not start anywhere
 # else.
-DEFAULT_AGENT_TOOLS_IMAGE = "osanzas/fbbench-agent-tools:v1"
+DEFAULT_AGENT_TOOLS_IMAGE = (
+    "osanzas/fbbench-agent-tools"
+    "@sha256:ffebbe6851f48f0c95831f3b2bff85f5001cb680f28b7efadb98e718d1da26f9")
 """The published toolbox. Pulled automatically the first time an agent episode
 starts on a machine, then cached, so gdb is not something anyone installs,
 configures or is told about -- it is part of the benchmark."""
