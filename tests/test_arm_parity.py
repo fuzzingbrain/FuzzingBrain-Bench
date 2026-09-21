@@ -185,11 +185,10 @@ def test_there_is_exactly_one_container_for_the_agent_arms():
 
 # ------------------------------------------------------------ the tool set
 def test_claudecode_is_allowed_exactly_the_tools_that_exist():
-    """It used to allow six, three of which the server does not implement.
+    """The allowlist is the shared list, not a copy of it.
 
-    Harmless in practice -- an agent can only call what the server advertises
-    -- but it read as though claudecode had tools the other arms lacked, which
-    is precisely the question this file exists to settle. One list now.
+    A copy drifts, and a claudecode allowlist naming tools the other arms do
+    not have reads as an advantage whether or not it is one.
     """
     from fbbench.sweep import claudecode as cc
     allowed = {t.removeprefix("mcp__bench__") for t in cc._BENCH_TOOLS.split(",")}

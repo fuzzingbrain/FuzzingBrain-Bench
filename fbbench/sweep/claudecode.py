@@ -19,7 +19,8 @@ off, not just forbidden by the prompt:
     the repo's `output/` (prior winning PoCs) and `bugs/` (the staged answer) are
     not reachable by relative path.
   - ALL built-in tools (Bash/Read/Write/Web*/Task/Skill/SlashCommand/…) are
-    disallowed; the ONLY allowed tools are the six `mcp__bench__*` tools. Verified
+    disallowed; the ONLY allowed tools are the `mcp__bench__*` ones named by
+    BENCH_TOOL_NAMES, the same set every other arm gets. Verified
     that with these flags an agent explicitly instructed to shell out / read the
     host answer file produces ZERO non-bench tool calls and cannot reach it.
   - `--strict-mcp-config` → only the bench MCP server (no user MCP servers leak).

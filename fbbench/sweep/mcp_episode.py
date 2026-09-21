@@ -68,15 +68,12 @@ class AgentToolsUnavailable(RuntimeError):
     all. A run that cannot be compared is worse than a run that stops."""
 
 # ------------------------------------------------------------- the tool set
-# What the mcp-server inside every challenge image actually advertises. Asked
-# of a live server, not assumed: setup(), exec(cmd, timeout_s) and
-# run_poc_on_harness(path), and nothing else.
+# What the mcp-server inside every challenge image advertises, and therefore
+# everything any arm can call. Verified against a live server, not assumed --
+# tests/test_arm_parity.py asks one and fails if it disagrees.
 #
-# It lives here because all three arms must agree on it. claudecode's
-# --allowedTools used to name six, three of which (list_directory, read_file,
-# write_file) do not exist -- harmless, since an agent can only call what the
-# server advertises, but it read as though claudecode had tools the others
-# lacked, which is the exact question this file exists to settle.
+# It lives here because all three arms must name the same set. Anything that
+# needs a tool list builds it from this and nothing keeps its own copy.
 BENCH_TOOL_NAMES = ("setup", "exec", "run_poc_on_harness")
 
 _RESERVED = {"mcp-server", "llvm-symbolizer", "sh", "bash", "env"}
