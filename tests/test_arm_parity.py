@@ -305,8 +305,12 @@ def test_the_note_does_not_name_the_hidden_oracle_binary():
     on the path the note handed it. The note may only say what holds on all 78.
     """
     note = mcp_episode.agent_tools_note(["gdb"])
-    assert "/opt/fbbench/oracle" not in note
-    assert "graded" not in note.lower()
+    # The path may be named -- it is readable on roughly half the challenges
+    # (mode 705) and refused on the rest (mode 700) -- but the note must not
+    # promise either, because it is wrong half the time whichever it claims.
+    assert "refused" in note and "readable" in note
+    for absolute in ("always readable", "is readable on every", "cannot be opened"):
+        assert absolute not in note
 
 
 # ------------------------------------------------------ what a run cost
