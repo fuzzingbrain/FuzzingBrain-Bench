@@ -6,6 +6,7 @@ absent from 33, for no reason anyone chose. This is the place those extras go,
 built so the next one is a file drop rather than a special case.
 """
 import subprocess
+import sys
 import inspect
 import os
 import stat
@@ -78,12 +79,45 @@ def test_the_binaries_come_from_a_pinned_image_not_a_local_directory():
     assert "digest" in inspect.getsource(ep.ensure_agent_tools)
 
 
-def test_it_is_off_by_default_so_a_fresh_clone_runs():
-    """Unset means agents get whatever the challenge image ships -- v1
-    behaviour -- and nobody has to download anything to run the bench."""
-    assert ep.AGENT_TOOLS_IMAGE == "" or ep.AGENT_TOOLS_IMAGE
+def test_it_is_on_by_default_so_nobody_has_to_install_anything():
+    """The toolbox is part of the benchmark, not a dependency.
+
+    This replaces an earlier test that asserted the opposite -- off unless an
+    env var was set. That default made the toolbox something each person had
+    to know about and switch on, so two machines running "the same benchmark"
+    would quietly differ in whether the agent had a debugger. The download is
+    ~11MB, once per machine, and it happens by itself.
+    """
+    assert ep.DEFAULT_AGENT_TOOLS_IMAGE, "there must be a published default"
+    # In a fresh interpreter with a clean environment -- what a new machine
+    # looks like. Not ep.AGENT_TOOLS_IMAGE directly: conftest blanks that so
+    # the suite never reaches a registry, which would hide this very default.
+    env = {k: v for k, v in os.environ.items()
+           if k != "FBBENCH_AGENT_TOOLS_IMAGE"}
+    r = subprocess.run(
+        [sys.executable, "-c",
+         "from fbbench.sweep.mcp_episode import AGENT_TOOLS_IMAGE as i; print(i)"],
+        capture_output=True, text=True, env=env, cwd=os.getcwd())
+    assert r.stdout.strip() == ep.DEFAULT_AGENT_TOOLS_IMAGE, (
+        f"a clean machine resolved {r.stdout.strip()!r}, not the published "
+        f"toolbox -- it would run the agent arms with no gdb")
+
+
+def test_it_can_be_turned_off_on_purpose_but_not_by_accident():
+    """`none` is the deliberate opt-out; there is no way to end up without the
+    toolbox silently."""
     assert ep.agent_tool_mounts("") == ([], [])
     assert ep.ensure_agent_tools("") == ""
+
+
+def test_a_toolbox_that_cannot_be_fetched_stops_the_run(monkeypatch, tmp_path):
+    """The failure that matters. If the pull fails, the agent arm would run
+    without gdb and still produce a number -- one that is not comparable to a
+    run that had it, and on 33 of the 78 challenges means no debugger at all.
+    Nothing in the output would say so. So it raises instead."""
+    monkeypatch.setattr(ep, "_CACHE_ROOT", str(tmp_path))
+    with pytest.raises(ep.AgentToolsUnavailable):
+        ep.ensure_agent_tools("fbbench-agent-tools:definitely-not-published")
 
 
 def test_a_cell_records_which_toolbox_produced_it():

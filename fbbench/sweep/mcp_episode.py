@@ -43,10 +43,27 @@ from pathlib import Path
 # Binaries in the image must be STATICALLY linked -- the gdb the challenge
 # images ship is 10 MB against 59 shared libraries and will not start anywhere
 # else.
-AGENT_TOOLS_IMAGE = os.environ.get("FBBENCH_AGENT_TOOLS_IMAGE", "")
-"""Image holding the agent toolbox under /tools/bin. Empty disables the whole
-mechanism, and agents then have whatever the challenge image itself ships --
-exactly v1 behaviour, so a fresh clone runs with no download."""
+DEFAULT_AGENT_TOOLS_IMAGE = "osanzas/fbbench-agent-tools:v1"
+"""The published toolbox. Pulled automatically the first time an agent episode
+starts on a machine, then cached, so gdb is not something anyone installs,
+configures or is told about -- it is part of the benchmark."""
+
+_tools_env = os.environ.get("FBBENCH_AGENT_TOOLS_IMAGE")
+AGENT_TOOLS_IMAGE = (
+    DEFAULT_AGENT_TOOLS_IMAGE if _tools_env is None else _tools_env.strip())
+if AGENT_TOOLS_IMAGE.lower() in {"none", "off", "0", ""}:
+    AGENT_TOOLS_IMAGE = ""
+"""Override to pin a digest (`...@sha256:...`) or point at your own registry.
+Set it to `none` to run an agent arm with only what the challenge image ships."""
+
+
+class AgentToolsUnavailable(RuntimeError):
+    """The toolbox was asked for and could not be had.
+
+    Raised rather than quietly continuing. An agent arm that silently loses gdb
+    still produces a number, and that number is not comparable to one produced
+    with it -- on 33 of the 78 challenges the agent would have no debugger at
+    all. A run that cannot be compared is worse than a run that stops."""
 
 _RESERVED = {"mcp-server", "llvm-symbolizer", "sh", "bash", "env"}
 _CACHE_ROOT = os.environ.get(
@@ -81,13 +98,19 @@ def ensure_agent_tools(image: str | None = None) -> str:
         digest = agent_tools_digest(img)
         if not digest:
             try:
-                subprocess.run(["docker", "pull", "-q", img],
-                               capture_output=True, timeout=1800)
-            except Exception:  # noqa: BLE001
-                return ""
+                pull = subprocess.run(["docker", "pull", "-q", img],
+                                      capture_output=True, text=True, timeout=1800)
+            except Exception as e:  # noqa: BLE001
+                raise AgentToolsUnavailable(
+                    f"could not pull the agent toolbox {img}: {e}") from e
             digest = agent_tools_digest(img)
             if not digest:
-                return ""
+                raise AgentToolsUnavailable(
+                    f"could not pull the agent toolbox {img}.\n"
+                    f"  docker said: {(pull.stderr or pull.stdout or '').strip()[:300]}\n"
+                    f"  This machine would run the agent arms without gdb, which is\n"
+                    f"  not comparable to a run that had it. Fix the pull, or set\n"
+                    f"  FBBENCH_AGENT_TOOLS_IMAGE=none to accept that deliberately.")
         d = os.path.join(_CACHE_ROOT, digest.replace(":", "_"))
         stamp = os.path.join(d, ".complete")
         if os.path.exists(stamp):
@@ -106,19 +129,26 @@ def ensure_agent_tools(image: str | None = None) -> str:
                                capture_output=True, text=True, timeout=300)
             cid = (c.stdout or "").strip()
             if c.returncode != 0 or not cid:
-                return ""
+                raise AgentToolsUnavailable(
+                    f"could not open the agent toolbox {img}: "
+                    f"{(c.stderr or '').strip()[:300]}")
             r = subprocess.run(
                 ["docker", "cp", f"{cid}:/tools/bin/.", os.path.join(d, "bin")],
                 capture_output=True, text=True, timeout=1800)
             if r.returncode != 0:
-                return ""
+                raise AgentToolsUnavailable(
+                    f"could not copy the agent toolbox out of {img}: "
+                    f"{(r.stderr or '').strip()[:300]}")
             for name in os.listdir(os.path.join(d, "bin")):
                 f = os.path.join(d, "bin", name)
                 if os.path.isfile(f):
                     os.chmod(f, 0o755)
             open(stamp, "w").close()
-        except Exception:  # noqa: BLE001
-            return ""
+        except AgentToolsUnavailable:
+            raise
+        except Exception as e:  # noqa: BLE001
+            raise AgentToolsUnavailable(
+                f"could not materialise the agent toolbox {img}: {e}") from e
         finally:
             if cid:
                 subprocess.run(["docker", "rm", "-f", cid],

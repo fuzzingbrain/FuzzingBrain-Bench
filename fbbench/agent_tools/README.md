@@ -15,9 +15,22 @@ tools image  ──►  cache on this host  ──►  bind-mounted file by file
 (pinned)          (derived, disposable)     into /usr/local/bin
 ```
 
+Nobody sets anything. The first time an agent episode starts on a machine, the
+benchmark pulls the published toolbox image and caches it — ~11MB, once. gdb is
+part of the benchmark, not a dependency somebody installs and not a flag
+somebody has to know about.
+
 ```bash
+# only if you are pinning a digest or using your own registry
 export FBBENCH_AGENT_TOOLS_IMAGE=ghcr.io/…/fbbench-agent-tools@sha256:…
+# deliberate opt-out: agent arms then get only what the image ships
+export FBBENCH_AGENT_TOOLS_IMAGE=none
 ```
+
+If that pull fails, the run **stops**. It does not quietly continue without
+gdb: an agent arm missing its debugger still produces a number, and that number
+is not comparable to one produced with it — on 33 of the 78 challenges it would
+mean no debugger at all, with nothing in the output saying so.
 
 Pull one image and every machine has identical bits. That is the whole reason
 it is an image: a gitignored `bin/` means a second machine silently runs a
@@ -29,8 +42,9 @@ The challenge images are never modified. The cache lives in
 repopulates. Keyed by image id, so bumping the version repopulates rather than
 reusing stale binaries.
 
-Unset the variable and the mechanism is off: agents get whatever the challenge
-image ships, exactly v1 behaviour, and a fresh clone runs with no download.
+Set the variable to `none` and the mechanism is off: agents get whatever the
+challenge image ships, exactly v1 behaviour. That is the only way to end up
+without it, and it has to be chosen.
 
 ## Building the tools image
 
