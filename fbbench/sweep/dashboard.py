@@ -33,6 +33,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from rich.text import Text
+from fbbench.sweep.mcp_episode import BENCH_TOOL_NAMES
 
 # phase -> (glyph, rich style). Ordered roughly by lifecycle progression.
 _PHASE_STYLE: dict[str, tuple[str, str]] = {
@@ -460,7 +461,8 @@ def _preview(static: bool = False) -> None:
             STATUS.cell_start(m, b, 0)
             for turn in range(0, 30, 3):
                 STATUS.feed_event(m, b, 0, {"event": "assistant", "turn": turn})
-                tool = ["list_directory", "read_file", "exec", "write_file", "run_poc_on_harness"][turn % 5]
+                # the real tool set, so the demo shows what a run shows
+                tool = BENCH_TOOL_NAMES[turn % len(BENCH_TOOL_NAMES)]
                 STATUS.feed_event(m, b, 0, {"event": "tool_result", "turn": turn, "tool": tool})
                 time.sleep(0.05)
             STATUS.cell_finish(m, b, 0, outcome(i))
