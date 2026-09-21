@@ -307,3 +307,32 @@ def test_the_note_does_not_name_the_hidden_oracle_binary():
     note = mcp_episode.agent_tools_note(["gdb"])
     assert "/opt/fbbench/oracle" not in note
     assert "graded" not in note.lower()
+
+
+# ------------------------------------------------------ what a run cost
+def test_claude_code_cost_is_not_summed_across_resumes():
+    """total_cost_usd is the SESSION's running total, not one turn's cost.
+
+    A resume continues the same session and re-reports the whole figure, so
+    adding them compounds. On libavif-01 twelve resumes reported 0.825, 0.841,
+    0.856 ... 0.993 -- one $0.99 run recorded as $10.87. The phantom total then
+    tripped the $10 agent cap and killed the run at turn 85 of 100 for money it
+    had never spent, and the same happened on systemd-01 at turn 75.
+    """
+    src = inspect.getsource(cc)
+    assert 'st["usd"] +=' not in src, "cost must never be accumulated with +="
+    assert "cost_by_session" in src
+    assert "usd = sum(cost_by_session.values())" in src
+
+
+def test_resumes_of_one_session_cost_what_the_session_says():
+    """The arithmetic itself, on the numbers that produced the bug."""
+    reported = [0.8252, 0.8411, 0.8562, 0.8711, 0.8854, 0.8989,
+                0.9121, 0.9254, 0.9389, 0.9524, 0.9658, 0.9932]
+    by_session: dict = {}
+    for v in reported:
+        by_session["session-A"] = v          # a resume overwrites its session
+    assert round(sum(by_session.values()), 4) == 0.9932
+    assert round(sum(reported), 4) == 10.8657   # what the old code recorded
+    by_session["session-B"] = 1.19              # a genuinely new session adds
+    assert round(sum(by_session.values()), 4) == 2.1832

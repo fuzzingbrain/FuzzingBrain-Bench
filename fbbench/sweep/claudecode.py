@@ -255,7 +255,7 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
     proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL,
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             text=True, bufsize=1, start_new_session=True, env=env)
-    st = {"turns": 0, "grade_calls": 0, "tokens": 0, "usd": 0.0,
+    st = {"turns": 0, "grade_calls": 0, "tokens": 0, "usd_by_session": {},
           "input_tokens": 0, "output_tokens": 0,
           "cache_read_tokens": 0, "cache_write_tokens": 0,
           "session_id": None, "ended": "exited"}
@@ -313,7 +313,11 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
             st["cache_read_tokens"] += int(u.get("cache_read_input_tokens", 0))
             st["cache_write_tokens"] += int(u.get("cache_creation_input_tokens", 0))
             st["tokens"] += it + ot
-            st["usd"] += float(ev.get("total_cost_usd") or 0.0)
+            # total_cost_usd is the SESSION's running total, not this turn's
+            # cost. Keyed by session and overwritten, never summed -- see the
+            # note above the accumulator in run_once().
+            sid = ev.get("session_id") or st["session_id"]
+            st["usd_by_session"][sid] = float(ev.get("total_cost_usd") or 0.0)
         elif t == "system" and ev.get("subtype") == "api_retry":
             # 401/403 can never be fixed by retrying or resuming; a whole run
             # used to spend its wall clock on them and then record a false zero.
@@ -358,6 +362,15 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     deadline = t0 + min(timeout_s, AGENT_WALL_CAP_S)
     turns = grade_calls = tokens = 0
     in_tok = out_tok = cr_tok = cw_tok = 0
+    # Claude Code reports total_cost_usd as the cost of the SESSION SO FAR, and
+    # a resume continues the same session and reports the whole thing again.
+    # Summing those turned one $0.99 run into $10.87 -- 12 resumes, each
+    # reporting a slightly larger cumulative figure, all added together. Worse,
+    # the phantom total tripped AGENT_USD_CAP and killed the run at turn 85 of
+    # 100 for money it had not spent. Keyed by session id and overwritten, so a
+    # resume replaces its session's figure and genuinely separate sessions
+    # still add up.
+    cost_by_session: dict = {}
     usd = 0.0
     session_id = None
     last_grade_turn = 0
@@ -380,7 +393,8 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             out_tok += st["output_tokens"]
             cr_tok += st["cache_read_tokens"]
             cw_tok += st["cache_write_tokens"]
-            usd += st["usd"]
+            cost_by_session.update(st["usd_by_session"])
+            usd = sum(cost_by_session.values())
             if st["grade_calls"]:
                 last_grade_turn = turns
             session_id = st["session_id"] or session_id
