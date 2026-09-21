@@ -67,6 +67,18 @@ class AgentToolsUnavailable(RuntimeError):
     with it -- on 33 of the 78 challenges the agent would have no debugger at
     all. A run that cannot be compared is worse than a run that stops."""
 
+# ------------------------------------------------------------- the tool set
+# What the mcp-server inside every challenge image actually advertises. Asked
+# of a live server, not assumed: setup(), exec(cmd, timeout_s) and
+# run_poc_on_harness(path), and nothing else.
+#
+# It lives here because all three arms must agree on it. claudecode's
+# --allowedTools used to name six, three of which (list_directory, read_file,
+# write_file) do not exist -- harmless, since an agent can only call what the
+# server advertises, but it read as though claudecode had tools the others
+# lacked, which is the exact question this file exists to settle.
+BENCH_TOOL_NAMES = ("setup", "exec", "run_poc_on_harness")
+
 _RESERVED = {"mcp-server", "llvm-symbolizer", "sh", "bash", "env"}
 _CACHE_ROOT = os.environ.get(
     "FBBENCH_AGENT_TOOLS_CACHE",

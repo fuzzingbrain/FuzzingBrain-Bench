@@ -5,6 +5,9 @@ staged host copy, a ./submit script and a ./reach responder. Every assertion
 here is a difference that actually existed and was removed, so the test is a
 ratchet -- it fails if any of them comes back.
 """
+import pytest
+import subprocess
+import json
 import ast
 import inspect
 import textwrap
@@ -178,3 +181,70 @@ def test_there_is_exactly_one_container_for_the_agent_arms():
         assert len(calls) == 1, fn.__name__
         # (image, workspace, root, candidates) -- the observer is not optional
         assert len(calls[0].args) == 4, f"{fn.__name__} passes {len(calls[0].args)} args"
+
+
+# ------------------------------------------------------------ the tool set
+def test_claudecode_is_allowed_exactly_the_tools_that_exist():
+    """It used to allow six, three of which the server does not implement.
+
+    Harmless in practice -- an agent can only call what the server advertises
+    -- but it read as though claudecode had tools the other arms lacked, which
+    is precisely the question this file exists to settle. One list now.
+    """
+    from fbbench.sweep import claudecode as cc
+    allowed = {t.removeprefix("mcp__bench__") for t in cc._BENCH_TOOLS.split(",")}
+    assert allowed == set(mcp_episode.BENCH_TOOL_NAMES)
+
+
+def test_the_api_arm_does_not_filter_tools_so_every_arm_sees_the_same_set():
+    """The api arm takes whatever the in-image server advertises. If it ever
+    started filtering, the agent arms would be compared against a baseline
+    holding a different set of tools."""
+    from fbbench.runner import mcp_client
+    src = inspect.getsource(mcp_client.MCPClient.list_tools)
+    assert "tools/list" in src
+    assert "filter" not in src and "allowed" not in src
+
+
+@pytest.mark.skipif(
+    subprocess.run(["docker", "image", "inspect",
+                    "osanzas/fbbench-challenge-libxml2-04:latest"],
+                   capture_output=True).returncode != 0,
+    reason="challenge image not present on this machine")
+def test_the_shared_tool_list_matches_what_a_live_server_advertises():
+    """Ground truth, asked of the server itself rather than assumed.
+
+    BENCH_TOOL_NAMES is what claudecode's allowlist is built from and what the
+    parity claim rests on. If a future challenge image ships a different
+    mcp-server, this fails here rather than silently handing one arm a tool
+    the others never hear about.
+    """
+    p = subprocess.Popen(
+        ["docker", "run", "-i", "--rm", "--entrypoint", "mcp-server",
+         "osanzas/fbbench-challenge-libxml2-04:latest"],
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.DEVNULL, text=True)
+    try:
+        def send(o):
+            p.stdin.write(json.dumps(o) + "\n")
+            p.stdin.flush()
+        send({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
+            "protocolVersion": "2024-11-05", "capabilities": {},
+            "clientInfo": {"name": "parity-test", "version": "1"}}})
+        p.stdout.readline()
+        send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
+        send({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
+        names = None
+        for _ in range(6):
+            line = p.stdout.readline()
+            if not line:
+                break
+            m = json.loads(line)
+            if m.get("id") == 2:
+                names = {t["name"] for t in m["result"]["tools"]}
+                break
+    finally:
+        p.kill()
+    assert names == set(mcp_episode.BENCH_TOOL_NAMES), (
+        f"the image advertises {names}, the bench believes "
+        f"{set(mcp_episode.BENCH_TOOL_NAMES)}")

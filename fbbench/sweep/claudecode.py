@@ -59,11 +59,12 @@ MAX_TURNS_DEFAULT = 100
 MODEL_DEFAULT = "sonnet"
 MAX_RESUMES = 30  # parity with the Codex arm's resume cap
 
-# The only tools the agent may call: the six bench MCP tools. Everything else is
-# a host-side cheat/contamination surface and is hard-denied below.
-_BENCH_TOOLS = ",".join(
-    f"mcp__bench__{t}" for t in
-    ("setup", "list_directory", "read_file", "write_file", "exec", "run_poc_on_harness"))
+from fbbench.sweep.mcp_episode import BENCH_TOOL_NAMES
+
+# The only tools the agent may call: the bench MCP tools, named from the one
+# list every arm shares. Everything else is a host-side cheat/contamination
+# surface and is hard-denied below.
+_BENCH_TOOLS = ",".join(f"mcp__bench__{t}" for t in BENCH_TOOL_NAMES)
 # Exhaustive built-in denylist. `--allowedTools` is NOT exclusive (tools absent
 # from it can still run if they don't require a prompt — Skill/SlashCommand slip
 # through), so we ALSO name every built-in here. Audited: with this list an agent
