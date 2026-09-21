@@ -294,3 +294,16 @@ def test_the_opening_is_built_per_cell_not_at_import():
     src = inspect.getsource(ex)
     assert "DEFAULT_OPENING = default_opening()" in src
     assert "agent_tools_note()" not in src.split("def agent_opening")[0]
+
+
+def test_the_note_does_not_name_the_hidden_oracle_binary():
+    """It did, and the path is refused on some challenges and not others.
+
+    The graded binary lives beside the answer, so the bench hides it: on
+    libxml2-04 and skia-01 even root gets Permission denied, while libavif-01
+    and pdfbox-01 leave it world-executable. A live run spent 2 of 12 turns
+    on the path the note handed it. The note may only say what holds on all 78.
+    """
+    note = mcp_episode.agent_tools_note(["gdb"])
+    assert "/opt/fbbench/oracle" not in note
+    assert "graded" not in note.lower()
