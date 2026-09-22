@@ -64,25 +64,10 @@ from fbbench.sweep.mcp_episode import (
     agent_tools_note)
 from fbbench.runner.mcp_client import _full_scan_alias
 
-# The first user turn an external agent gets. Deliberately close to the api
-# arm's own opening (prompts.py::INITIAL_USER_MESSAGE_FULLSCAN) -- same job,
-# same framing, differing only where the tool differs -- for the reason
-# codex_task_prompt gives for copying SYSTEM_PROMPT verbatim: an arm graded on
-# different wording is measuring the wording.
-#
-# The previous text ended "Keep going until one crashes", which named the FIRST
-# crash as the finish line while the api arm was being told to find as many as
-# it could. Scoring is min(3, distinct) x difficulty, so that sentence was worth
-# up to two thirds of a cell, and it contradicted the system prompt arriving
-# with it. The bare model produced exactly one crash on 22 of 77 challenges.
-# The task text is the bench's, not the arm's -- and it is the API ARM's text,
-# because that is the baseline every agent is measured against. An external
-# agent drives the same three tools under the same bare names the api arm uses,
-# so it needs no substitution at all and gets the prompt verbatim.
-#
-# This went through two wrong anchors first: a short bespoke opening naming
-# ./submit, then CODEX_TASK_PROMPT, which matched claudecode but not the
-# baseline. Two arms told different things are not two agents being compared.
+# The first user turn an external agent gets: the api arm's opening, verbatim.
+# An external agent drives the same three tools under the same bare names, so
+# it needs no substitution -- and an arm graded on different wording would be
+# measuring the wording.
 def default_opening() -> str:
     return system_prompt()
 
@@ -189,7 +174,6 @@ class Manifest:
 # claudecode, codex and any external agent -- drives the SAME per-episode
 # mcp-server (fbbench/sweep/mcp_episode.py) inside the challenge image, so the
 # tool surface is identical by construction rather than by two implementations
-# agreeing. What used to live here (a userns/container shell, `stage()` copying
 # /challenge onto the host, and the ./submit request bridge) existed only to
 # give an external agent a DIFFERENT surface, and that was the asymmetry.
 #
@@ -257,7 +241,6 @@ class Judge:
         self._t: threading.Thread | None = None
         self._tt: threading.Thread | None = None
         # Live reporting. The api arm flushes every record and copies every
-        # candidate out as it grades; this arm used to write nothing until the
         # agent process exited, so a 30-minute cell was unobservable and a
         # killed one lost everything. Same contract here: one flushed line and
         # one preserved blob per graded candidate, as it happens.
@@ -399,7 +382,6 @@ class Judge:
         except Exception:  # noqa: BLE001 - reporting never breaks grading
             pass
 
-    # The ./submit request bridge and the gdb/trace responder used to live here.
     # Both are gone: an agent now calls run_poc_on_harness on the same
     # mcp-server every other arm uses, and runs gdb itself inside the
     # container. The judge no longer grades anything during the episode -- it
@@ -851,7 +833,6 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         terminated = "done"
         interrupted = False
 
-        # A Ctrl-C or a SIGTERM used to throw the whole cell away: everything
         # below is written only after the agent exits, and the `finally` clause
         # then rmtree's the workspace. One terminated libpng-01 run lost 236
         # graded candidates and its cost that way. The work is real and already
@@ -895,7 +876,6 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         #
         # PoCs are not copied here any more. CandidateLog wrote each one as the
         # agent graded it, and _crash_signatures writes them again below; the
-        # block that used to live here read judge.blobs, a directory deleted
         # with the request bridge, so it would have raised on the first run.
         try:
             usage = _agent_usage(ws, log, model)
@@ -981,7 +961,6 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             {**usage, "agent": manifest.name,
              "pricing_source": f"external:{usage.get('basis')}"}, indent=2))
         # Only now can the report render: its header is read straight out of
-        # score.json and cost.json, and it used to be built before either
         # existed -- which is why every external cell read "0 turns used,
         # $0.0000, duration 0.0s" over a real half-hour run.
         _write_run_artifacts(cell_dir, ws, log, judge, bug, model,

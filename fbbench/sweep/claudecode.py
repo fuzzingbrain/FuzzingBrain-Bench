@@ -81,11 +81,9 @@ _DENY_TOOLS = ",".join((
 def claude_task_prompt() -> str:
     """The BENCH's task prompt -- the same text the api arm is given.
 
-    It used to be CODEX_TASK_PROMPT, a second brief written for the codex arm:
-    64 lines different from the api arm's, with a different goal sentence and a
-    different definition of a crash. Since every arm now drives the same three
-    tools, there is nothing left for two prompts to express. The api arm is the
-    baseline everything is measured against, so its text is the one that wins.
+    One brief for every arm. Every arm drives the same three tools, so there is
+    nothing for a second prompt to express, and the api arm is the baseline
+    everything is measured against -- its text is the one that wins.
 
     The only substitution is mechanical and forced: Claude Code namespaces MCP
     tools, so `setup()` is `mcp__bench__setup()` to it and nowhere else.
@@ -99,12 +97,9 @@ def claude_task_prompt() -> str:
     return p
 
 
-# _budget_text used to append 695 characters of HARD RULES here -- "grade
-# within your first 10 turns", "at least once every ~6 turns" -- to this arm and
-# no other. Nobody could say where 10 and 6 came from, and prescribing a search
-# strategy to one arm is coaching, not a budget. What an arm needs is the two
-# facts it cannot count for itself: turns and time. That is budget_note(), the
-# api arm's own function, and all three arms use it now.
+# No search strategy is prescribed to one arm and not the others: that is
+# coaching, not a budget. An arm is told only the two facts it cannot count for
+# itself -- turns and time -- by budget_note(), which every arm shares.
 
 
 def model_label(model: str) -> str:
@@ -115,7 +110,7 @@ def model_label(model: str) -> str:
 
 # --- one bench MCP server per EPISODE -----------------------------------------
 # `claude -p` spawns its MCP servers per session, and the arm resumes a session
-# up to MAX_RESUMES times, so an episode used to get a NEW mcp-server per resume.
+# up to MAX_RESUMES times, and all resumes share ONE mcp-server.
 # The image keeps its crash-signature memory in that process, so every resume
 # reset it and the agent was told "new" for crashes it had already found
 # (observed: 4 crashes, all reported new, episode counter stuck at 1).
@@ -320,7 +315,7 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
             st["usd_by_session"][sid] = float(ev.get("total_cost_usd") or 0.0)
         elif t == "system" and ev.get("subtype") == "api_retry":
             # 401/403 can never be fixed by retrying or resuming; a whole run
-            # used to spend its wall clock on them and then record a false zero.
+            # would otherwise spend the wall clock retrying and record a false zero.
             if str(ev.get("error_status")) in ("401", "403"):
                 st["ended"] = "auth_error"
     try:
@@ -362,19 +357,10 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     deadline = t0 + min(timeout_s, AGENT_WALL_CAP_S)
     turns = grade_calls = tokens = 0
     in_tok = out_tok = cr_tok = cw_tok = 0
-    # Claude Code reports total_cost_usd as the cost of the SESSION SO FAR, and
-    # a resume continues the same session and reports the whole thing again.
-    # Summing those turned one $0.99 run into $10.87 -- 12 resumes, each
-    # reporting a slightly larger cumulative figure, all added together. Worse,
-    # the phantom total tripped AGENT_USD_CAP and killed the run at turn 85 of
-    # 100 for money it had not spent. Keyed by session id and overwritten, so a
-    # resume replaces its session's figure and genuinely separate sessions
-    # still add up.
-    cost_by_session: dict = {}
-    usd = 0.0
-    session_id = None
-    last_grade_turn = 0
-    terminated = "resumes_exhausted"
+    # total_cost_usd is the cost of the SESSION so far, and a resume reports
+    # the whole figure again. Keyed by session id and overwritten, never summed:
+    # adding them compounds, and the inflated total would trip the agent cost
+    # cap and end a run for money it had not spent.
 
     with open(log_path, "w") as lf:
         prompt = claude_task_prompt()

@@ -41,14 +41,9 @@ _tools_lock = threading.Lock()
 def agent_tools_note() -> str:
     """The one line an agent arm gets and the api arm does not.
 
-    It used to describe what the bench bind-mounted into a published image at
-    container start: a statically linked gdb and a readable copy of the target,
-    both carried in from the host because the images could not be changed. The
-    agent images ship those properties themselves now, so this only names them.
-
-    Still absent from prompts.system_prompt(), because the api arm runs in the
-    published images and has none of this -- and that string is the baseline
-    every agent is measured against.
+    Never added to prompts.system_prompt(): the api arm runs in the published
+    images and has neither gdb nor a readable target, and that string is the
+    baseline the agents are measured against.
     """
     return ("\n\nAlso available in this environment: `gdb`, and the binary "
             "run_poc_on_harness() grades against is readable at "
@@ -63,11 +58,8 @@ def agent_tools_note() -> str:
 
 
 # ---------------------------------------------------------------- the policy
-# Fuzzing is forbidden to EVERY agent arm, and the bench is where that belongs.
-# It used to live in fb-agent's own coach, which meant one arm was refused a
-# tool the others were free to use -- a rule asymmetry on top of a tooling one.
-# Screening it here also makes it visible: a run that tried is recorded, so a
-# result can be read knowing whether the agent reached for it.
+# Fuzzing is forbidden to every agent arm, and screened here so the rule is the
+# same for all of them and every attempt is recorded in the cell.
 #
 # Deliberately narrow. `clang -fsanitize=address` is honest work -- compiling a
 # reproducer to read a stack trace. What is blocked is building or DRIVING a
@@ -117,12 +109,9 @@ AGENT_USD_CAP = 10.0           # $10 per challenge
 class CandidateLog:
     """Every candidate an agent grades, preserved as it grades it.
 
-    The bench used to learn what an agent tried in two different ways. The
-    external arm watched a request directory and copied each blob out the
-    moment it was graded; claudecode and codex swept the workspace afterwards
-    and graded whatever files happened to be lying there. The second is worse
-    twice over: a killed run keeps nothing, and a workspace sweep grades the
-    agent's `gen.py` as if it were a PoC.
+    Written as each verdict arrives rather than swept from the workspace
+    afterwards: a killed run still keeps what it earned, and a sweep would
+    grade the agent's own `gen.py` as if it were a PoC.
 
     Both arms now speak to one mcp-server through one relay, so there is one
     place that sees every run_poc_on_harness call and its verdict. Watching it
