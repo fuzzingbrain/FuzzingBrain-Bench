@@ -305,12 +305,12 @@ def test_the_note_does_not_name_the_hidden_oracle_binary():
     on the path the note handed it. The note may only say what holds on all 78.
     """
     note = mcp_episode.agent_tools_note(["gdb"])
-    # The path may be named -- it is readable on roughly half the challenges
-    # (mode 705) and refused on the rest (mode 700) -- but the note must not
-    # promise either, because it is wrong half the time whichever it claims.
-    assert "refused" in note and "readable" in note
-    for absolute in ("always readable", "is readable on every", "cannot be opened"):
-        assert absolute not in note
+    # The sealed path must never be handed over: it is mode 700 on about half
+    # the images and a live run burned 2 of 12 turns on it. The note points at
+    # the readable copy instead, which exists on every challenge, so it no
+    # longer has to hedge about what is and is not openable.
+    assert mcp_episode.ORACLE_HARNESS not in note
+    assert mcp_episode.TARGET_HARNESS in note
 
 
 # ------------------------------------------------------ what a run cost
@@ -340,3 +340,36 @@ def test_resumes_of_one_session_cost_what_the_session_says():
     assert round(sum(reported), 4) == 10.8657   # what the old code recorded
     by_session["session-B"] = 1.19              # a genuinely new session adds
     assert round(sum(by_session.values()), 4) == 2.1832
+
+
+# ------------------------------------------------- the target, made readable
+def test_the_target_copy_is_mounted_for_agent_arms_only():
+    """Same shape as the toolbox: one shared docker run, so neither agent arm
+    can have it without the other, and the api arm's MCPClient never does."""
+    from fbbench.runner import mcp_client
+    assert "target_harness_mount" in inspect.getsource(mcp_episode._start_episode_server)
+    assert "target_harness_mount" not in inspect.getsource(mcp_client)
+
+
+def test_it_is_not_mounted_over_the_sealed_path():
+    """/opt/fbbench/oracle is mode 700 on half the images, so the agent cannot
+    traverse into it whatever the file's own mode is -- verified live, the
+    mount at the original path is still Permission denied. The copy has to go
+    somewhere reachable, and the rest of the oracle stays sealed."""
+    assert mcp_episode.TARGET_HARNESS.startswith("/usr/local/")
+    assert not mcp_episode.TARGET_HARNESS.startswith("/opt/fbbench/oracle")
+
+
+def test_a_local_failure_stops_the_run_but_a_missing_binary_does_not():
+    """A docker failure is this machine's problem and would produce a cell that
+    silently had no target. An image that simply has no such binary is the same
+    everywhere, so it is recorded and skipped rather than killing the run."""
+    src = inspect.getsource(mcp_episode.ensure_target_harness)
+    assert "raise TargetHarnessUnavailable" in src
+    assert "no such file" in src and ".absent" in src
+
+
+def test_both_arms_are_told_where_the_copy_is():
+    note = mcp_episode.agent_tools_note(["gdb"])
+    assert mcp_episode.TARGET_HARNESS in note
+    assert "-print_coverage=1" in note
