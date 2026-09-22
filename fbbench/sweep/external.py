@@ -56,12 +56,12 @@ from typing import Callable
 
 from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
-from fbbench.images import challenge_image
+from fbbench.images import agent_image, image_digest
 from fbbench.prompts import system_prompt
 from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
-    AGENT_TOOLS_IMAGE, agent_tool_mounts, agent_tools_digest, agent_tools_note)
+    agent_tools_note)
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets. Deliberately close to the api
@@ -793,7 +793,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     if not real:
         return {"error": f"bug not found: {bug}"}
     alias = _full_scan_alias(str(real))
-    image = challenge_image(alias)
+    # the AGENT image set: same challenge, with gdb and a readable target
+    image = agent_image(alias)
 
     root = Path(tempfile.mkdtemp(prefix=f"ext-{alias}-"))
     ws = root / "workspace"
@@ -956,9 +957,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "fuzzing_attempts": len(candidates.blocked),
             # What this arm had that the api arm does not. A result should be
             # readable knowing which tools were on PATH when it was produced.
-            "agent_tools": agent_tool_mounts()[1],
-            "agent_tools_image": AGENT_TOOLS_IMAGE,
-            "agent_tools_digest": agent_tools_digest(),
+            "agent_image": image,
+            "agent_image_digest": image_digest(image),
             "network": "allowed" if manifest.allow_network else "blocked",
             "sandbox": sandbox_kind,
             "tokens_used": (usage.get("input_tokens", 0)

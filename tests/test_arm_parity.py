@@ -59,7 +59,12 @@ def test_every_arm_is_handed_the_api_arm_s_task_text():
     claude = cc.claude_task_prompt()
     assert claude != api
     undone = claude.replace("mcp__bench__", "")
-    assert undone == api, "claudecode's prompt differs by more than the tool prefix"
+    # Both agent arms also carry the toolbox line, which the api arm does not:
+    # it runs in the published images and has neither gdb nor a readable
+    # target. That line is identical for both agent arms, and it is the ONLY
+    # thing either of them has beyond the baseline text.
+    assert undone == api + mcp_episode.agent_tools_note(), \
+        "claudecode's prompt differs by more than the tool prefix and the toolbox line"
 
 
 def test_both_arms_observe_candidates_with_the_same_observer():
@@ -257,11 +262,8 @@ def test_both_agent_arms_are_told_about_the_toolbox_in_the_same_words():
     one arm knew it had a debugger and the other had to guess -- and a toolbox
     nobody is told about may as well not be mounted.
     """
-    import unittest.mock as m
-    with m.patch.object(mcp_episode, "agent_tool_mounts",
-                        lambda *a, **k: ([], ["gdb"])):
-        a, b = ex.agent_opening(), cc.claude_task_prompt()
-    note = mcp_episode.agent_tools_note(["gdb"])
+    a, b = ex.agent_opening(), cc.claude_task_prompt()
+    note = mcp_episode.agent_tools_note()
     assert note and note in a
     expect = a
     for t in mcp_episode.BENCH_TOOL_NAMES:
@@ -282,11 +284,8 @@ def test_the_toolbox_line_never_reaches_the_api_arm():
 def test_the_note_cannot_promise_a_tool_that_is_not_mounted():
     """Generated from what is actually mounted. With the toolbox off both
     agent arms fall back to the api arm's text exactly."""
-    assert mcp_episode.agent_tools_note([]) == ""
-    import unittest.mock as m
-    with m.patch.object(mcp_episode, "agent_tool_mounts", lambda *a, **k: ([], [])):
-        from fbbench import prompts
-        assert ex.agent_opening() == prompts.system_prompt()
+    from fbbench import prompts
+    assert ex.agent_opening() == prompts.system_prompt() + mcp_episode.agent_tools_note()
 
 
 def test_the_opening_is_built_per_cell_not_at_import():
@@ -304,13 +303,12 @@ def test_the_note_does_not_name_the_hidden_oracle_binary():
     and pdfbox-01 leave it world-executable. A live run spent 2 of 12 turns
     on the path the note handed it. The note may only say what holds on all 78.
     """
-    note = mcp_episode.agent_tools_note(["gdb"])
+    note = mcp_episode.agent_tools_note()
     # The sealed path must never be handed over: it is mode 700 on about half
     # the images and a live run burned 2 of 12 turns on it. The note points at
     # the readable copy instead, which exists on every challenge, so it no
     # longer has to hedge about what is and is not openable.
-    assert mcp_episode.ORACLE_HARNESS not in note
-    assert mcp_episode.TARGET_HARNESS in note
+    assert "/opt/fbbench/oracle/binaries/vuln/asan/harness" in note
 
 
 # ------------------------------------------------------ what a run cost
@@ -342,34 +340,32 @@ def test_resumes_of_one_session_cost_what_the_session_says():
     assert round(sum(by_session.values()), 4) == 2.1832
 
 
-# ------------------------------------------------- the target, made readable
-def test_the_target_copy_is_mounted_for_agent_arms_only():
-    """Same shape as the toolbox: one shared docker run, so neither agent arm
-    can have it without the other, and the api arm's MCPClient never does."""
+def test_the_agent_image_set_is_for_agent_arms_only():
+    """The asymmetry is which IMAGE each arm runs in, not what gets mounted.
+
+    Both agent arms resolve fbbench-agent/<alias>, which ships gdb and leaves
+    the vulnerable build readable. The api arm resolves the published
+    challenge image, unchanged, because its v1 numbers were produced there and
+    they are the baseline every agent is measured against.
+    """
     from fbbench.runner import mcp_client
-    assert "target_harness_mount" in inspect.getsource(mcp_episode._start_episode_server)
-    assert "target_harness_mount" not in inspect.getsource(mcp_client)
+    from fbbench import images
+    assert "agent_image" in inspect.getsource(ex)
+    assert "agent_image" in inspect.getsource(cc)
+    assert "agent_image" not in inspect.getsource(mcp_client)
+    assert images.agent_image("x-01") != images.challenge_image("x-01")
+    assert images.challenge_image("x-01").startswith("docker.io/osanzas/fbbench-challenge-")
 
 
-def test_it_is_not_mounted_over_the_sealed_path():
-    """/opt/fbbench/oracle is mode 700 on half the images, so the agent cannot
-    traverse into it whatever the file's own mode is -- verified live, the
-    mount at the original path is still Permission denied. The copy has to go
-    somewhere reachable, and the rest of the oracle stays sealed."""
-    assert mcp_episode.TARGET_HARNESS.startswith("/usr/local/")
-    assert not mcp_episode.TARGET_HARNESS.startswith("/opt/fbbench/oracle")
-
-
-def test_a_local_failure_stops_the_run_but_a_missing_binary_does_not():
-    """A docker failure is this machine's problem and would produce a cell that
-    silently had no target. An image that simply has no such binary is the same
-    everywhere, so it is recorded and skipped rather than killing the run."""
-    src = inspect.getsource(mcp_episode.ensure_target_harness)
-    assert "raise TargetHarnessUnavailable" in src
-    assert "no such file" in src and ".absent" in src
+def test_the_episode_server_mounts_nothing_but_the_workspace():
+    """The bind-mount workaround is gone with the images that needed it: no
+    toolbox image, no extracted copy of the target, no host cache."""
+    src = inspect.getsource(mcp_episode._start_episode_server)
+    for gone in ("agent_tool_mounts", "target_harness_mount", "AGENT_TOOLS_IMAGE"):
+        assert gone not in src
 
 
 def test_both_arms_are_told_where_the_copy_is():
-    note = mcp_episode.agent_tools_note(["gdb"])
-    assert mcp_episode.TARGET_HARNESS in note
+    note = mcp_episode.agent_tools_note()
+    assert "/opt/fbbench/oracle/binaries/vuln/asan/harness" in note
     assert "-print_coverage=1" in note

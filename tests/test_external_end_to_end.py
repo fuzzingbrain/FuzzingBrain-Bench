@@ -80,7 +80,9 @@ def wired(tmp_path, monkeypatch):
     bug_dir.mkdir(parents=True)
     monkeypatch.setattr(ex, "find_bug", lambda b: bug_dir)
     monkeypatch.setattr(ex, "_full_scan_alias", lambda p: "fake-01")
-    monkeypatch.setattr(ex, "challenge_image", lambda a: "fake/image:latest")
+    # the arm resolves the AGENT image set now, not the published one
+    monkeypatch.setattr(ex, "agent_image", lambda a: "fake/image:latest")
+    monkeypatch.setattr(ex, "image_digest", lambda i: "sha256:fake")
 
     servers = []
 

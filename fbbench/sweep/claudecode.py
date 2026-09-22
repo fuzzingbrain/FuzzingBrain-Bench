@@ -60,6 +60,7 @@ MAX_TURNS_DEFAULT = 100
 MODEL_DEFAULT = "sonnet"
 MAX_RESUMES = 30  # parity with the Codex arm's resume cap
 
+from fbbench.images import agent_image, image_digest
 from fbbench.sweep.mcp_episode import BENCH_TOOL_NAMES, agent_tools_note
 
 # The only tools the agent may call: the bench MCP tools, named from the one
@@ -127,8 +128,7 @@ def model_label(model: str) -> str:
 # server instead of a parallel implementation.
 from fbbench.sweep.mcp_episode import (  # noqa: F401
     _RELAY_SRC, AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog,
-    _start_episode_server, AGENT_TOOLS_IMAGE, agent_tool_mounts,
-    agent_tools_digest)  # noqa: E402,F401
+    _start_episode_server)  # noqa: E402,F401
 
 
 def stage_claude_env(
@@ -147,7 +147,7 @@ def stage_claude_env(
                  subprocess and a listening port per cell.
     """
     alias = _full_scan_alias(real_bug_dir)
-    image = f"{IMAGE_PREFIX}{alias}"
+    image = agent_image(alias)   # same set the external arm runs in
     root = tempfile.mkdtemp(prefix=f"cc-{alias}-")
     work = os.path.join(root, "workspace")
     os.makedirs(work, exist_ok=True)
@@ -604,9 +604,8 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "bug_id": bug, "model": model_label(model), "seed": 0,
         # Scored on distinct crash signatures, the same unit the API arm reports.
         "fuzzing_attempts": fuzzing_attempts,
-        "agent_tools": agent_tool_mounts()[1],
-        "agent_tools_image": AGENT_TOOLS_IMAGE,
-        "agent_tools_digest": agent_tools_digest(),
+        "agent_image": image,
+        "agent_image_digest": image_digest(image),
         "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
         "score": len(sigs), "grading": "in-image",
         "terminated_reason": r["terminated"], "turns_used": r["turns"],
