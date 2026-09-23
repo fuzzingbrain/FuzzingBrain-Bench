@@ -381,3 +381,33 @@ def test_a_published_image_is_always_refetched_and_a_local_one_is_not():
     assert images.pull_policy(images.agent_image("x-01")) == "always"
     assert images.pull_policy("fbbench-agent/x-01:latest") == "missing"
     assert "pull_policy" in inspect.getsource(mcp_episode._start_episode_server)
+
+
+def test_the_resume_loop_runs_with_no_undefined_names():
+    """run_claude() has now lost code twice to careless edits, and nothing
+    exercised it: the cost accumulator was summed instead of keyed, and later
+    its five initialisation lines were deleted with a comment block. Both
+    reached a real run before anything noticed. This drives the loop with a
+    stubbed subprocess so the function is at least executed."""
+    import types
+    from fbbench.sweep import claudecode as c
+    calls = {"n": 0}
+
+    def fake_once(argv, lf, deadline, work="", snap_dir="", env=None):
+        calls["n"] += 1
+        return {"turns": 100, "grade_calls": 1, "tokens": 10, "input_tokens": 1,
+                "output_tokens": 1, "cache_read_tokens": 0, "cache_write_tokens": 0,
+                "usd_by_session": {"s1": 0.5}, "session_id": "s1", "ended": "exited"}
+
+    orig = c._run_claude_once
+    c._run_claude_once = fake_once
+    try:
+        import tempfile, os
+        work = tempfile.mkdtemp()
+        r = c.run_claude(work, os.path.join(work, "mcp.json"), "claude-haiku-4-5",
+                         timeout_s=60, max_turns=100, auth="api", api_key="x")
+    finally:
+        c._run_claude_once = orig
+    assert calls["n"] >= 1
+    assert r["terminated"] == "turn_budget"
+    assert r["total_usd"] == 0.5, "a single session must not be summed twice"

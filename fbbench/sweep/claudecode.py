@@ -361,6 +361,11 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     # the whole figure again. Keyed by session id and overwritten, never summed:
     # adding them compounds, and the inflated total would trip the agent cost
     # cap and end a run for money it had not spent.
+    cost_by_session: dict = {}
+    usd = 0.0
+    session_id = None
+    last_grade_turn = 0
+    terminated = "resumes_exhausted"
 
     with open(log_path, "w") as lf:
         prompt = claude_task_prompt()
