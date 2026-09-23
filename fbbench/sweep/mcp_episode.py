@@ -202,6 +202,12 @@ def install_gdb_source_map(sock_path: str, target: str = "",
     _exec_once(sock_path,
                f"mkdir -p {GDB_CONFIG_HOME}/gdb && "
                f"cat > {GDB_INIT_PATH} <<'FBEOF'\n{body}\nFBEOF", 60.0)
+    # Verified, not assumed. Writing the file proves nothing: a gdb older than
+    # 11 never reads this path, and then the agent gets a debugger that cannot
+    # show a line while we report that it can. Ask gdb what it loaded.
+    shown = _exec_once(sock_path, 'gdb -batch -ex "show substitute-path" 2>&1', 60.0)
+    if not all(r.split()[-2] in shown for r in rules):
+        return []
     return rules
 
 

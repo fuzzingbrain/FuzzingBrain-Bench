@@ -8,6 +8,7 @@ ratchet -- it fails if any of them comes back.
 import pytest
 import subprocess
 import json
+import os
 import ast
 import inspect
 import textwrap
@@ -571,3 +572,59 @@ def test_both_arms_install_the_source_map():
     for mod in (ex, cc):
         src = inspect.getsource(mod)
         assert "install_gdb_source_map" in src, mod.__name__
+
+
+def test_a_failed_source_map_is_not_reported_as_a_working_one():
+    """Writing the file proves nothing -- a gdb older than 11 never reads it.
+
+    Silently returning the rules there would tell a reader gdb can show source
+    when it cannot, which is the same failure as a prompt naming a path the
+    kernel refuses. The install asks gdb what it loaded.
+    """
+    from fbbench.sweep import mcp_episode as me
+
+    src = inspect.getsource(me.install_gdb_source_map)
+    assert "show substitute-path" in src, "the install never verifies itself"
+    assert src.index("show substitute-path") > src.index("FBEOF"), \
+        "verification must come after the write"
+
+    calls = []
+
+    def fake_exec(sock, cmd, timeout=0.0):
+        calls.append(cmd)
+        if "info sources" in cmd:
+            return "/src/harness/harness.c, /src/proj-asan/a.c"
+        if cmd.startswith("test -d"):
+            return "OK" if ("/challenge/harness" in cmd or "/challenge/src" in cmd) else ""
+        if "show substitute-path" in cmd:
+            return calls.pop() and ""      # gdb loaded nothing
+        return ""
+
+    orig = me._exec_once
+    me._exec_once = fake_exec
+    try:
+        assert me.install_gdb_source_map("s") == [], "unverified rules reported"
+        # and when gdb does confirm them, they come back
+        # only the dirs that really exist in an image answer OK
+        me._exec_once = lambda s, c, t=0.0: (
+            "/src/harness/harness.c, /src/proj-asan/a.c" if "info sources" in c
+            else ("OK" if ("/challenge/harness" in c or "/challenge/src" in c) else "")
+            if c.startswith("test -d")
+            else "rule: /src/harness -> x\nrule: /src/proj-asan -> y"
+            if "show substitute-path" in c else "")
+        assert me.install_gdb_source_map("s") == [
+            "set substitute-path /src/harness /challenge/harness",
+            "set substitute-path /src/proj-asan /challenge/src"]
+    finally:
+        me._exec_once = orig
+
+
+def test_the_source_map_can_never_be_graded_as_a_candidate():
+    """It lives in the workspace the agent also writes PoCs into."""
+    from fbbench.sweep.mcp_episode import GDB_CONFIG_HOME
+    import glob as _glob
+
+    # hidden, so the one arm that scans the workspace cannot pick it up
+    assert os.path.basename(GDB_CONFIG_HOME).startswith("."), \
+        "a visible dir here would be swept up as a candidate blob"
+    assert "*" not in _glob.escape(GDB_CONFIG_HOME)

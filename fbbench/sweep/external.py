@@ -824,7 +824,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # gdb can only show source once the build paths are mapped onto the
         # staged copy; harmless when the image ships no gdb.
         if env_caps.get("gdb"):
-            install_gdb_source_map(sock_path, env_caps.get("target", ""))
+            env_caps["gdb_source_map"] = install_gdb_source_map(
+                sock_path, env_caps.get("target", ""))
         opening = agent_opening(setup_resp, env_caps)
 
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
@@ -981,6 +982,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "arm": f"external:{manifest.name}" if getattr(manifest, "name", "") else "external",
             "agent_image": image,
             "agent_image_digest": image_digest(image),
+            # Whether gdb in this container could actually show source. Verified
+            # against gdb, not assumed from having written the file.
+            "gdb_source_map": env_caps.get("gdb_source_map") or [],
             "network": "allowed" if manifest.allow_network else "blocked",
             "sandbox": sandbox_kind,
             "tokens_used": (usage.get("input_tokens", 0)

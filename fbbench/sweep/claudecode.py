@@ -169,7 +169,8 @@ def stage_claude_env(
     # gdb can only show source once the build paths are mapped onto the
     # staged copy; harmless when the image ships no gdb.
     if env_caps.get("gdb"):
-        install_gdb_source_map(sock_path, env_caps.get("target", ""))
+        env_caps["gdb_source_map"] = install_gdb_source_map(
+            sock_path, env_caps.get("target", ""))
     return image, root, work, mcp_cfg, (server, srv_sock, candidates,
                                         setup_resp, env_caps)
 
@@ -443,6 +444,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             "total_usd": round(usd, 4),
             # what was actually sent, so the cell cannot record something else
             "system_prompt_sent": agent_system_prompt(env_caps),
+            "gdb_source_map": (env_caps or {}).get("gdb_source_map") or [],
             "user_turn_sent": prompt}
 
 
@@ -720,6 +722,9 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "arm": "claudecode",
         "agent_image": agent_image(alias),
         "agent_image_digest": image_digest(agent_image(alias)),
+        # Whether gdb in this container could actually show source. Verified
+        # against gdb, not assumed from having written the file.
+        "gdb_source_map": (r.get("gdb_source_map") or []),
         "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
         "score": len(sigs), "grading": "in-image",
         "terminated_reason": r["terminated"], "turns_used": r["turns"],
