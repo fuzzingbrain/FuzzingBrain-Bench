@@ -256,6 +256,16 @@ def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str,
             f'<pre>{_block(initial_user)}</pre></details>'
         )
 
+    # State the one gap in the record rather than let a reader find it.
+    if wire and any(r[0].get("source") == "reconstructed" for r in wire.values()):
+        head += (
+            '<div class="bnote" style="margin:10px 0">Every message sent and returned is '
+            'recorded below. The model\'s internal reasoning is not: this arm runs through '
+            'the Claude Code CLI, which streams each <code>thinking</code> block with its '
+            'text stripped and only a signature left, so the reasoning tokens the run was '
+            'billed for cannot be recovered. The API-driven arm records reasoning too.</div>'
+        )
+
     blocks = []
     for t in turns:
         inner = []

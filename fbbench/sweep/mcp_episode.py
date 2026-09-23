@@ -151,24 +151,46 @@ def probe_environment(sock_path: str, timeout: float = 120.0) -> dict:
 def agent_tools_note(env: dict | None = None) -> str:
     """The one line an agent arm's SYSTEM prompt carries and the api arm's does not.
 
-    Appended to prompts.system_prompt(), which is otherwise used verbatim: this
-    sentence is the only difference between what an agent is told and what the
-    baseline is told. Built from probe_environment(), so it can only name what
-    this container actually has, and empty when it has neither.
+    A bullet, because it belongs in the "How to work" list next to the one about
+    the harness binary -- it is a readable copy of that same binary. Built from
+    probe_environment(), so it can only name what this container actually has,
+    and empty when it has neither.
     """
     env = env or {}
     have_gdb, target = bool(env.get("gdb")), env.get("target") or ""
     if have_gdb and target:
-        return (f"\n\nThis environment also gives you `gdb` and a readable copy of "
-                f"the binary run_poc_on_harness() grades against, at {target} -- "
-                f"you may run it, debug it, and ask it which functions an input "
-                f"reached (`-print_coverage=1`).")
+        return (f"- You also have `gdb` and a readable copy of that binary, at "
+                f"{target}: you may run it, debug it, and ask it which functions "
+                f"an input reached (`-print_coverage=1`).")
     if have_gdb:
-        return "\n\nThis environment also gives you `gdb`."
+        return "- You also have `gdb`."
     if target:
-        return (f"\n\nThis environment also lets you read and run the binary "
-                f"run_poc_on_harness() grades against, at {target}.")
+        return (f"- You may also read and run the binary run_poc_on_harness() "
+                f"grades against, at {target}.")
     return ""
+
+
+# The bullet about the graded harness binary. The gdb line goes under it, which
+# is where a reader looks for it -- not stranded after the closing instruction.
+_TOOLS_ANCHOR = "- Do not build a harness binary;"
+
+
+def with_agent_tools(prompt: str, env: dict | None = None) -> str:
+    """`prompt` with the agent's one extra line in its natural place.
+
+    Inserted under the harness-binary bullet. If that bullet ever moves the line
+    still goes in, at the end, rather than being silently dropped -- an agent
+    that is not told it has gdb does not use it.
+    """
+    note = agent_tools_note(env)
+    if not note:
+        return prompt
+    lines = prompt.splitlines()
+    for i, line in enumerate(lines):
+        if line.startswith(_TOOLS_ANCHOR):
+            lines.insert(i + 1, note)
+            return "\n".join(lines)
+    return prompt + "\n\n" + note
 
 
 # ---------------------------------------------------------------- the policy

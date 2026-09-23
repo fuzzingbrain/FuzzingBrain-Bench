@@ -96,7 +96,7 @@ CONTEXT_WINDOWS: dict[str, int] = {
     "qwen3:30b-a3b":             40_960,
     # The --max-model-len the HPRC vLLM server is started with, not the model's
     # published window: the server rejects anything longer.
-    "qwen3.8:27b":               65_536,
+    "qwen3.8:27b":              229_376,
     "llama3.1:8b":              131_072,
 }
 

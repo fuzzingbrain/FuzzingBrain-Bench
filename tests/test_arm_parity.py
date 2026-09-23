@@ -264,10 +264,19 @@ def test_both_agent_arms_are_told_about_the_environment_in_the_same_words():
     """
     caps = {"gdb": True, "target": mcp_episode.ORACLE_HARNESS}
     note = mcp_episode.agent_tools_note(caps)
-    assert note and note.count("\n\n") == 1, "one appended paragraph, not a section"
-    # the system prompt is the api arm's, verbatim, plus exactly that
+    assert note and "\n" not in note, "one line, not a section"
+    assert note.startswith("- "), "a bullet, so it reads as one of the steps"
+    # the system prompt is the api arm's, verbatim, plus exactly that one line
     from fbbench.prompts import build_initial_user_message, system_prompt
-    assert ex.agent_system_prompt(caps) == system_prompt() + note
+    api = system_prompt()
+    sp_full = ex.agent_system_prompt(caps)
+    assert [l for l in sp_full.splitlines() if l not in api.splitlines() or
+            api.splitlines().count(l) < sp_full.splitlines().count(l)] == [note]
+    # it sits under the bullet about the graded binary, not after the whole prompt
+    body = sp_full.splitlines()
+    assert body[body.index(note) - 1].startswith(mcp_episode._TOOLS_ANCHOR)
+    assert not sp_full.rstrip().endswith(note), "stranded at the end"
+    assert sp_full.splitlines()[-1] == api.splitlines()[-1], "closing line moved"
     # and the user turn is the api arm's, untouched
     assert ex.agent_opening() == build_initial_user_message({})
     # claudecode passes the same string, differing only by the forced prefix

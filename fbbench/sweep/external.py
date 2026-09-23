@@ -62,7 +62,7 @@ from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
     fetch_setup, probe_environment,
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
-    agent_tools_note)
+    agent_tools_note, with_agent_tools)
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets: the api arm's opening, verbatim.
@@ -87,7 +87,7 @@ DEFAULT_OPENING = default_opening()
 
 def agent_system_prompt(env_caps: dict | None = None) -> str:
     """The api arm's system prompt, plus the one line about this environment."""
-    return system_prompt() + agent_tools_note(env_caps)
+    return with_agent_tools(system_prompt(), env_caps)
 
 
 def agent_opening(setup_resp: dict | None = None,
