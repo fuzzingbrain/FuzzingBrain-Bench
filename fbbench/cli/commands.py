@@ -195,12 +195,18 @@ def cmd_run(args) -> int:
         models = [claudecode.model_label(m) for m in raw_models]
         model_map = {claudecode.model_label(m): m for m in raw_models}
     elif arm == "external":
-        # The label is the agent's model string verbatim; the manifest, not a
-        # per-arm module, is what knows how to drive it.
+        # Labelled <agent>-<model>, the way claudecode and codex label theirs.
+        # Without the agent's name a cell is indistinguishable from an api-arm
+        # cell of the same model -- same directory, same report header -- and a
+        # result nobody can attribute is not a result.
         raw_models = ([m.strip() for m in args.model.split(",") if m.strip()]
                       if args.model else ["default"])
-        models = list(raw_models)
-        model_map = {m: m for m in raw_models}
+        agent_name = getattr(args, "agent", None) or "external"
+        agent_name = Path(str(agent_name)).name
+        for suffix in (".agent.yaml", ".agent.yml", ".yaml", ".yml"):
+            agent_name = agent_name.removesuffix(suffix)
+        models = [f"{agent_name}-{m}" for m in raw_models]
+        model_map = {f"{agent_name}-{m}": m for m in raw_models}
     else:  # api arm — a provider model driven via its API
         if args.model is None:
             provider, have = detect_provider()

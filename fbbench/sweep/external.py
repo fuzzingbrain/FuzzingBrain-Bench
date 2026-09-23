@@ -786,6 +786,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
              preserve_pocs: bool = True) -> dict | None:
     """Stage a challenge, run the external agent over it, grade what it left."""
     cell_dir = Path(cell_dir)
+    # What a reader sees: <agent>-<model>, as claudecode and codex label theirs.
+    # `model` itself stays the raw id the agent is invoked with.
+    label = f"{manifest.name}-{model}" if getattr(manifest, "name", "") else model
     real = find_bug(bug)
     if not real:
         return {"error": f"bug not found: {bug}"}
@@ -816,7 +819,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
 
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
                       image=image,
-                      header={"bug_id": bug, "model": model, "max_turns": max_turns,
+                      header={"bug_id": bug, "model": label, "max_turns": max_turns,
                               "initial_user_message": opening,
                               "system_prompt": system_prompt()})
         judge.start()
@@ -935,7 +938,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             shutil.copy(best, cell_dir / "best_blob")
 
         score = {
-            "bug_id": bug, "model": model, "seed": 0,
+            "bug_id": bug, "model": label, "seed": 0,
             "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
             "score": len(sigs), "grading": "in-image",
             "terminated_reason": (terminated if blobs else
@@ -965,6 +968,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "fuzzing_attempts": len(candidates.blocked),
             # What this arm had that the api arm does not. A result should be
             # readable knowing which tools were on PATH when it was produced.
+            "arm": f"external:{manifest.name}" if getattr(manifest, "name", "") else "external",
             "agent_image": image,
             "agent_image_digest": image_digest(image),
             "network": "allowed" if manifest.allow_network else "blocked",

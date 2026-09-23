@@ -67,6 +67,18 @@ def _config_rows(score: dict, max_turns_fallback) -> list[tuple[str, str]]:
     cfg = score.get("config") or {}
     rows: list[tuple[str, str]] = []
 
+    # Which arm produced this. Without it an agent cell and an api cell of the
+    # same model render identically, and a result nobody can attribute to an arm
+    # is not a result.
+    arm = (cfg.get("arm") or score.get("arm")
+           or ("claudecode" if str(score.get("model", "")).startswith("claude-code-")
+               else None))
+    if arm:
+        rows.append(("arm", arm))
+    agent_image = cfg.get("agent_image") or score.get("agent_image")
+    if agent_image:
+        rows.append(("image", agent_image))
+
     mode = cfg.get("mode") or score.get("mode") or "blind"
     rows.append(("mode", mode))
 

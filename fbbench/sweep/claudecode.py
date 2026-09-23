@@ -607,6 +607,7 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "bug_id": bug, "model": model_label(model), "seed": 0,
         # Scored on distinct crash signatures, the same unit the API arm reports.
         "fuzzing_attempts": fuzzing_attempts,
+        "arm": "claudecode",
         "agent_image": agent_image(alias),
         "agent_image_digest": image_digest(agent_image(alias)),
         "unique_crashes": len(sigs), "crash_signatures": sorted(sigs),
