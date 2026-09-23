@@ -44,3 +44,16 @@ def image_digest(image: str) -> str:
         return (r.stdout or "").strip()
     except Exception:  # noqa: BLE001
         return ""
+
+
+def pull_policy(image: str) -> str:
+    """"always" for a registry image, "missing" for a locally built one.
+
+    A published image is always re-fetched, so a stale cached :latest cannot
+    silently grade a run. A local build has nowhere to be fetched from, and
+    --pull=always would fail the run before it started. Docker's own rule for
+    telling them apart: the first path segment is a registry only if it
+    contains a dot or a colon.
+    """
+    head = image.split("/")[0]
+    return "always" if ("." in head or ":" in head) else "missing"

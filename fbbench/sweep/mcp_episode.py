@@ -310,7 +310,7 @@ def _start_episode_server(image: str, work: str, root: str,
     import threading
 
     proc = subprocess.Popen(
-        ["docker", "run", "-i", "--rm", "--pull=always",
+        ["docker", "run", "-i", "--rm", f"--pull={pull_policy(image)}",
          "--security-opt", "seccomp=unconfined",
          "-v", f"{work}:/workspace", image, "mcp-server"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,

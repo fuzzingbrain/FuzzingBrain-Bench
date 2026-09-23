@@ -369,3 +369,13 @@ def test_both_arms_are_told_where_the_copy_is():
     note = mcp_episode.agent_tools_note()
     assert "/opt/fbbench/oracle/binaries/vuln/asan/harness" in note
     assert "-print_coverage=1" in note
+
+
+def test_a_published_image_is_always_refetched_and_a_local_one_is_not():
+    """A stale cached :latest must never grade a run, and a locally built
+    image has nowhere to be fetched from -- --pull=always would fail the cell
+    before it started."""
+    from fbbench import images
+    assert images.pull_policy(images.challenge_image("x-01")) == "always"
+    assert images.pull_policy(images.agent_image("x-01")) == "missing"
+    assert "pull_policy" in inspect.getsource(mcp_episode._start_episode_server)
