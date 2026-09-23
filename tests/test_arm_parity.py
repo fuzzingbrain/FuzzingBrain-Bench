@@ -49,10 +49,10 @@ def test_every_arm_is_handed_the_api_arm_s_task_text():
     so its prompt is the one that wins -- not CODEX_TASK_PROMPT, a second brief
     written for the codex arm whose goal sentence and crash definition differed
     from the baseline's by 64 lines."""
-    from fbbench.prompts import system_prompt
-    api = system_prompt()
-    # An external agent calls the tools by their bare names, as the api arm
-    # does, so it gets the text verbatim.
+    from fbbench.prompts import build_initial_user_message, system_prompt
+    api = build_initial_user_message({})
+    # Both arms are handed the api arm's FIRST USER TURN, not its system
+    # prompt: that travels separately, in the system slot.
     assert ex.DEFAULT_OPENING == api
     # Claude Code namespaces MCP tools, so it gets exactly one substitution --
     # mechanical, forced by the client, and nothing else may differ.
@@ -276,16 +276,17 @@ def test_the_toolbox_line_never_reaches_the_api_arm():
     against. Changing it makes v1 api results incomparable, and the api arm
     has no toolbox to be told about."""
     from fbbench import prompts
-    assert prompts.system_prompt() == ex.DEFAULT_OPENING
-    for word in ("gdb", "Also available on PATH"):
+    for word in ("gdb", "Also available in this environment"):
         assert word not in prompts.system_prompt()
+        assert word not in prompts.build_initial_user_message({})
 
 
 def test_the_note_cannot_promise_a_tool_that_is_not_mounted():
     """Generated from what is actually mounted. With the toolbox off both
     agent arms fall back to the api arm's text exactly."""
     from fbbench import prompts
-    assert ex.agent_opening() == prompts.system_prompt() + mcp_episode.agent_tools_note()
+    assert ex.agent_opening() == (prompts.build_initial_user_message({})
+                                 + mcp_episode.agent_tools_note())
 
 
 def test_the_opening_is_built_per_cell_not_at_import():

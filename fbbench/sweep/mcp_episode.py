@@ -40,6 +40,52 @@ _CACHE_ROOT = os.environ.get(
 _tools_lock = threading.Lock()
 
 
+
+def fetch_setup(sock_path: str, timeout: float = 120.0) -> dict:
+    """Call setup() on a running episode server and return its answer.
+
+    The api arm builds its first user turn from this response, because it
+    carries what nothing else does -- the sanitizer and its fault family. An
+    agent arm cannot be handed that text unless the bench asks for it first, so
+    the bench asks, once, before the agent starts. Returns {} on any failure:
+    a missing context block degrades the prompt, and must not fail the cell.
+    """
+    import socket as _socket
+    try:
+        c = _socket.socket(_socket.AF_UNIX)
+        c.settimeout(timeout)
+        c.connect(sock_path)
+        f = c.makefile("rw")
+        n = 0
+
+        def call(method, params):
+            nonlocal n
+            n += 1
+            f.write(json.dumps({"jsonrpc": "2.0", "id": n,
+                                "method": method, "params": params}) + "\n")
+            f.flush()
+            while True:
+                line = f.readline()
+                if not line:
+                    return None
+                m = json.loads(line)
+                if m.get("id") == n:
+                    return m
+
+        call("initialize", {"protocolVersion": "2024-11-05", "capabilities": {},
+                            "clientInfo": {"name": "fbbench", "version": "1"}})
+        f.write(json.dumps({"jsonrpc": "2.0",
+                            "method": "notifications/initialized",
+                            "params": {}}) + "\n")
+        f.flush()
+        r = call("tools/call", {"name": "setup", "arguments": {}})
+        c.close()
+        out = ((r or {}).get("result") or {}).get("structuredContent")
+        return out if isinstance(out, dict) else {}
+    except Exception:  # noqa: BLE001
+        return {}
+
+
 def agent_tools_note() -> str:
     """The one line an agent arm gets and the api arm does not.
 

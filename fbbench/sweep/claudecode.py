@@ -61,7 +61,9 @@ MODEL_DEFAULT = "sonnet"
 MAX_RESUMES = 30  # parity with the Codex arm's resume cap
 
 from fbbench.images import agent_image, image_digest
-from fbbench.sweep.mcp_episode import BENCH_TOOL_NAMES, agent_tools_note
+from fbbench.sweep.external import agent_opening
+from fbbench.sweep.mcp_episode import (
+    BENCH_TOOL_NAMES, agent_tools_note, fetch_setup)
 
 # The only tools the agent may call: the bench MCP tools, named from the one
 # list every arm shares. Everything else is a host-side cheat/contamination
@@ -78,7 +80,7 @@ _DENY_TOOLS = ",".join((
 ))
 
 
-def claude_task_prompt() -> str:
+def claude_task_prompt(setup_resp: dict | None = None) -> str:
     """The BENCH's task prompt -- the same text the api arm is given.
 
     One brief for every arm. Every arm drives the same three tools, so there is
@@ -91,7 +93,7 @@ def claude_task_prompt() -> str:
     # The note is substituted too: it names run_poc_on_harness(), and a prompt
     # that says mcp__bench__run_poc_on_harness() everywhere else and the bare
     # name here would be pointing this arm at a tool it cannot call.
-    p = system_prompt() + agent_tools_note()
+    p = agent_opening(setup_resp) if setup_resp is not None else agent_opening()
     for tool in BENCH_TOOL_NAMES:
         p = p.replace(f"{tool}()", f"mcp__bench__{tool}()")
     return p
@@ -160,7 +162,8 @@ def stage_claude_env(
         json.dump({"mcpServers": {"bench": {
             "command": sys.executable,
             "args": [relay_path, sock_path]}}}, f)
-    return image, root, work, mcp_cfg, (server, srv_sock, candidates)
+    setup_resp = fetch_setup(sock_path)
+    return image, root, work, mcp_cfg, (server, srv_sock, candidates, setup_resp)
 
 
 def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
@@ -172,6 +175,11 @@ def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
            "--mcp-config", mcp_cfg, "--strict-mcp-config",
            "--allowedTools", _BENCH_TOOLS,
            "--disallowedTools", _DENY_TOOLS,
+           # The api arm's system prompt, appended rather than replacing Claude
+           # Code's own: its default system prompt carries the instructions its
+           # harness depends on, and overriding that changes the agent rather
+           # than equalising the brief.
+           "--append-system-prompt", system_prompt(),
            "--permission-mode", "default",
            "--setting-sources", "project",
            "--max-turns", str(max_turns)]
@@ -327,7 +335,7 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
 
 
 def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
-               max_turns: int = MAX_TURNS_DEFAULT, *,
+               max_turns: int = MAX_TURNS_DEFAULT, *, setup_resp: dict | None = None,
                auth: str = "sub", api_key: str | None = None) -> dict:
     """Drive `claude -p` to a fixed TURN budget, EB-style (like the Codex arm).
 
@@ -368,7 +376,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     terminated = "resumes_exhausted"
 
     with open(log_path, "w") as lf:
-        prompt = claude_task_prompt()
+        prompt = claude_task_prompt(setup_resp)
         resume = None
         for attempt in range(MAX_RESUMES + 1):
             remaining = max_turns - turns
@@ -644,10 +652,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     if not real:
         return {"error": f"bug not found: {bug}"}
     alias = _full_scan_alias(str(real))
-    _image, root, work, mcp_cfg, (server, srv_sock, candidates) = stage_claude_env(
+    _image, root, work, mcp_cfg, (server, srv_sock, candidates, setup_resp) = stage_claude_env(
         str(real), model, cell_dir=cell_dir, preserve_pocs=preserve_pocs)
     try:
-        r = run_claude(work, mcp_cfg, model, timeout_s, max_turns,
+        r = run_claude(work, mcp_cfg, model, timeout_s, max_turns, setup_resp=setup_resp,
                        auth=auth, api_key=api_key)
         r["max_turns"] = max_turns
         # What the agent actually ran through run_poc_on_harness, seen live on

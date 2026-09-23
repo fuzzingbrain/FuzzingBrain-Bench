@@ -261,31 +261,40 @@ def test_the_live_price_and_the_final_price_come_from_one_function():
     from fbbench.sweep import external
     assert "price_reported_usage" in inspect.getsource(external._agent_usage)
     assert "price_reported_usage" in inspect.getsource(external.Judge._reported)
-def test_the_external_arm_is_handed_the_api_arm_s_task_text():
-    """One brief across the bench. The api arm is the baseline every agent is
-    measured against, so its prompt is the one that wins. The external arm calls
-    the tools by their bare names, as the api arm does, so it gets it verbatim."""
+def test_the_agent_arms_get_the_api_arm_s_two_pieces_in_the_right_slots():
+    """The api arm sends a SYSTEM prompt and, separately, a first USER turn
+    built from setup(). An agent arm used to receive the system prompt AS its
+    user message and never see the user turn at all -- so it never got the
+    per-bug context block, the only place the sanitizer and its fault family
+    appear. Both pieces now travel, each in its own slot."""
+    from fbbench.prompts import build_initial_user_message, system_prompt
+    from fbbench.sweep.external import DEFAULT_OPENING, agent_opening
+    # the opening is the api arm's first user turn, not its system prompt
+    assert DEFAULT_OPENING == build_initial_user_message({})
+    assert DEFAULT_OPENING != system_prompt()
+    # and it carries the context block once setup() has answered
+    filled = agent_opening({"project": "libxml2", "language": "c",
+                            "harness": {"sanitizer": "asan"}})
+    assert "libxml2" in filled
+    assert "./submit" not in filled        # a tool no arm has
+
+
+def test_the_system_prompt_still_carries_the_methodology():
+    """The instructions that used to be asserted on the opening live in the
+    system prompt, which is where the api arm puts them."""
     from fbbench.prompts import system_prompt
-    from fbbench.sweep.external import DEFAULT_OPENING
-    assert DEFAULT_OPENING == system_prompt()
-    assert "./submit" not in DEFAULT_OPENING   # a tool this arm no longer has
+    sp = system_prompt()
+    assert "until one crashes" not in sp
+    assert "Find ALL distinct vulnerabilities" in sp
+    assert "Maximize the total count" in sp
+    assert "run_poc_on_harness() is your only ground-truth" in sp
+    assert "Do not build a harness" in sp
 
 
-def test_the_opening_does_not_stop_the_agent_at_its_first_crash():
-    # It used to end "Keep going until one crashes", naming the first crash as
-    # the finish line while the api arm was told to find as many as it could.
-    # Scoring is min(3, distinct) x difficulty, so that was worth up to two
-    # thirds of a cell -- and the bare model produced exactly one crash on 22 of
-    # 77 challenges.
-    from fbbench.sweep.external import DEFAULT_OPENING
-    assert "until one crashes" not in DEFAULT_OPENING
-    assert "Find ALL distinct vulnerabilities" in DEFAULT_OPENING
-    assert "Maximize the total count" in DEFAULT_OPENING
-
-
-def test_the_opening_says_the_graded_harness_is_the_evidence():
-    # An agent that trusts its own harness over the graded one is jq-01: 77 exec
-    # calls, one submission, thirty minutes, nothing.
-    from fbbench.sweep.external import DEFAULT_OPENING
-    assert "run_poc_on_harness() is your only ground-truth" in DEFAULT_OPENING
-    assert "Do not build a harness" in DEFAULT_OPENING
+def test_both_agent_arms_are_handed_that_system_prompt():
+    """Not folded into the user turn: the external arm gets it in the
+    environment, claudecode on the command line."""
+    import inspect
+    from fbbench.sweep import claudecode as cc, external as ex
+    assert "FBBENCH_SYSTEM_PROMPT" in inspect.getsource(ex)
+    assert "--append-system-prompt" in inspect.getsource(cc)

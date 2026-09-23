@@ -57,9 +57,10 @@ from typing import Callable
 from fbbench.models import cost_usd
 from fbbench.grading import find_bug, grade_blob
 from fbbench.images import agent_image, image_digest
-from fbbench.prompts import system_prompt
+from fbbench.prompts import build_initial_user_message, system_prompt
 from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
+    fetch_setup,
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
     agent_tools_note)
 from fbbench.runner.mcp_client import _full_scan_alias
@@ -68,19 +69,26 @@ from fbbench.runner.mcp_client import _full_scan_alias
 # An external agent drives the same three tools under the same bare names, so
 # it needs no substitution -- and an arm graded on different wording would be
 # measuring the wording.
-def default_opening() -> str:
-    return system_prompt()
+def default_opening(setup_resp: dict | None = None) -> str:
+    """The api arm's first user turn, verbatim.
+
+    Not system_prompt(): that is the api arm's SYSTEM prompt and belongs in the
+    system slot. This is build_initial_user_message(), which carries the one
+    thing nothing else does -- the per-bug sanitizer and build-env block. With
+    no setup response the context block is empty rather than absent, so an arm
+    whose server did not answer still gets the same instructions.
+    """
+    return build_initial_user_message(setup_resp or {})
 
 
 DEFAULT_OPENING = default_opening()
-"""The api arm's text, unmodified -- what every arm shares."""
+"""The api arm's first user turn with no per-bug context filled in."""
 
 
-def agent_opening() -> str:
-    """What an agent arm is actually handed: the shared text plus the one
-    toolbox line. Computed per cell, not at import, because resolving the
-    toolbox can pull an image and importing a module must not."""
-    return DEFAULT_OPENING + agent_tools_note()
+def agent_opening(setup_resp: dict | None = None) -> str:
+    """What an agent arm is handed as its first user turn: the api arm's own
+    opening plus the one line naming what this environment additionally has."""
+    return default_opening(setup_resp) + agent_tools_note()
 
 
 # --------------------------------------------------------------- the manifest
@@ -619,6 +627,11 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
     recs: list[dict] = []
     if src.is_file():
         shutil.copy(src, cell_dir / "trace.jsonl")
+    # the verbatim model exchange, if the agent recorded one: the request as it
+    # went over the wire, which the transcript does not keep
+    exch = ws / ".fbagent-exchange.jsonl"
+    if exch.is_file():
+        shutil.copy(exch, cell_dir / "exchange.jsonl")
         for line in src.read_text(errors="ignore").splitlines():
             try:
                 recs.append(json.loads(line))
@@ -631,7 +644,8 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
     # every field in the header rendered as zero on a cell that had really spent
     # half an hour and a dollar.
     ev: list[dict] = [{"event": "start", "model": model, "bug_id": bug,
-                       "system_prompt": "", "initial_user_message": opening,
+                       "system_prompt": system_prompt(),
+                       "initial_user_message": opening,
                        "max_turns": max_turns, "preserve_pocs": preserve_pocs,
                        "tools": sorted({r.get("tool") for r in (recs or [])
                                         if r.get("kind") == "tool_call"
@@ -784,11 +798,6 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     server = None
     try:
 
-        judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
-                      image=image,
-                      header={"bug_id": bug, "model": model, "max_turns": max_turns,
-                              "initial_user_message": agent_opening()})
-        judge.start()
         # The SAME per-episode mcp-server every other agent arm drives. The
         # agent speaks MCP to it over `relay.py`; cwd inside is /challenge
         # (read-only), /workspace is the bind-mounted dir above.
@@ -796,6 +805,18 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         server, sock_path, relay_path, _srv = _start_episode_server(
             image, str(ws), str(root), candidates)
         sandbox_kind = "container"
+        # The api arm builds its first user turn from setup(), so the server has
+        # to be up before the opening exists -- and therefore before the
+        # transcript header that records it.
+        setup_resp = fetch_setup(sock_path)
+        opening = agent_opening(setup_resp)
+
+        judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
+                      image=image,
+                      header={"bug_id": bug, "model": model, "max_turns": max_turns,
+                              "initial_user_message": opening,
+                              "system_prompt": system_prompt()})
+        judge.start()
 
         # Every arm is budgeted the same way: a turn cap and a wall clock, and
         # no dollar cap (the api arm has none, so neither may we). The api arm
@@ -813,7 +834,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # silently not reach the agent and every cell in a sweep would run
         # whatever the manifest said -- the run would be mislabelled, not fail.
         argv = manifest.render(workspace=str(ws), timeout=str(timeout_s),
-                               opening=agent_opening(),
+                               opening=opening,
                                mcp_socket=sock_path, relay=relay_path,
                                max_turns=str(max_turns), model=model)
         env = dict(os.environ)
@@ -825,6 +846,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # How an agent reaches the bench tools, for a manifest that would rather
         # read them from the environment than from its command template.
         env["FBBENCH_MCP_SOCKET"] = sock_path
+        # The api arm's SYSTEM prompt, in the system slot rather than folded
+        # into the first user turn. An agent that ignores it is no worse off
+        # than before; one that reads it now matches the baseline's structure.
+        env["FBBENCH_SYSTEM_PROMPT"] = system_prompt()
         env["FBBENCH_MCP_RELAY"] = relay_path
         if api_key:
             env["ANTHROPIC_API_KEY"] = api_key
@@ -964,7 +989,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # existed -- which is why every external cell read "0 turns used,
         # $0.0000, duration 0.0s" over a real half-hour run.
         _write_run_artifacts(cell_dir, ws, log, judge, bug, model,
-                             agent_opening(), score=score, usage=usage,
+                             opening, score=score, usage=usage,
                              max_turns=max_turns, preserve_pocs=preserve_pocs)
         if interrupted:
             # The cell is on disk now; let the interrupt do its job.
