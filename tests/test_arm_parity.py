@@ -424,3 +424,15 @@ def test_a_cell_records_the_prompt_the_agent_was_actually_sent():
     assert '"system_prompt": system_prompt()' not in src
     assert "system_prompt_sent" in src
     assert "agent_system_prompt(env_caps)" in src
+
+
+def test_the_claudecode_cell_records_what_it_sent_too():
+    """The external arm recorded prompts.system_prompt() while sending more; this
+    arm recorded the USER turn in the system slot and nothing in the user slot,
+    so a full 100-turn run reported a 638-char system prompt with no mention of
+    gdb and an empty first message."""
+    src = inspect.getsource(cc)
+    assert '"system_prompt": claude_task_prompt()' not in src
+    assert '"system_prompt": system_prompt_sent' in src
+    assert '"initial_user_message": user_turn_sent' in src
+    assert '"system_prompt_sent": agent_system_prompt(env_caps)' in src

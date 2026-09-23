@@ -435,11 +435,15 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             "log_path": log_path, "snap_dir": snap_dir, "turns": turns, "grade_calls": grade_calls,
             "tokens": tokens, "input_tokens": in_tok, "output_tokens": out_tok,
             "cache_read_tokens": cr_tok, "cache_write_tokens": cw_tok,
-            "total_usd": round(usd, 4)}
+            "total_usd": round(usd, 4),
+            # what was actually sent, so the cell cannot record something else
+            "system_prompt_sent": agent_system_prompt(env_caps),
+            "user_turn_sent": prompt}
 
 
 def _stream_to_transcript(log_path: str, out_path: Path, *, model: str,
-                          bug_id: str) -> None:
+                          bug_id: str, system_prompt_sent: str = "",
+                          user_turn_sent: str = "") -> None:
     """Convert a claude stream-json log into report.py's transcript.jsonl format.
 
     Maps assistant text + tool_use → assistant events, tool_result (in `user`
@@ -448,8 +452,8 @@ def _stream_to_transcript(log_path: str, out_path: Path, *, model: str,
     """
     events: list[dict] = [{
         "event": "start", "model": model, "bug_id": bug_id,
-        "system_prompt": claude_task_prompt(),
-        "initial_user_message": "",
+        "system_prompt": system_prompt_sent,
+        "initial_user_message": user_turn_sent,
     }]
     call_name: dict[str, str] = {}
     call_input: dict[str, object] = {}
@@ -639,7 +643,9 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
     (cell_dir / "cost.json").write_text(json.dumps(cost, indent=2))
     try:
         _stream_to_transcript(r["log_path"], cell_dir / "transcript.jsonl",
-                              model=model_label(model), bug_id=bug)
+                              model=model_label(model), bug_id=bug,
+                              system_prompt_sent=r.get("system_prompt_sent", ""),
+                              user_turn_sent=r.get("user_turn_sent", ""))
         from fbbench.runner.report import write_report
         write_report(cell_dir)
     except Exception as e:  # noqa: BLE001
