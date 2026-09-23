@@ -441,6 +441,70 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             "user_turn_sent": prompt}
 
 
+def _write_exchange(log_path: str, out_path: Path, *, system_prompt: str,
+                    user_turn: str) -> None:
+    """The agent-model exchange for this arm, in the schema the report reads.
+
+    The CLI streams each response and each tool result but never the array it
+    posted, so the request side is rebuilt the way the Messages API defines it:
+    the Nth call carries the system prompt, the opening turn and every message
+    exchanged before it. Marked `reconstructed` so a reader knows the request
+    bodies are accumulated from the stream rather than captured on the wire.
+    """
+    try:
+        recs = []
+        with open(log_path, errors="replace") as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    recs.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        return
+
+    history: list[dict] = [{"role": "system", "content": system_prompt}] if system_prompt else []
+    if user_turn:
+        history.append({"role": "user", "content": user_turn})
+    out: list[dict] = []
+    model_name = ""
+    emitted = 0          # messages already written out in an earlier record
+    for r in recs:
+        t, msg = r.get("type"), r.get("message") or {}
+        if t == "assistant":
+            model_name = msg.get("model") or model_name
+            # Each call posts `history` in full. Writing all of it every time
+            # turns a 1 MB log into tens of MB of the same text; the appended
+            # messages plus the count reconstruct the array exactly.
+            appended = history[emitted:]
+            emitted = len(history)
+            out.append({
+                "t": r.get("timestamp"),
+                "model": model_name,
+                "source": "reconstructed",
+                "request": {"message_count": len(history),
+                            "messages_appended": appended},
+                "response": {
+                    "id": msg.get("id"),
+                    "model": msg.get("model"),
+                    "usage": msg.get("usage") or {},
+                    "choices": [{"message": {"role": "assistant",
+                                             "content": msg.get("content")},
+                                 "finish_reason": msg.get("stop_reason")}],
+                },
+            })
+            history.append({"role": "assistant", "content": msg.get("content")})
+        elif t == "user" and msg.get("content") is not None:
+            history.append({"role": "user", "content": msg.get("content")})
+
+    if out:
+        with out_path.open("w") as fh:
+            for rec in out:
+                fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+
+
 def _stream_to_transcript(log_path: str, out_path: Path, *, model: str,
                           bug_id: str, system_prompt_sent: str = "",
                           user_turn_sent: str = "") -> None:
@@ -646,6 +710,9 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
                               model=model_label(model), bug_id=bug,
                               system_prompt_sent=r.get("system_prompt_sent", ""),
                               user_turn_sent=r.get("user_turn_sent", ""))
+        _write_exchange(r["log_path"], cell_dir / "exchange.jsonl",
+                        system_prompt=r.get("system_prompt_sent", ""),
+                        user_turn=r.get("user_turn_sent", ""))
         from fbbench.runner.report import write_report
         write_report(cell_dir)
     except Exception as e:  # noqa: BLE001

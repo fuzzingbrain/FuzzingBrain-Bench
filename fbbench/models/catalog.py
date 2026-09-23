@@ -50,6 +50,10 @@ CATALOG: list[tuple[str, str, str]] = [
     # small dense fallback. Both verified working over the local ollama endpoint.
     ("qwen3:30b-a3b",            "ollama",    "flagship"),
     ("llama3.1:8b",              "ollama",    "fast"),
+    # Qwen3.8-27B served by vLLM on TAMU HPRC, reached through an ssh tunnel on
+    # localhost:8000. The ":" keeps it on the keyless local path, so it prices
+    # at $0. Listed after qwen3:30b-a3b so default_sweep() still picks that one.
+    ("qwen3.8:27b",              "ollama",    "flagship"),
 ]
 
 SUPPORTED_MODELS = [m for m, _, _ in CATALOG]
@@ -90,6 +94,9 @@ CONTEXT_WINDOWS: dict[str, int] = {
     "glm-4.5-air":              131_072,
     "qwen/qwen3-coder":         262_144,
     "qwen3:30b-a3b":             40_960,
+    # The --max-model-len the HPRC vLLM server is started with, not the model's
+    # published window: the server rejects anything longer.
+    "qwen3.8:27b":               65_536,
     "llama3.1:8b":              131_072,
 }
 

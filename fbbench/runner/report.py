@@ -194,6 +194,26 @@ def build_conversation(transcript_path: Path) -> tuple[list[dict], str, str]:
         elif ev == "budget_note":
             notes_by_turn.setdefault(e.get("turn"), []).append(e.get("note", ""))
 
+    # One model response can arrive as two assistant events -- the text and the
+    # tool call it came with -- which renders as a turn repeated, once blank.
+    # They are one response, so fold same-numbered events back together.
+    merged: list[dict] = []
+    for a in assistants:
+        prev = merged[-1] if merged else None
+        if prev is not None and a.get("turn") == prev.get("turn"):
+            txt = " ".join(x for x in ((prev.get("text") or "").strip(),
+                                       (a.get("text") or "").strip()) if x)
+            prev["text"] = txt
+            prev["tool_calls"] = (prev.get("tool_calls") or []) + (a.get("tool_calls") or [])
+            for k in ("input_tokens", "output_tokens", "cache_read_tokens",
+                      "cache_write_tokens"):
+                prev[k] = (prev.get(k) or 0) + (a.get(k) or 0)
+            if a.get("stop_reason"):
+                prev["stop_reason"] = a["stop_reason"]
+            continue
+        merged.append(dict(a))
+    assistants = merged
+
     turns: list[dict] = []
     for a in assistants:
         calls = []
@@ -240,13 +260,16 @@ def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str)
         inner = []
         if t["text"].strip():
             inner.append(f'<div class="think">{_block(t["text"])}</div>')
+        elif t["calls"]:
+            inner.append('<div class="think nowords">the model returned no prose this '
+                         'turn — only the tool call below</div>')
         for note in t["notes"]:
             inner.append(f'<div class="bnote">{_esc(note)}</div>')
         for c in t["calls"]:
             badge = ('<span class="b crash">crash</span>' if c["crash"]
                      else ('<span class="b err">error</span>' if c["err"] else ""))
             arg_json = json.dumps(c["input"], indent=2, ensure_ascii=False) if c["input"] is not None else ""
-            arg_det = (f'<details><summary>arguments</summary><pre>{_block(arg_json)}</pre></details>'
+            arg_det = (f'<details open><summary>arguments</summary><pre>{_block(arg_json)}</pre></details>'
                        if arg_json.strip() not in ("", "{}", "null") else "")
             open_attr = " open" if (c["crash"] or c["err"]) else ""
             res_det = (f'<details{open_attr}><summary>result {badge}</summary>'
@@ -264,6 +287,117 @@ def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str)
         )
     body = "".join(blocks) or '<div class="muted">no conversation recorded</div>'
     return head + '<div class="conv">' + body + "</div>"
+
+
+def _msg_text(content) -> str:
+    """One message's content as text. litellm carries either a string or the
+    content-block list, and a tool_calls-only assistant turn carries neither."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        out = []
+        for b in content:
+            if isinstance(b, str):
+                out.append(b)
+            elif isinstance(b, dict):
+                out.append(b.get("text") or b.get("content")
+                           or json.dumps(b, indent=2, ensure_ascii=False))
+        return "\n".join(out)
+    return "" if content is None else json.dumps(content, indent=2, ensure_ascii=False)
+
+
+def _exchange_html(run_dir: Path) -> str:
+    """The verbatim request/response pairs, when the agent recorded them.
+
+    This is the exchange itself, not a rendering of it: every message the agent
+    put on the wire in the order it sent them, and the response object that came
+    back. The Conversation section above is the readable view of the same thing.
+    """
+    path = run_dir / "exchange.jsonl"
+    if not path.is_file():
+        return ""
+    recs = []
+    for line in path.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            recs.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    if not recs:
+        return ""
+
+    blocks = []
+    for i, rec in enumerate(recs, 1):
+        req = rec.get("request") or {}
+        resp = rec.get("response") or {}
+        # Every call re-posts the whole conversation. Rendering the shared
+        # prefix once per call would repeat the same text N times over, so show
+        # what this call added and say how much stood above it unchanged.
+        if "messages_appended" in req:
+            msgs = req.get("messages_appended") or []
+            total = req.get("message_count") or len(msgs)
+        else:
+            full = req.get("messages") or []
+            prev = (recs[i - 2].get("request") or {}).get("messages") or [] if i > 1 else []
+            k = 0
+            while k < len(prev) and k < len(full) and prev[k] == full[k]:
+                k += 1
+            msgs, total = full[k:], len(full)
+        carried = total - len(msgs)
+        sent = []
+        for m in msgs:
+            role = str(m.get("role", "?"))
+            body = _msg_text(m.get("content"))
+            tcs = m.get("tool_calls") or []
+            if tcs:
+                body = (body + "\n" if body else "") + json.dumps(
+                    tcs, indent=2, ensure_ascii=False)
+            cls = role if role in ("system", "user", "assistant", "tool") else ""
+            sent.append(f'<div class="xmsg {cls}"><div class="r">{_esc(role)}</div>'
+                        f'<pre>{_block(body)}</pre></div>')
+        got = []
+        for ch in (resp.get("choices") or []):
+            m = ch.get("message") or {}
+            body = _msg_text(m.get("content"))
+            tcs = m.get("tool_calls") or []
+            if tcs:
+                body = (body + "\n" if body else "") + json.dumps(
+                    tcs, indent=2, ensure_ascii=False)
+            fin = ch.get("finish_reason")
+            label = "assistant" + (f" · finish: {fin}" if fin else "")
+            got.append(f'<div class="xmsg assistant"><div class="r">{_esc(label)}</div>'
+                       f'<pre>{_block(body)}</pre></div>')
+        u = resp.get("usage") or {}
+        meta = " · ".join(filter(None, [
+            f'{total} message{"s" if total != 1 else ""} sent',
+            f'{u.get("prompt_tokens"):,} prompt tok' if u.get("prompt_tokens") else "",
+            f'{u.get("completion_tokens"):,} completion tok' if u.get("completion_tokens") else "",
+            _esc(str(rec.get("model") or resp.get("model") or "")),
+        ]))
+        blocks.append(
+            f'<details class="sys"><summary>request {i} — {meta}</summary>'
+            f'<div class="sub" style="margin:8px 0 2px">sent to the model'
+            + (f' — the {carried} message{"s" if carried != 1 else ""} above this '
+               f'point again, then:' if carried > 0 else ':')
+            + '</div>'
+            + (("".join(sent)) or "<div class=muted>—</div>")
+            + '<div class="sub" style="margin:14px 0 2px">returned by the model</div>'
+            + (("".join(got)) or "<div class=muted>—</div>") + '</details>'
+        )
+    return (
+        '<h2>Model exchange (verbatim)</h2>\n'
+        f'<div class="sub" style="margin-bottom:6px">{len(recs)} API call'
+        f'{"s" if len(recs) != 1 else ""} recorded exactly as they went over the wire — '
+        'every message the agent sent, in order, and the response object it got back. '
+        + ("The CLI does not expose the array it posts, so request bodies here are "
+           "accumulated from the streamed messages the way the Messages API defines "
+           "them; responses are verbatim. " if any(r.get("source") == "reconstructed"
+                                                   for r in recs) else "")
+        + 'Also on disk as <code>exchange.jsonl</code>.</div>\n'
+        '<div class="xch">' + "".join(blocks) + '</div>\n'
+    )
 
 
 def _findings_section(score: dict) -> tuple[str, str, str]:
@@ -426,6 +560,7 @@ def build_report_html(run_dir: str | Path) -> str:
         tool_rows=tool_rows_html or '<tr><td colspan="3" class="muted">no tool calls</td></tr>',
         traj_rows="".join(traj_rows) or '<tr><td colspan="6" class="muted">no trajectory</td></tr>',
         conversation=conv_html,
+        exchange=_exchange_html(run_dir),
         err_card=err_card,
     )
 
@@ -487,6 +622,14 @@ details.sys>summary{{cursor:pointer;color:var(--muted);font-size:.84rem;padding:
 margin-bottom:8px;font-variant-numeric:tabular-nums;}}
 .think{{white-space:pre-wrap;word-break:break-word;color:var(--txt);font-size:.92rem;
 background:var(--card2);border-left:3px solid var(--purple);border-radius:8px;padding:11px 14px;margin:6px 0 12px;}}
+.think.nowords{{color:var(--muted);font-style:italic;border-left-color:var(--line);}}
+.xch{{display:flex;flex-direction:column;gap:14px;margin-top:18px;}}
+.xmsg{{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:#11161f;}}
+.xmsg>.r{{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+padding:6px 12px;border-bottom:1px solid var(--line);background:#0d1117;text-align:left;}}
+.xmsg>pre{{margin:0;padding:10px 12px;}}
+.xmsg.system>.r{{color:var(--purple)}}.xmsg.user>.r{{color:var(--accent)}}
+.xmsg.assistant>.r{{color:var(--green)}}.xmsg.tool>.r{{color:var(--amber)}}
 .bnote{{color:var(--amber);font-size:.82rem;background:#d2992212;border:1px solid #d2992233;
 border-radius:8px;padding:7px 12px;margin:6px 0;}}
 .tcall{{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0;background:#11161f;}}
@@ -564,6 +707,7 @@ every tool call with its arguments, and the system's response. Long blocks are c
 faulting / errored calls are expanded.</div>
 {conversation}
 
+{exchange}
 <div class="foot">Generated by FuzzingBrain&nbsp;Bench · the report records the agent's own
 actions only — no reference PoC, expected fault, or crash location is ever included.</div>
 

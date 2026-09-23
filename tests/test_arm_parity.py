@@ -436,3 +436,70 @@ def test_the_claudecode_cell_records_what_it_sent_too():
     assert '"system_prompt": system_prompt_sent' in src
     assert '"initial_user_message": user_turn_sent' in src
     assert '"system_prompt_sent": agent_system_prompt(env_caps)' in src
+
+
+def test_both_arms_render_the_model_exchange(tmp_path):
+    """The report must show the exchange, not just a rendering of it.
+
+    fbagent records the full messages array it posted; the claudecode CLI never
+    exposes one, so that arm writes the appended messages plus a running count.
+    Both shapes have to reach the report, and neither may repeat the shared
+    prefix once per call -- that is what turned a 1 MB log into a 36 MB page.
+    """
+    from fbbench.runner.report import _exchange_html
+
+    assert _exchange_html(tmp_path) == ""          # no log, no section
+
+    full = {"model": "m", "request": {"messages": [
+        {"role": "system", "content": "SYSPROMPT"},
+        {"role": "user", "content": "OPENING"}]},
+        "response": {"choices": [{"message": {"role": "assistant",
+                                             "content": "FIRST REPLY"},
+                                  "finish_reason": "stop"}],
+                     "usage": {"prompt_tokens": 10, "completion_tokens": 2}}}
+    grown = {"model": "m", "request": {"messages": full["request"]["messages"] + [
+        {"role": "assistant", "content": "FIRST REPLY"},
+        {"role": "user", "content": "SECOND TURN"}]},
+        "response": {"choices": [{"message": {"role": "assistant",
+                                              "content": "SECOND REPLY"}}]}}
+    (tmp_path / "exchange.jsonl").write_text(
+        json.dumps(full) + "\n" + json.dumps(grown) + "\n")
+    html = _exchange_html(tmp_path)
+    for must in ("SYSPROMPT", "OPENING", "SECOND TURN", "FIRST REPLY",
+                 "SECOND REPLY", "4 messages sent"):
+        assert must in html, must
+    # the prefix is rendered once, not again inside request 2
+    assert html.count("SYSPROMPT") == 1
+    assert "2 messages above this point again" in html
+
+    delta = {"model": "m", "source": "reconstructed",
+             "request": {"message_count": 3,
+                         "messages_appended": [{"role": "user", "content": "DELTA MSG"}]},
+             "response": {"choices": [{"message": {"role": "assistant",
+                                                   "content": "DELTA REPLY"}}]}}
+    (tmp_path / "exchange.jsonl").write_text(json.dumps(delta) + "\n")
+    html = _exchange_html(tmp_path)
+    assert "DELTA MSG" in html and "DELTA REPLY" in html
+    assert "3 messages sent" in html
+    assert "accumulated from the streamed messages" in html   # labelled, not claimed
+
+
+def test_one_response_is_one_turn(tmp_path):
+    """Text and the tool call it arrived with are one response, not two turns."""
+    from fbbench.runner.report import build_conversation
+
+    t = tmp_path / "transcript.jsonl"
+    t.write_text("\n".join(json.dumps(e) for e in [
+        {"event": "start", "system_prompt": "S", "initial_user_message": "U"},
+        {"event": "assistant", "turn": 1, "text": "thinking out loud",
+         "stop_reason": None, "tool_calls": []},
+        {"event": "assistant", "turn": 1, "text": "", "stop_reason": "tool_use",
+         "tool_calls": [{"id": "a", "name": "exec", "input": {"cmd": "ls"}}]},
+        {"event": "tool_result", "id": "a", "tool": "exec", "result": "ok"},
+    ]) + "\n")
+    turns, sp, iu = build_conversation(t)
+    assert (sp, iu) == ("S", "U")
+    assert len(turns) == 1
+    assert turns[0]["text"] == "thinking out loud"
+    assert [c["tool"] for c in turns[0]["calls"]] == ["exec"]
+    assert turns[0]["stop"] == "tool_use"
