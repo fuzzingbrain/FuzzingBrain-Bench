@@ -441,6 +441,19 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             "user_turn_sent": prompt}
 
 
+def _call_usage(u: dict) -> dict:
+    """The usage fields a single call can actually be held to.
+
+    The CLI repeats a placeholder `output_tokens` on every event of a message --
+    2 or 3, where the run's own result record totals 35k -- so reporting it per
+    call states a number the stream never measured. The input and cache counts
+    are real: summed over the calls they match the result record exactly.
+    """
+    out = {k: v for k, v in u.items() if k != "output_tokens"}
+    out["output_tokens_note"] = "not emitted per call by the CLI"
+    return out
+
+
 def _write_exchange(log_path: str, out_path: Path, *, system_prompt: str,
                     user_turn: str) -> None:
     """The agent-model exchange for this arm, in the schema the report reads.
@@ -489,7 +502,7 @@ def _write_exchange(log_path: str, out_path: Path, *, system_prompt: str,
                 if msg.get("stop_reason"):
                     prev["response"]["choices"][0]["finish_reason"] = msg["stop_reason"]
                 if msg.get("usage"):
-                    prev["response"]["usage"] = msg["usage"]
+                    prev["response"]["usage"] = _call_usage(msg["usage"])
                 history[-1]["content"] = prev["response"]["choices"][0]["message"]["content"]
                 continue
             turn += 1
@@ -510,7 +523,7 @@ def _write_exchange(log_path: str, out_path: Path, *, system_prompt: str,
                 "response": {
                     "id": msg.get("id"),
                     "model": msg.get("model"),
-                    "usage": msg.get("usage") or {},
+                    "usage": _call_usage(msg.get("usage") or {}),
                     "choices": [{"message": {"role": "assistant",
                                              "content": msg.get("content")},
                                  "finish_reason": msg.get("stop_reason")}],

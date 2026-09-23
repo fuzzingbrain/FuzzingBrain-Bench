@@ -393,8 +393,10 @@ def _wire_html(entry) -> str:
     u = resp.get("usage") or {}
     meta = " · ".join(filter(None, [
         f'{total} message{"s" if total != 1 else ""} posted',
-        f'{u.get("prompt_tokens"):,} prompt tok' if u.get("prompt_tokens") else "",
+        f'{(u.get("prompt_tokens") or u.get("input_tokens")):,} prompt tok'
+        if (u.get("prompt_tokens") or u.get("input_tokens")) else "",
         f'{u.get("completion_tokens"):,} completion tok' if u.get("completion_tokens") else "",
+        f'{u.get("cache_read_input_tokens"):,} cached' if u.get("cache_read_input_tokens") else "",
         "request rebuilt from the stream" if rec.get("source") == "reconstructed" else "",
     ]))
     return (

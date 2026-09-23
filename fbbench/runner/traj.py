@@ -99,7 +99,12 @@ def build_traj(transcript_path: str | Path) -> list[dict]:
     for line in Path(transcript_path).read_text().splitlines():
         if not line.strip():
             continue
-        e = json.loads(line)
+        # A run killed mid-write leaves a half-line. It must not cost the whole
+        # report -- build_conversation has always skipped these.
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
         if e.get("event") != "tool_result":
             continue
         tool = e.get("tool", "?")
