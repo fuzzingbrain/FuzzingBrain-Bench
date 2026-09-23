@@ -60,7 +60,10 @@ def cell_dir(out: Path, bug: str, model: str, sample: int) -> Path:
     518 existing data points. It still does not drive sampling — it is which
     repeat this is, forwarded to the runner as --seed so one cell's repeats
     can be told apart."""
-    return out / bug / model / f"seed-{sample}"
+    # A colon in the model id (ollama: "qwen3:27b") makes a directory whose
+    # file:// URL Firefox reads as a protocol, so the report cannot be opened
+    # by double-click. The id stays intact in score.json; only the path changes.
+    return out / bug / model.replace(":", "-") / f"seed-{sample}"
 
 
 # The subprocess timeout is a BACKSTOP only: the episode owns its wall-clock

@@ -12,6 +12,8 @@ already seen; they say what it hit, never what it was supposed to hit.
 """
 from __future__ import annotations
 
+from fbbench.sweep.orchestrator import cell_dir
+
 import json
 from pathlib import Path
 
@@ -113,7 +115,9 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
     for bug in bugs:
         for model in models:
             for sample in samples:
-                cd = exp_dir / bug / model / f"seed-{sample}"
+                # the one place that decides a cell's path, so the summary
+                # looks where the run actually wrote
+                cd = cell_dir(exp_dir, bug, model, sample)
                 sj = cd / "score.json"
                 if not sj.is_file():
                     continue

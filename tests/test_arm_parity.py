@@ -628,3 +628,25 @@ def test_the_source_map_can_never_be_graded_as_a_candidate():
     assert os.path.basename(GDB_CONFIG_HOME).startswith("."), \
         "a visible dir here would be swept up as a candidate blob"
     assert "*" not in _glob.escape(GDB_CONFIG_HOME)
+
+
+def test_a_model_id_with_a_colon_makes_an_openable_path():
+    """ollama ids carry a colon, and Firefox reads it as a protocol.
+
+    The report then cannot be opened by double-click. Only the path is
+    sanitised -- score.json keeps the id verbatim -- and the summary has to
+    build the path the same way or it stops finding the cells.
+    """
+    from pathlib import Path
+    from fbbench.sweep.orchestrator import cell_dir
+
+    d = cell_dir(Path("out"), "avro-03", "fb-agent-qwen3.8:27b", 0)
+    assert ":" not in str(d)
+    assert d == Path("out/avro-03/fb-agent-qwen3.8-27b/seed-0")
+    # unaffected for ordinary ids
+    assert cell_dir(Path("out"), "avro-03", "claude-haiku-4-5", 0) == \
+        Path("out/avro-03/claude-haiku-4-5/seed-0")
+
+    src = inspect.getsource(__import__("fbbench.report.summary",
+                                      fromlist=["x"]))
+    assert "cell_dir(" in src, "the summary builds its own path and will miss cells"
