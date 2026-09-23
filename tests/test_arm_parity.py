@@ -413,3 +413,14 @@ def test_the_resume_loop_runs_with_no_undefined_names():
     assert calls["n"] >= 1
     assert r["terminated"] == "turn_budget"
     assert r["total_usd"] == 0.5, "a single session must not be summed twice"
+
+
+def test_a_cell_records_the_prompt_the_agent_was_actually_sent():
+    """It recorded prompts.system_prompt() while sending that plus the
+    environment line, so the report showed 2504 chars with no mention of gdb
+    while 3107 chars went over the wire. A transcript that does not match the
+    request is worse than no transcript."""
+    src = inspect.getsource(ex)
+    assert '"system_prompt": system_prompt()' not in src
+    assert "system_prompt_sent" in src
+    assert "agent_system_prompt(env_caps)" in src

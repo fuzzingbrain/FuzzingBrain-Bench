@@ -618,6 +618,7 @@ def _read_trace(path: Path) -> list[dict]:
 
 def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
                          bug: str, model: str, opening: str, *,
+                         system_prompt_sent: str = "",
                          score: dict | None = None, usage: dict | None = None,
                          max_turns: int = 0, preserve_pocs: bool = True) -> None:
     """Give an external-agent cell the same paper trail every other arm leaves.
@@ -650,7 +651,7 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
     # every field in the header rendered as zero on a cell that had really spent
     # half an hour and a dollar.
     ev: list[dict] = [{"event": "start", "model": model, "bug_id": bug,
-                       "system_prompt": system_prompt(),
+                       "system_prompt": system_prompt_sent,
                        "initial_user_message": opening,
                        "max_turns": max_turns, "preserve_pocs": preserve_pocs,
                        "tools": sorted({r.get("tool") for r in (recs or [])
@@ -826,7 +827,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
                       image=image,
                       header={"bug_id": bug, "model": label, "max_turns": max_turns,
                               "initial_user_message": opening,
-                              "system_prompt": system_prompt()})
+                              "system_prompt": agent_system_prompt(env_caps)})
         judge.start()
 
         # Every arm is budgeted the same way: a turn cap and a wall clock, and
@@ -1000,8 +1001,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # Only now can the report render: its header is read straight out of
         # existed -- which is why every external cell read "0 turns used,
         # $0.0000, duration 0.0s" over a real half-hour run.
-        _write_run_artifacts(cell_dir, ws, log, judge, bug, model,
-                             opening, score=score, usage=usage,
+        _write_run_artifacts(cell_dir, ws, log, judge, bug, model, opening,
+                             system_prompt_sent=agent_system_prompt(env_caps),
+                             score=score, usage=usage,
                              max_turns=max_turns, preserve_pocs=preserve_pocs)
         if interrupted:
             # The cell is on disk now; let the interrupt do its job.
