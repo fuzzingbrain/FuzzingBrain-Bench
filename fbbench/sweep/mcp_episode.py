@@ -21,6 +21,8 @@ import subprocess
 import threading
 from pathlib import Path
 
+from fbbench.images import pull_policy
+
 
 # ------------------------------------------------------------- the tool set
 # What the mcp-server inside every challenge image advertises, and therefore

@@ -372,10 +372,12 @@ def test_both_arms_are_told_where_the_copy_is():
 
 
 def test_a_published_image_is_always_refetched_and_a_local_one_is_not():
-    """A stale cached :latest must never grade a run, and a locally built
-    image has nowhere to be fetched from -- --pull=always would fail the cell
-    before it started."""
+    """A stale cached :latest must never grade a run, and an image that lives
+    only on this machine has nowhere to be fetched from -- --pull=always would
+    fail the cell before it started. Both published sets are registry
+    references and are always re-fetched."""
     from fbbench import images
     assert images.pull_policy(images.challenge_image("x-01")) == "always"
-    assert images.pull_policy(images.agent_image("x-01")) == "missing"
+    assert images.pull_policy(images.agent_image("x-01")) == "always"
+    assert images.pull_policy("fbbench-agent/x-01:latest") == "missing"
     assert "pull_policy" in inspect.getsource(mcp_episode._start_episode_server)

@@ -3,7 +3,7 @@
 Two sets, one per arm kind:
 
     docker.io/osanzas/fbbench-challenge-<alias>:latest   the api arm
-    fbbench-agent/<alias>:latest                         the agent arms
+    docker.io/osanzas/fbbench-agent-<alias>:latest       the agent arms
 
 Same challenge in both -- same source, same harness, same prebuilt binary, byte
 for byte, so a golden PoC produces the same signature either way. The agent set
@@ -19,7 +19,8 @@ import os
 import subprocess
 
 DEFAULT_IMAGE_PREFIX = "docker.io/osanzas/fbbench-challenge-"
-AGENT_IMAGE_PREFIX = os.environ.get("FBBENCH_AGENT_IMAGE_PREFIX", "fbbench-agent/")
+AGENT_IMAGE_PREFIX = os.environ.get(
+    "FBBENCH_AGENT_IMAGE_PREFIX", "docker.io/osanzas/fbbench-agent-")
 DEFAULT_IMAGE_TAG = "latest"
 
 
