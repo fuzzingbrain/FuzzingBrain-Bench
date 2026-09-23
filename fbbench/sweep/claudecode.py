@@ -63,7 +63,8 @@ MAX_RESUMES = 30  # parity with the Codex arm's resume cap
 from fbbench.images import agent_image, image_digest
 from fbbench.sweep.external import agent_opening, agent_system_prompt
 from fbbench.sweep.mcp_episode import (
-    BENCH_TOOL_NAMES, agent_tools_note, fetch_setup, probe_environment)
+    BENCH_TOOL_NAMES, agent_tools_note, fetch_setup, install_gdb_source_map,
+    probe_environment)
 
 # The only tools the agent may call: the bench MCP tools, named from the one
 # list every arm shares. Everything else is a host-side cheat/contamination
@@ -165,6 +166,10 @@ def stage_claude_env(
             "args": [relay_path, sock_path]}}}, f)
     setup_resp = fetch_setup(sock_path)
     env_caps = probe_environment(sock_path)
+    # gdb can only show source once the build paths are mapped onto the
+    # staged copy; harmless when the image ships no gdb.
+    if env_caps.get("gdb"):
+        install_gdb_source_map(sock_path, env_caps.get("target", ""))
     return image, root, work, mcp_cfg, (server, srv_sock, candidates,
                                         setup_resp, env_caps)
 

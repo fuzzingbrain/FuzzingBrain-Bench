@@ -62,7 +62,7 @@ from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
     fetch_setup, probe_environment,
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
-    agent_tools_note, with_agent_tools)
+    agent_tools_note, install_gdb_source_map, with_agent_tools)
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets: the api arm's opening, verbatim.
@@ -821,6 +821,10 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         setup_resp = fetch_setup(sock_path)
         # what this container actually offers, rather than what we assume
         env_caps = probe_environment(sock_path)
+        # gdb can only show source once the build paths are mapped onto the
+        # staged copy; harmless when the image ships no gdb.
+        if env_caps.get("gdb"):
+            install_gdb_source_map(sock_path, env_caps.get("target", ""))
         opening = agent_opening(setup_resp, env_caps)
 
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,

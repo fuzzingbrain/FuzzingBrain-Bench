@@ -148,6 +148,63 @@ def probe_environment(sock_path: str, timeout: float = 120.0) -> dict:
     return {"gdb": "GDB=1" in out, "target": ORACLE_HARNESS if "TARGET=1" in out else ""}
 
 
+GDB_CONFIG_HOME = "/workspace/.config"
+GDB_INIT_PATH = GDB_CONFIG_HOME + "/gdb/gdbinit"
+
+
+def _source_roots(out: str) -> list[str]:
+    """The build-time source prefixes named in the binary's own debug info.
+
+    Every path in it is from the machine that compiled the target, e.g.
+    /src/harness/harness.c and /src/avro-asan/lang/c/src/map.c. The first
+    component under /src is what has to be remapped.
+    """
+    roots = []
+    for tok in re.split(r"[,\s]+", out):
+        # only the start of a path counts: .../lang/c/src/map.c contains "/src/"
+        # too, and taking that as a root produced 27 rules where 2 were needed.
+        if not tok.startswith("/src/"):
+            continue
+        parts = tok.split("/")
+        if len(parts) < 4:
+            continue
+        r = "/".join(parts[:3])
+        if r not in roots:
+            roots.append(r)
+    return roots
+
+
+def install_gdb_source_map(sock_path: str, target: str = "",
+                           timeout: float = 180.0) -> list[str]:
+    """Let gdb show source, by mapping the build paths onto the staged copy.
+
+    The debug info points at the build machine -- /src/<project>-<san>/... and
+    /src/harness/... -- none of which exists here, so every stop printed
+    "No such file or directory" instead of the line. The source IS present,
+    under /challenge. Derived from the binary rather than assumed, and each
+    mapping is kept only if it actually resolves a file.
+
+    Returns the rules installed, empty when there is nothing to map.
+    """
+    target = target or ORACLE_HARNESS
+    out = _exec_once(sock_path, f'gdb -batch -ex "file {target}" '
+                                f'-ex "info sources" 2>/dev/null', timeout)
+    rules = []
+    for root in _source_roots(out):
+        for cand in (f"/challenge/{os.path.basename(root)}", "/challenge/src"):
+            probe = _exec_once(sock_path, f"test -d {cand} && echo OK", 30.0)
+            if "OK" in probe:
+                rules.append(f"set substitute-path {root} {cand}")
+                break
+    if not rules:
+        return []
+    body = "\n".join(rules)
+    _exec_once(sock_path,
+               f"mkdir -p {GDB_CONFIG_HOME}/gdb && "
+               f"cat > {GDB_INIT_PATH} <<'FBEOF'\n{body}\nFBEOF", 60.0)
+    return rules
+
+
 def agent_tools_note(env: dict | None = None) -> str:
     """The one line an agent arm's SYSTEM prompt carries and the api arm's does not.
 
@@ -448,6 +505,11 @@ def _start_episode_server(image: str, work: str, root: str,
     proc = subprocess.Popen(
         ["docker", "run", "-i", "--rm", f"--pull={pull_policy(image)}",
          "--security-opt", "seccomp=unconfined",
+         # The image root is read-only, so gdb cannot be given a $HOME/.gdbinit.
+         # /workspace is the one writable path, and gdb 12+ reads
+         # $XDG_CONFIG_HOME/gdb/gdbinit -- that is where install_gdb_source_map
+         # puts the source mapping.
+         "-e", f"XDG_CONFIG_HOME={GDB_CONFIG_HOME}",
          "-v", f"{work}:/workspace", image, "mcp-server"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, bufsize=0)

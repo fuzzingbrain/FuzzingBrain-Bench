@@ -536,3 +536,38 @@ def test_one_response_is_one_turn(tmp_path):
     assert turns[0]["text"] == "thinking out loud"
     assert [c["tool"] for c in turns[0]["calls"]] == ["exec"]
     assert turns[0]["stop"] == "tool_use"
+
+
+def test_gdb_is_given_the_source_the_debug_info_points_at():
+    """Mapping the build paths is what makes gdb able to show a line.
+
+    The debug info names the machine that compiled the target -- /src/harness
+    and /src/<project>-<san> -- and neither exists in the image, so every stop
+    printed "No such file or directory". Only the first component under /src is
+    a root: a path like .../lang/c/src/map.c contains "/src/" too, and treating
+    that as one produced 27 rules where 2 were needed.
+    """
+    from fbbench.sweep.mcp_episode import (GDB_CONFIG_HOME, GDB_INIT_PATH,
+                                           _source_roots, _start_episode_server)
+
+    out = ("/src/harness/harness.c, /usr/lib/llvm-14/include/stddef.h, "
+           "/src/avro-asan/lang/c/src/map.c, /src/avro-asan/lang/c/src/avro/io.h, "
+           "/usr/include/stdio.h")
+    assert _source_roots(out) == ["/src/harness", "/src/avro-asan"]
+    assert _source_roots("") == []
+    assert _source_roots("/usr/include/stdio.h") == []
+    assert _source_roots("/src/x") == []            # no file under it, not a root
+
+    # gdb must be pointed at the one writable path: the image root is read-only,
+    # so $HOME/.gdbinit cannot be written -- only /workspace can.
+    assert GDB_CONFIG_HOME.startswith("/workspace")
+    assert GDB_INIT_PATH == GDB_CONFIG_HOME + "/gdb/gdbinit"
+    src = inspect.getsource(_start_episode_server)
+    assert "XDG_CONFIG_HOME" in src, "gdb would never read the file"
+
+
+def test_both_arms_install_the_source_map():
+    """Neither arm may be the only one whose gdb can show source."""
+    for mod in (ex, cc):
+        src = inspect.getsource(mod)
+        assert "install_gdb_source_map" in src, mod.__name__
