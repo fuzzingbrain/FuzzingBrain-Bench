@@ -262,8 +262,9 @@ def test_both_agent_arms_are_told_about_the_toolbox_in_the_same_words():
     one arm knew it had a debugger and the other had to guess -- and a toolbox
     nobody is told about may as well not be mounted.
     """
-    a, b = ex.agent_opening(), cc.claude_task_prompt()
-    note = mcp_episode.agent_tools_note()
+    caps = {"gdb": True, "target": mcp_episode.ORACLE_HARNESS}
+    a, b = ex.agent_opening(None, caps), cc.claude_task_prompt(None, caps)
+    note = mcp_episode.agent_tools_note(caps)
     assert note and note in a
     expect = a
     for t in mcp_episode.BENCH_TOOL_NAMES:
@@ -285,8 +286,7 @@ def test_the_note_cannot_promise_a_tool_that_is_not_mounted():
     """Generated from what is actually mounted. With the toolbox off both
     agent arms fall back to the api arm's text exactly."""
     from fbbench import prompts
-    assert ex.agent_opening() == (prompts.build_initial_user_message({})
-                                 + mcp_episode.agent_tools_note())
+    assert ex.agent_opening() == prompts.build_initial_user_message({})
 
 
 def test_the_opening_is_built_per_cell_not_at_import():
@@ -296,23 +296,17 @@ def test_the_opening_is_built_per_cell_not_at_import():
     assert "agent_tools_note()" not in src.split("def agent_opening")[0]
 
 
-def test_the_note_does_not_name_the_hidden_oracle_binary():
-    """It did, and the path is refused on some challenges and not others.
-
-    The graded binary lives beside the answer, so the bench hides it: on
-    libxml2-04 and skia-01 even root gets Permission denied, while libavif-01
-    and pdfbox-01 leave it world-executable. A live run spent 2 of 12 turns
-    on the path the note handed it. The note may only say what holds on all 78.
-    """
-    note = mcp_episode.agent_tools_note()
-    # The sealed path must never be handed over: it is mode 700 on about half
-    # the images and a live run burned 2 of 12 turns on it. The note points at
-    # the readable copy instead, which exists on every challenge, so it no
-    # longer has to hedge about what is and is not openable.
-    assert "/opt/fbbench/oracle/binaries/vuln/asan/harness" in note
+def test_the_note_names_the_target_only_when_it_is_readable():
+    """A prompt that promises a path the kernel refuses costs turns: a live run
+    spent 2 of its 12 on exactly that. The line is built from a probe of the
+    running container, so it can only name what is actually there."""
+    caps = {"gdb": True, "target": mcp_episode.ORACLE_HARNESS}
+    assert mcp_episode.ORACLE_HARNESS in mcp_episode.agent_tools_note(caps)
+    assert mcp_episode.ORACLE_HARNESS not in mcp_episode.agent_tools_note({"gdb": True})
+    assert mcp_episode.agent_tools_note({}) == ""
+    assert "gdb" not in mcp_episode.agent_tools_note({"target": mcp_episode.ORACLE_HARNESS})
 
 
-# ------------------------------------------------------ what a run cost
 def test_claude_code_cost_is_not_summed_across_resumes():
     """total_cost_usd is the SESSION's running total, not one turn's cost.
 
@@ -366,10 +360,11 @@ def test_the_episode_server_mounts_nothing_but_the_workspace():
         assert gone not in src
 
 
-def test_both_arms_are_told_where_the_copy_is():
-    note = mcp_episode.agent_tools_note()
-    assert "/opt/fbbench/oracle/binaries/vuln/asan/harness" in note
-    assert "-print_coverage=1" in note
+def test_the_probe_asks_the_container_rather_than_assuming():
+    src = inspect.getsource(mcp_episode.probe_environment)
+    assert "command -v gdb" in src and "test -r" in src
+    for arm in (ex, cc):
+        assert "probe_environment" in inspect.getsource(arm)
 
 
 def test_a_published_image_is_always_refetched_and_a_local_one_is_not():

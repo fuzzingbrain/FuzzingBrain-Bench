@@ -60,7 +60,7 @@ from fbbench.images import agent_image, image_digest
 from fbbench.prompts import build_initial_user_message, system_prompt
 from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
-    fetch_setup,
+    fetch_setup, probe_environment,
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
     agent_tools_note)
 from fbbench.runner.mcp_client import _full_scan_alias
@@ -85,10 +85,11 @@ DEFAULT_OPENING = default_opening()
 """The api arm's first user turn with no per-bug context filled in."""
 
 
-def agent_opening(setup_resp: dict | None = None) -> str:
+def agent_opening(setup_resp: dict | None = None,
+                  env_caps: dict | None = None) -> str:
     """What an agent arm is handed as its first user turn: the api arm's own
-    opening plus the one line naming what this environment additionally has."""
-    return default_opening(setup_resp) + agent_tools_note()
+    opening plus a line naming what this container actually has, probed."""
+    return default_opening(setup_resp) + agent_tools_note(env_caps)
 
 
 # --------------------------------------------------------------- the manifest
@@ -809,7 +810,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # to be up before the opening exists -- and therefore before the
         # transcript header that records it.
         setup_resp = fetch_setup(sock_path)
-        opening = agent_opening(setup_resp)
+        # what this container actually offers, rather than what we assume
+        env_caps = probe_environment(sock_path)
+        opening = agent_opening(setup_resp, env_caps)
 
         judge = Judge(ws, Path(real), cell_dir=cell_dir, preserve_pocs=preserve_pocs,
                       image=image,
