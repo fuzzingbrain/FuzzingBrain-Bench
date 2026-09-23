@@ -255,21 +255,27 @@ def test_the_shared_tool_list_matches_what_a_live_server_advertises():
 
 
 # ------------------------------------------------- knowing the tools exist
-def test_both_agent_arms_are_told_about_the_toolbox_in_the_same_words():
-    """An asymmetry in information is the same unfairness as one in tools.
+def test_both_agent_arms_are_told_about_the_environment_in_the_same_words():
+    """One sentence, in the system prompt, identical for both arms -- and the
+    only difference between what an agent is told and what the baseline is told.
 
-    fb-agent's own config described gdb while claudecode was told nothing, so
-    one arm knew it had a debugger and the other had to guess -- and a toolbox
-    nobody is told about may as well not be mounted.
+    An asymmetry in information is the same unfairness as one in tools: one arm
+    knowing it has a debugger while the other has to guess is not a comparison.
     """
     caps = {"gdb": True, "target": mcp_episode.ORACLE_HARNESS}
-    a, b = ex.agent_opening(None, caps), cc.claude_task_prompt(None, caps)
     note = mcp_episode.agent_tools_note(caps)
-    assert note and note in a
-    expect = a
-    for t in mcp_episode.BENCH_TOOL_NAMES:
-        expect = expect.replace(f"{t}()", f"mcp__bench__{t}()")
-    assert b == expect, "the arms differ by more than the forced tool prefix"
+    assert note and note.count("\n\n") == 1, "one appended paragraph, not a section"
+    # the system prompt is the api arm's, verbatim, plus exactly that
+    from fbbench.prompts import build_initial_user_message, system_prompt
+    assert ex.agent_system_prompt(caps) == system_prompt() + note
+    # and the user turn is the api arm's, untouched
+    assert ex.agent_opening() == build_initial_user_message({})
+    # claudecode passes the same string, differing only by the forced prefix
+    sp = ex.agent_system_prompt(caps)
+    assert "--append-system-prompt" in inspect.getsource(cc)
+    assert "agent_system_prompt" in inspect.getsource(cc)
+    undone = cc.claude_task_prompt(None, caps).replace("mcp__bench__", "")
+    assert undone == build_initial_user_message({})
 
 
 def test_the_toolbox_line_never_reaches_the_api_arm():

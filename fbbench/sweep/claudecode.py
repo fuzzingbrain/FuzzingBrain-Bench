@@ -61,7 +61,7 @@ MODEL_DEFAULT = "sonnet"
 MAX_RESUMES = 30  # parity with the Codex arm's resume cap
 
 from fbbench.images import agent_image, image_digest
-from fbbench.sweep.external import agent_opening
+from fbbench.sweep.external import agent_opening, agent_system_prompt
 from fbbench.sweep.mcp_episode import (
     BENCH_TOOL_NAMES, agent_tools_note, fetch_setup, probe_environment)
 
@@ -170,6 +170,7 @@ def stage_claude_env(
 
 
 def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
+               system_prompt_for_run: str = "",
                resume_session: str | None = None) -> list[str]:
     """The hardened `claude -p` argv (see module docstring for the threat model)."""
     cmd = ["claude", "-p", prompt,
@@ -182,7 +183,7 @@ def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
            # Code's own: its default system prompt carries the instructions its
            # harness depends on, and overriding that changes the agent rather
            # than equalising the brief.
-           "--append-system-prompt", system_prompt(),
+           "--append-system-prompt", system_prompt_for_run,
            "--permission-mode", "default",
            "--setting-sources", "project",
            "--max-turns", str(max_turns)]
@@ -387,7 +388,9 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             if remaining <= 0:
                 terminated = "turn_budget"
                 break
-            argv = claude_cmd(prompt, mcp_cfg, model, remaining, resume_session=resume)
+            argv = claude_cmd(prompt, mcp_cfg, model, remaining,
+                              agent_system_prompt(env_caps),
+                              resume_session=resume)
             st = _run_claude_once(argv, lf, deadline, work, snap_dir, env)
             turns += st["turns"]
             grade_calls += st["grade_calls"]

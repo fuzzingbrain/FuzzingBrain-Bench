@@ -85,11 +85,16 @@ DEFAULT_OPENING = default_opening()
 """The api arm's first user turn with no per-bug context filled in."""
 
 
+def agent_system_prompt(env_caps: dict | None = None) -> str:
+    """The api arm's system prompt, plus the one line about this environment."""
+    return system_prompt() + agent_tools_note(env_caps)
+
+
 def agent_opening(setup_resp: dict | None = None,
                   env_caps: dict | None = None) -> str:
-    """What an agent arm is handed as its first user turn: the api arm's own
-    opening plus a line naming what this container actually has, probed."""
-    return default_opening(setup_resp) + agent_tools_note(env_caps)
+    """The api arm's first user turn, unchanged. What this environment adds is
+    named in the system prompt instead -- see agent_system_prompt()."""
+    return default_opening(setup_resp)
 
 
 # --------------------------------------------------------------- the manifest
@@ -855,7 +860,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         # The api arm's SYSTEM prompt, in the system slot rather than folded
         # into the first user turn. An agent that ignores it is no worse off
         # than before; one that reads it now matches the baseline's structure.
-        env["FBBENCH_SYSTEM_PROMPT"] = system_prompt()
+        env["FBBENCH_SYSTEM_PROMPT"] = agent_system_prompt(env_caps)
         env["FBBENCH_MCP_RELAY"] = relay_path
         if api_key:
             env["ANTHROPIC_API_KEY"] = api_key
