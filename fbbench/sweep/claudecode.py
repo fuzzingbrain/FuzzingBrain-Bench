@@ -471,17 +471,38 @@ def _write_exchange(log_path: str, out_path: Path, *, system_prompt: str,
     out: list[dict] = []
     model_name = ""
     emitted = 0          # messages already written out in an earlier record
+    turn = 0
+    seen_msg: dict[str, int] = {}     # message.id -> index in `out`
     for r in recs:
         t, msg = r.get("type"), r.get("message") or {}
         if t == "assistant":
             model_name = msg.get("model") or model_name
+            # One response is split across several stream events sharing a
+            # message.id -- and is one API call. Fold them, the way
+            # _stream_to_transcript numbers turns, so a record is a call.
+            mid = msg.get("id")
+            if mid is not None and mid in seen_msg:
+                prev = out[seen_msg[mid]]
+                blocks = (prev["response"]["choices"][0]["message"]["content"] or [])
+                prev["response"]["choices"][0]["message"]["content"] = (
+                    list(blocks) + list(msg.get("content") or []))
+                if msg.get("stop_reason"):
+                    prev["response"]["choices"][0]["finish_reason"] = msg["stop_reason"]
+                if msg.get("usage"):
+                    prev["response"]["usage"] = msg["usage"]
+                history[-1]["content"] = prev["response"]["choices"][0]["message"]["content"]
+                continue
+            turn += 1
             # Each call posts `history` in full. Writing all of it every time
             # turns a 1 MB log into tens of MB of the same text; the appended
             # messages plus the count reconstruct the array exactly.
             appended = history[emitted:]
             emitted = len(history)
+            if mid is not None:
+                seen_msg[mid] = len(out)
             out.append({
                 "t": r.get("timestamp"),
+                "turn": turn,
                 "model": model_name,
                 "source": "reconstructed",
                 "request": {"message_count": len(history),

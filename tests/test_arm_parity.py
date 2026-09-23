@@ -438,17 +438,18 @@ def test_the_claudecode_cell_records_what_it_sent_too():
     assert '"system_prompt_sent": agent_system_prompt(env_caps)' in src
 
 
-def test_both_arms_render_the_model_exchange(tmp_path):
-    """The report must show the exchange, not just a rendering of it.
+def test_both_arms_render_the_model_exchange_inside_each_turn(tmp_path):
+    """The exchange belongs in the turn it produced, not in a separate section.
 
     fbagent records the full messages array it posted; the claudecode CLI never
     exposes one, so that arm writes the appended messages plus a running count.
-    Both shapes have to reach the report, and neither may repeat the shared
-    prefix once per call -- that is what turned a 1 MB log into a 36 MB page.
+    Both shapes have to reach the turn, and neither may repeat the prefix every
+    call -- that is what made this page 36 MB.
     """
-    from fbbench.runner.report import _exchange_html
+    from fbbench.runner.report import (_load_exchange, _exchange_by_turn,
+                                       _conversation_html)
 
-    assert _exchange_html(tmp_path) == ""          # no log, no section
+    assert _load_exchange(tmp_path) == []          # no log, nothing to attach
 
     full = {"model": "m", "request": {"messages": [
         {"role": "system", "content": "SYSPROMPT"},
@@ -464,24 +465,47 @@ def test_both_arms_render_the_model_exchange(tmp_path):
                                               "content": "SECOND REPLY"}}]}}
     (tmp_path / "exchange.jsonl").write_text(
         json.dumps(full) + "\n" + json.dumps(grown) + "\n")
-    html = _exchange_html(tmp_path)
-    for must in ("SYSPROMPT", "OPENING", "SECOND TURN", "FIRST REPLY",
-                 "SECOND REPLY", "4 messages sent"):
-        assert must in html, must
-    # the prefix is rendered once, not again inside request 2
-    assert html.count("SYSPROMPT") == 1
-    assert "2 messages above this point again" in html
+    wire = _exchange_by_turn(_load_exchange(tmp_path))
+    assert sorted(wire) == [1, 2]
 
-    delta = {"model": "m", "source": "reconstructed",
+    turns = [{"turn": 1, "text": "a", "stop": "", "in_tok": 0, "out_tok": 0,
+              "notes": [], "calls": []},
+             {"turn": 2, "text": "b", "stop": "", "in_tok": 0, "out_tok": 0,
+              "notes": [], "calls": []}]
+    html = _conversation_html(turns, "S", "U", wire)
+    for must in ("SYSPROMPT", "OPENING", "SECOND TURN", "FIRST REPLY",
+                 "SECOND REPLY", "4 messages posted", "raw exchange"):
+        assert must in html, must
+    # one block per turn, and the prefix rendered once rather than per call
+    assert html.count('class="wire"') == 2
+    assert html.count("SYSPROMPT") == 1
+    assert "2 messages from the turns above" in html
+
+    delta = {"model": "m", "source": "reconstructed", "turn": 7,
              "request": {"message_count": 3,
                          "messages_appended": [{"role": "user", "content": "DELTA MSG"}]},
              "response": {"choices": [{"message": {"role": "assistant",
                                                    "content": "DELTA REPLY"}}]}}
     (tmp_path / "exchange.jsonl").write_text(json.dumps(delta) + "\n")
-    html = _exchange_html(tmp_path)
+    wire = _exchange_by_turn(_load_exchange(tmp_path))
+    assert sorted(wire) == [7]                     # keyed by its own turn number
+    html = _conversation_html(
+        [{"turn": 7, "text": "", "stop": "", "in_tok": 0, "out_tok": 0,
+          "notes": [], "calls": []}], "S", "U", wire)
     assert "DELTA MSG" in html and "DELTA REPLY" in html
-    assert "3 messages sent" in html
-    assert "accumulated from the streamed messages" in html   # labelled, not claimed
+    assert "3 messages posted" in html
+    assert "request rebuilt from the stream" in html   # labelled, not claimed
+
+
+def test_a_thinking_block_does_not_dump_its_signature(tmp_path):
+    """An empty thinking block carries a page of base64 and no meaning."""
+    from fbbench.runner.report import _msg_text
+
+    out = _msg_text([{"type": "thinking", "thinking": "", "signature": "A" * 400},
+                     {"type": "text", "text": "the actual words"}])
+    assert "A" * 40 not in out
+    assert "the actual words" in out
+    assert "[thinking block, empty]" in out
 
 
 def test_one_response_is_one_turn(tmp_path):

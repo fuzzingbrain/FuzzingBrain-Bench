@@ -241,7 +241,8 @@ def build_conversation(transcript_path: Path) -> tuple[list[dict], str, str]:
     return turns, system_prompt, initial_user
 
 
-def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str) -> str:
+def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str,
+                      wire: dict | None = None) -> str:
     head = ""
     if system_prompt:
         head += (
@@ -279,6 +280,8 @@ def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str)
                 f'<div class="tcall {ccls}"><div class="tc-h"><code>{_esc(c["tool"])}</code>{badge}</div>'
                 f'{arg_det}{res_det}</div>'
             )
+        if wire and t["turn"] in wire:
+            inner.append(_wire_html(wire[t["turn"]]))
         meta = (f'turn {t["turn"]}'
                 + (f' · {t["in_tok"]:,} in / {t["out_tok"]:,} out tok' if (t["in_tok"] or t["out_tok"]) else "")
                 + (f' · stop: {_esc(t["stop"])}' if t["stop"] else ""))
@@ -299,23 +302,31 @@ def _msg_text(content) -> str:
         for b in content:
             if isinstance(b, str):
                 out.append(b)
-            elif isinstance(b, dict):
+            elif not isinstance(b, dict):
+                continue
+            elif b.get("type") == "text":
+                out.append(b.get("text") or "")
+            elif b.get("type") == "thinking":
+                # The signature is a page of base64 carrying no meaning to a
+                # reader; exchange.jsonl keeps the block whole.
+                out.append(b.get("thinking") or "[thinking block, empty]")
+            elif b.get("type") == "tool_use":
+                out.append(f'[calls {b.get("name")}]\n' + json.dumps(
+                    b.get("input"), indent=2, ensure_ascii=False))
+            elif b.get("type") == "tool_result":
+                out.append(_msg_text(b.get("content")))
+            else:
                 out.append(b.get("text") or b.get("content")
                            or json.dumps(b, indent=2, ensure_ascii=False))
-        return "\n".join(out)
+        return "\n".join(x for x in out if x)
     return "" if content is None else json.dumps(content, indent=2, ensure_ascii=False)
 
 
-def _exchange_html(run_dir: Path) -> str:
-    """The verbatim request/response pairs, when the agent recorded them.
-
-    This is the exchange itself, not a rendering of it: every message the agent
-    put on the wire in the order it sent them, and the response object that came
-    back. The Conversation section above is the readable view of the same thing.
-    """
+def _load_exchange(run_dir: Path) -> list[dict]:
+    """The recorded API calls, in order. One record is one call."""
     path = run_dir / "exchange.jsonl"
     if not path.is_file():
-        return ""
+        return []
     recs = []
     for line in path.read_text(errors="replace").splitlines():
         line = line.strip()
@@ -325,78 +336,75 @@ def _exchange_html(run_dir: Path) -> str:
             recs.append(json.loads(line))
         except json.JSONDecodeError:
             continue
-    if not recs:
-        return ""
+    return recs
 
-    blocks = []
-    for i, rec in enumerate(recs, 1):
+
+def _exchange_by_turn(recs: list[dict]) -> dict:
+    """Each call keyed by the turn it produced, with its prefix already peeled.
+
+    A call re-posts the whole conversation, so what is new in it is the tail:
+    either recorded as the appended messages, or found by matching the previous
+    call's array. Rendering the shared prefix per turn would repeat the same
+    text N times over -- it is what made this page 36 MB.
+    """
+    out = {}
+    for i, rec in enumerate(recs):
         req = rec.get("request") or {}
-        resp = rec.get("response") or {}
-        # Every call re-posts the whole conversation. Rendering the shared
-        # prefix once per call would repeat the same text N times over, so show
-        # what this call added and say how much stood above it unchanged.
         if "messages_appended" in req:
             msgs = req.get("messages_appended") or []
             total = req.get("message_count") or len(msgs)
         else:
             full = req.get("messages") or []
-            prev = (recs[i - 2].get("request") or {}).get("messages") or [] if i > 1 else []
+            prev = (recs[i - 1].get("request") or {}).get("messages") or [] if i else []
             k = 0
             while k < len(prev) and k < len(full) and prev[k] == full[k]:
                 k += 1
             msgs, total = full[k:], len(full)
-        carried = total - len(msgs)
-        sent = []
-        for m in msgs:
-            role = str(m.get("role", "?"))
-            body = _msg_text(m.get("content"))
-            tcs = m.get("tool_calls") or []
-            if tcs:
-                body = (body + "\n" if body else "") + json.dumps(
-                    tcs, indent=2, ensure_ascii=False)
-            cls = role if role in ("system", "user", "assistant", "tool") else ""
-            sent.append(f'<div class="xmsg {cls}"><div class="r">{_esc(role)}</div>'
-                        f'<pre>{_block(body)}</pre></div>')
-        got = []
-        for ch in (resp.get("choices") or []):
-            m = ch.get("message") or {}
-            body = _msg_text(m.get("content"))
-            tcs = m.get("tool_calls") or []
-            if tcs:
-                body = (body + "\n" if body else "") + json.dumps(
-                    tcs, indent=2, ensure_ascii=False)
-            fin = ch.get("finish_reason")
-            label = "assistant" + (f" · finish: {fin}" if fin else "")
-            got.append(f'<div class="xmsg assistant"><div class="r">{_esc(label)}</div>'
-                       f'<pre>{_block(body)}</pre></div>')
-        u = resp.get("usage") or {}
-        meta = " · ".join(filter(None, [
-            f'{total} message{"s" if total != 1 else ""} sent',
-            f'{u.get("prompt_tokens"):,} prompt tok' if u.get("prompt_tokens") else "",
-            f'{u.get("completion_tokens"):,} completion tok' if u.get("completion_tokens") else "",
-            _esc(str(rec.get("model") or resp.get("model") or "")),
-        ]))
-        blocks.append(
-            f'<details class="sys"><summary>request {i} — {meta}</summary>'
-            f'<div class="sub" style="margin:8px 0 2px">sent to the model'
-            + (f' — the {carried} message{"s" if carried != 1 else ""} above this '
-               f'point again, then:' if carried > 0 else ':')
-            + '</div>'
-            + (("".join(sent)) or "<div class=muted>—</div>")
-            + '<div class="sub" style="margin:14px 0 2px">returned by the model</div>'
-            + (("".join(got)) or "<div class=muted>—</div>") + '</details>'
-        )
+        turn = rec.get("turn") or (i + 1)
+        out[turn] = (rec, msgs, total, total - len(msgs))
+    return out
+
+
+def _wire_html(entry) -> str:
+    """One turn's call: the messages it added, and the response, verbatim."""
+    rec, msgs, total, carried = entry
+    resp = rec.get("response") or {}
+    sent = []
+    for m in msgs:
+        role = str(m.get("role", "?"))
+        body = _msg_text(m.get("content"))
+        tcs = m.get("tool_calls") or []
+        if tcs:
+            body = (body + "\n" if body else "") + json.dumps(tcs, indent=2, ensure_ascii=False)
+        cls = role if role in ("system", "user", "assistant", "tool") else ""
+        sent.append(f'<div class="xmsg {cls}"><div class="r">{_esc(role)}</div>'
+                    f'<pre>{_block(body)}</pre></div>')
+    got = []
+    for ch in (resp.get("choices") or []):
+        m = ch.get("message") or {}
+        body = _msg_text(m.get("content"))
+        tcs = m.get("tool_calls") or []
+        if tcs:
+            body = (body + "\n" if body else "") + json.dumps(tcs, indent=2, ensure_ascii=False)
+        fin = ch.get("finish_reason")
+        label = "assistant" + (f" · finish: {fin}" if fin else "")
+        got.append(f'<div class="xmsg assistant"><div class="r">{_esc(label)}</div>'
+                   f'<pre>{_block(body)}</pre></div>')
+    u = resp.get("usage") or {}
+    meta = " · ".join(filter(None, [
+        f'{total} message{"s" if total != 1 else ""} posted',
+        f'{u.get("prompt_tokens"):,} prompt tok' if u.get("prompt_tokens") else "",
+        f'{u.get("completion_tokens"):,} completion tok' if u.get("completion_tokens") else "",
+        "request rebuilt from the stream" if rec.get("source") == "reconstructed" else "",
+    ]))
     return (
-        '<h2>Model exchange (verbatim)</h2>\n'
-        f'<div class="sub" style="margin-bottom:6px">{len(recs)} API call'
-        f'{"s" if len(recs) != 1 else ""} recorded exactly as they went over the wire — '
-        'every message the agent sent, in order, and the response object it got back. '
-        + ("The CLI does not expose the array it posts, so request bodies here are "
-           "accumulated from the streamed messages the way the Messages API defines "
-           "them; responses are verbatim. " if any(r.get("source") == "reconstructed"
-                                                   for r in recs) else "")
-        + 'Also on disk as <code>exchange.jsonl</code>.</div>\n'
-        '<div class="xch">' + "".join(blocks) + '</div>\n'
+        f'<details class="wire"><summary>raw exchange — {meta}</summary>'
+        + '<div class="sub" style="margin:8px 0 2px">sent to the model'
+        + (f' — the {carried} message{"s" if carried != 1 else ""} from the turns above, '
+           'then:' if carried > 0 else ':')
+        + '</div>' + (("".join(sent)) or "<div class=muted>—</div>")
+        + '<div class="sub" style="margin:14px 0 2px">returned by the model</div>'
+        + (("".join(got)) or "<div class=muted>—</div>") + '</details>'
     )
 
 
@@ -535,7 +543,9 @@ def build_report_html(run_dir: str | Path) -> str:
     conv_html = ""
     if tpath.is_file():
         conv_turns, system_prompt_full, initial_user = build_conversation(tpath)
-        conv_html = _conversation_html(conv_turns, system_prompt_full, initial_user)
+        conv_html = _conversation_html(
+            conv_turns, system_prompt_full, initial_user,
+            _exchange_by_turn(_load_exchange(run_dir)))
 
     config_html = _config_html(_config_rows(score, None))
 
@@ -560,7 +570,6 @@ def build_report_html(run_dir: str | Path) -> str:
         tool_rows=tool_rows_html or '<tr><td colspan="3" class="muted">no tool calls</td></tr>',
         traj_rows="".join(traj_rows) or '<tr><td colspan="6" class="muted">no trajectory</td></tr>',
         conversation=conv_html,
-        exchange=_exchange_html(run_dir),
         err_card=err_card,
     )
 
@@ -623,7 +632,9 @@ margin-bottom:8px;font-variant-numeric:tabular-nums;}}
 .think{{white-space:pre-wrap;word-break:break-word;color:var(--txt);font-size:.92rem;
 background:var(--card2);border-left:3px solid var(--purple);border-radius:8px;padding:11px 14px;margin:6px 0 12px;}}
 .think.nowords{{color:var(--muted);font-style:italic;border-left-color:var(--line);}}
-.xch{{display:flex;flex-direction:column;gap:14px;margin-top:18px;}}
+details.wire{{margin:10px 0 2px;border:1px solid var(--line);border-radius:10px;
+padding:2px 12px;background:#0d1117;}}
+details.wire>summary{{cursor:pointer;color:var(--muted);font-size:.78rem;padding:7px 0;}}
 .xmsg{{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:#11161f;}}
 .xmsg>.r{{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
 padding:6px 12px;border-bottom:1px solid var(--line);background:#0d1117;text-align:left;}}
@@ -702,12 +713,12 @@ reproducible from these parameters alone.</div>
 <tbody>{traj_rows}</tbody></table>
 
 <h2>Conversation</h2>
-<div class="sub" style="margin-bottom:6px">The full dialogue — the agent's reasoning each turn,
-every tool call with its arguments, and the system's response. Long blocks are collapsed;
-faulting / errored calls are expanded.</div>
+<div class="sub" style="margin-bottom:6px">Every turn: what the model said, every tool
+call with its arguments, and what came back. Each turn also carries <b>raw exchange</b> —
+the messages that call posted and the response object it returned, verbatim. Same data on
+disk as <code>exchange.jsonl</code>.</div>
 {conversation}
 
-{exchange}
 <div class="foot">Generated by FuzzingBrain&nbsp;Bench · the report records the agent's own
 actions only — no reference PoC, expected fault, or crash location is ever included.</div>
 
