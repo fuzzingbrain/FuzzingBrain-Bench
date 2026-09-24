@@ -677,3 +677,19 @@ def test_claudecode_may_end_on_its_own_judgement():
     # the resume cap must not be the budget either
     assert cc.MAX_RESUMES >= 200, (
         f"MAX_RESUMES={cc.MAX_RESUMES} caps a cell below its wall/cost budget")
+
+
+def test_only_submitted_blobs_are_graded():
+    """The prompt's rule: an input never run through the oracle does not count.
+
+    Sweeping the workspace also graded inputs the agent never claimed, and with
+    an hour of budget one agent left 5,581 files behind -- the end-of-run pass
+    then held a worker for hours grading them one at a time.
+    """
+    src = inspect.getsource(cc)
+    i = src.index("blobs = sorted(set(")
+    block = src[i:i + 320]
+    assert "candidates.host_blobs()" in block, "submitted blobs must be graded"
+    assert "_graded_paths(" in block, "blobs recovered from the log must be graded"
+    assert "_candidate_blobs(work)" not in block, \
+        "the workspace sweep grades inputs the agent never submitted"

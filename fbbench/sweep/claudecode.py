@@ -833,12 +833,16 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
                        setup_resp=setup_resp, env_caps=env_caps,
                        auth=auth, api_key=api_key)
         r["max_turns"] = max_turns
-        # What the agent actually ran through run_poc_on_harness, seen live on
-        # the relay. The workspace sweep and the log scrape are kept as a
-        # fallback for a transcript the observer never saw (a resumed session).
+        # What the agent actually ran through run_poc_on_harness: seen live on the
+        # relay, recovered from the log for a session the observer missed, and
+        # snapshotted at the moment of grading.
+        #
+        # The workspace is NOT swept. The prompt's rule is that an input the
+        # agent never ran through the oracle does not count, and with an hour of
+        # budget one agent left 5,581 files behind -- grading them one at a time
+        # held a worker for hours and scored inputs the agent never claimed.
         candidates.close()
         blobs = sorted(set(candidates.host_blobs()
-                           + _candidate_blobs(work)
                            + _graded_paths(r["log_path"], work)
                            + _candidate_blobs(r.get("snap_dir", ""))))
         score = _persist(cell_dir, bug=bug, model=model, real=str(real),
