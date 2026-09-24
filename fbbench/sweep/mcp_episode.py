@@ -161,16 +161,32 @@ def _source_roots(out: str) -> list[str]:
     """
     roots = []
     for tok in re.split(r"[,\s]+", out):
-        # only the start of a path counts: .../lang/c/src/map.c contains "/src/"
-        # too, and taking that as a root produced 27 rules where 2 were needed.
-        if not tok.startswith("/src/"):
+        if not tok.startswith("/"):
             continue
-        parts = tok.split("/")
-        if len(parts) < 4:
+        # Normalise first. Builds record paths through their build dir --
+        # /src/build-asan/../systemd/src/... and /work/build/../../src/hb/... --
+        # and the unnormalised first component is the build dir, not the project.
+        norm = os.path.normpath(tok)
+        if not norm.startswith("/") or norm.startswith(("/usr/", "/opt/")):
             continue
-        r = "/".join(parts[:3])
-        if r not in roots:
-            roots.append(r)
+        nparts = norm.split("/")
+        if len(nparts) < 4:
+            continue
+        project = nparts[2]                  # /src/<project>/... after ".." is gone
+        # gdb matches a rule against the path AS RECORDED, so the rule has to
+        # start with the raw prefix -- /src/build-asan/../systemd, not
+        # /src/systemd. Emit the raw form, and the normalised one when they
+        # differ, since some entries are recorded already clean.
+        raw = tok.split("/")
+        for i, c in enumerate(raw):
+            if c == project:
+                cand = "/".join(raw[:i + 1])
+                if cand and cand not in roots:
+                    roots.append(cand)
+                break
+        n = "/".join(nparts[:3])
+        if n not in roots:
+            roots.append(n)
     return roots
 
 
@@ -196,6 +212,15 @@ def install_gdb_source_map(sock_path: str, target: str = "",
             if "OK" in probe:
                 rules.append(f"set substitute-path {root} {cand}")
                 break
+    # Rules cover the roots we could name. A search list covers the rest: gdb
+    # looks for each file in these directories too. Names with a colon or a
+    # space are dropped -- colon is gdb's separator, and a space ends the list.
+    dirs = _exec_once(sock_path,
+                      "find /challenge/src /challenge/harness -type d 2>/dev/null "
+                      "| grep -v '[: ]' | head -400", 120.0)
+    search = ":".join(d for d in dirs.split("\n") if d.startswith("/challenge"))
+    if search:
+        rules.append(f"set directories {search}")
     if not rules:
         return []
     body = "\n".join(rules)
@@ -206,7 +231,8 @@ def install_gdb_source_map(sock_path: str, target: str = "",
     # 11 never reads this path, and then the agent gets a debugger that cannot
     # show a line while we report that it can. Ask gdb what it loaded.
     shown = _exec_once(sock_path, 'gdb -batch -ex "show substitute-path" 2>&1', 60.0)
-    if not all(r.split()[-2] in shown for r in rules):
+    subs = [r for r in rules if r.startswith("set substitute-path")]
+    if subs and not all(r.split()[-2] in shown for r in subs):
         return []
     return rules
 

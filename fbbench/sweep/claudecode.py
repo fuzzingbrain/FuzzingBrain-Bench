@@ -382,6 +382,9 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     # cap and end a run for money it had not spent.
     cost_by_session: dict = {}
     usd = 0.0
+    usd_eff = 0.0        # the return is outside the loop; a run that never
+                         # reached the first poll must still price at zero
+
     session_id = None
     last_grade_turn = 0
     terminated = "resumes_exhausted"
@@ -407,6 +410,24 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             cw_tok += st["cache_write_tokens"]
             cost_by_session.update(st["usd_by_session"])
             usd = sum(cost_by_session.values())
+            # The CLI reports cost only in its `result` record, which never
+            # arrives on a timed-out or killed session -- so with no turn cap
+            # the dollar cap would never fire and the cell would report $0.
+            # The streamed token counts are always there; price those.
+            usd_eff = usd
+            if not usd_eff:
+                # NOT the streamed counters: the CLI repeats a placeholder
+                # usage on every event, so those are zero. _usage_floor
+                # re-reads the log and sums the per-message usage, which is
+                # how cost.json prices a killed session.
+                from fbbench.models import cost_report as _cr
+                try:
+                    lf.flush()
+                    f = _usage_floor(log_path)
+                    usd_eff = (_cr(model, basis="floor", **f).get("total_usd")
+                               or 0.0) if any(f.values()) else 0.0
+                except Exception:  # noqa: BLE001
+                    usd_eff = 0.0
             if st["grade_calls"]:
                 last_grade_turn = turns
             session_id = st["session_id"] or session_id
@@ -417,7 +438,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             if turns >= max_turns:
                 terminated = "turn_budget"
                 break
-            if usd >= AGENT_USD_CAP:
+            if usd_eff >= AGENT_USD_CAP:
                 terminated = "cost-cap"
                 break
             if st["ended"] == "deadline" or time.time() > deadline:
@@ -437,11 +458,20 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             prompt = nudge
             resume = session_id
 
+    if not usd_eff:
+        from fbbench.models import cost_report as _cr
+        try:
+            f = _usage_floor(log_path)
+            if any(f.values()):
+                usd_eff = _cr(model, basis="floor", **f).get("total_usd") or 0.0
+        except Exception:  # noqa: BLE001
+            pass
     return {"terminated": terminated, "duration_s": time.time() - t0,
             "log_path": log_path, "snap_dir": snap_dir, "turns": turns, "grade_calls": grade_calls,
             "tokens": tokens, "input_tokens": in_tok, "output_tokens": out_tok,
             "cache_read_tokens": cr_tok, "cache_write_tokens": cw_tok,
-            "total_usd": round(usd, 4),
+            "total_usd": round(usd_eff, 4),
+            "vendor_usd": round(usd, 4) or None,
             # what was actually sent, so the cell cannot record something else
             "system_prompt_sent": agent_system_prompt(env_caps),
             "gdb_source_map": (env_caps or {}).get("gdb_source_map") or [],
@@ -747,7 +777,7 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         basis = "floor"
     cost = cost_report(model, basis=basis, **toks)
     cost["model"] = model_label(model)
-    cost["vendor_reported_usd"] = r["total_usd"] or None   # cross-check only
+    cost["vendor_reported_usd"] = r.get("vendor_usd")     # cross-check only
     (cell_dir / "cost.json").write_text(json.dumps(cost, indent=2))
     try:
         _stream_to_transcript(r["log_path"], cell_dir / "transcript.jsonl",
