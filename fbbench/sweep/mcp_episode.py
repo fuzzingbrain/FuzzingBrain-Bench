@@ -331,6 +331,36 @@ AGENT_WALL_CAP_S = 3600        # 1 hour per challenge
 AGENT_USD_CAP = 10.0           # $10 per challenge
 
 
+def _harness_output(result) -> dict | None:
+    """The harness_output payload out of whatever shape the tool result has."""
+    if isinstance(result, str):
+        try: result = json.loads(result)
+        except ValueError: return None
+    if not isinstance(result, dict):
+        return None
+    for probe in (result, result.get("structuredContent") or {}):
+        ho = probe.get("harness_output")
+        if isinstance(ho, dict):
+            return ho
+    for c in (result.get("content") or []):
+        if isinstance(c, dict) and c.get("text"):
+            try: inner = json.loads(c["text"])
+            except ValueError: continue
+            if isinstance(inner, dict) and isinstance(inner.get("harness_output"), dict):
+                return inner["harness_output"]
+    return None
+
+
+def _signature_of(ho: dict):
+    """The scorer's own verdict, or None when it names no fault."""
+    try:
+        from fbbench.grading.signature import signature as _sig
+        s = _sig(ho)
+        return s.canon_sig if s else None
+    except Exception:  # noqa: BLE001
+        return None
+
+
 class CandidateLog:
     """Every candidate an agent grades, preserved as it grades it.
 
@@ -410,16 +440,24 @@ class CandidateLog:
 
     def _record(self, path: str, result) -> None:
         blob = json.dumps(result) if result is not None else ""
-        crashed = ('"crash_novelty"' in blob) or ('"signal": "SIG' in blob)
-        # The sanitizer's SUMMARY line names the fault AND where it happened, so
-        # two different faults stay two rows in the paper trail. Without it every
-        # crash collapsed into one "crash|<unnamed>" row.
-        m = re.search(r"SUMMARY:\s*\w*(?:Sanitizer|libFuzzer):\s*([^\\\"]+)", blob)
-        signature = (m.group(1).strip() if m else None)
+        # Judged the way the scorer judges it, so the live trail cannot disagree
+        # with the score. A bare fatal signal with no sanitizer output used to be
+        # labelled a crash here: the process had died during sanitizer start-up,
+        # the same bytes ran clean on a retry, and the agent was told it had found
+        # something and spent turns resubmitting a phantom.
+        ho = _harness_output(result)
+        sig = _signature_of(ho) if ho else None
+        crashed = bool(sig) or ('"crash_novelty"' in blob)
+        signature = sig
+        note = None
+        if not crashed and ho and str(ho.get("signal") or "").startswith("SIG"):
+            note = "harness died on %s with no sanitizer output; not a fault" % ho["signal"]
         with self._lock:
             n = len(self.entries) + 1
             entry = {"n": n, "path": path, "crashed": crashed,
                      "signature": signature}
+            if note:
+                entry["note"] = note
             self.entries.append(entry)
             if self.dir is None:
                 return

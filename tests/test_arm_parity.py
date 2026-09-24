@@ -693,3 +693,32 @@ def test_only_submitted_blobs_are_graded():
     assert "_graded_paths(" in block, "blobs recovered from the log must be graded"
     assert "_candidate_blobs(work)" not in block, \
         "the workspace sweep grades inputs the agent never submitted"
+
+
+def test_a_bare_fatal_signal_is_not_reported_as_a_crash():
+    """The live trail must judge a candidate the way the scorer judges it.
+
+    A harness that dies during sanitizer start-up produces a signal and no
+    output. The old label called that a crash: the same bytes then ran clean on
+    a retry, the score correctly refused it, but the agent had been told it
+    found something -- 30 such reports across 23 of 76 cells in one sweep, and
+    one agent resubmitted the same phantom three times.
+    """
+    from fbbench.sweep.mcp_episode import _harness_output, _signature_of
+
+    silent = {"harness_output": {"exit_code": -1, "signal": "SIGSEGV",
+                                 "stderr": "", "stdout": ""}}
+    ho = _harness_output(silent)
+    assert ho is not None and _signature_of(ho) is None, \
+        "a bare signal with no sanitizer output must name no fault"
+
+    # a real fault the sanitizer named, with no frames, still counts
+    oom = {"harness_output": {"exit_code": 71, "signal": "", "stderr":
+           "==1==ERROR: libFuzzer: out-of-memory\nSUMMARY: libFuzzer: out-of-memory\n"}}
+    assert _signature_of(_harness_output(oom)) == "out-of-memory|<no-frames>"
+
+    # and the payload is found whatever shape the tool result arrives in
+    inner = json.dumps({"harness_output": silent["harness_output"]})
+    assert _harness_output({"content": [{"text": inner}]}) is not None
+    assert _harness_output({"structuredContent": silent}) is not None
+    assert _harness_output("not json") is None
