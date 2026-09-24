@@ -58,7 +58,11 @@ from fbbench.sweep.codex import (
 
 MAX_TURNS_DEFAULT = 100
 MODEL_DEFAULT = "sonnet"
-MAX_RESUMES = 30  # parity with the Codex arm's resume cap
+# The CLI ends its turn sequence and has to be resumed to carry on, so this is
+# not a budget -- it only has to be high enough that the wall clock or the
+# dollar cap is what stops a cell. At 30 it WAS the budget: with no turn cap,
+# cells ended at ~8 minutes having spent $1.60 of 1h / $10.
+MAX_RESUMES = 400
 
 from fbbench.images import agent_image, image_digest
 from fbbench.sweep.external import agent_opening, agent_system_prompt
