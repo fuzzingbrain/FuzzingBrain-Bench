@@ -42,7 +42,7 @@ def print_models() -> None:
 def main() -> int:
     ap = argparse.ArgumentParser(prog="python -m fbbench.runner",
                                  description="FuzzingBrain Bench episode driver")
-    ap.add_argument("--bug", help="challenge alias (e.g. net-snmp-02)")
+    ap.add_argument("--bug", help="challenge alias")
     ap.add_argument("--model", default="claude-opus-4-8", help="model id (claude*/gpt*/gemini*)")
     ap.add_argument("--max-turns", type=int, default=100,
                     help="turn budget per episode (default 100)")

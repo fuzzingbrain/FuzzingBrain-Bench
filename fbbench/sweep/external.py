@@ -876,7 +876,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         interrupted = False
 
         # below is written only after the agent exits, and the `finally` clause
-        # then rmtree's the workspace. One terminated libpng-01 run lost 236
+        # then rmtree's the workspace. One terminated run lost 236
         # graded candidates and its cost that way. The work is real and already
         # on disk -- the judge graded every blob as it was submitted -- so treat
         # an interrupt like the wall-clock case: fall through, persist the cell,

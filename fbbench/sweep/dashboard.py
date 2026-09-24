@@ -433,7 +433,7 @@ def _preview(static: bool = False) -> None:
     """
     from rich.console import Console
     models = ["claude-opus-4-8", "gemini-2.5-pro", "claude-haiku-4-5"]
-    bugs = ["avro-03", "freerdp-01", "openssl-02", "mongoose-01", "skia-01"]
+    bugs = [f"bug-{i:02d}" for i in range(1, 6)]
     console = Console()
     STATUS.configure(exp="exp-preview", models=models, bugs=bugs, samples=[0],
                      max_turns=30, total=len(models) * len(bugs),

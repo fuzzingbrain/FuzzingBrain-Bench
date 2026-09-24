@@ -125,7 +125,7 @@ def stage_codex_env(real_bug_dir: str, bug: str,
     # Name the temp dir by the NEUTRAL alias, never the descriptive bug_id: Codex's
     # --cd is this host path, so a descriptive name (one that spells out the fault)
     # would leak the bug (the class + where to look) into its working directory.
-    # The alias (e.g. avro-02) reveals nothing — matches the main arm's neutral fullscan
+    # The alias reveals nothing — matches the main arm's neutral fullscan
     # workspace prefix. (`bug` is still used for the result dir, which Codex never sees.)
     root = tempfile.mkdtemp(prefix=f"codex-{alias}-")
     ch = os.path.join(root, "codex_home")
@@ -616,4 +616,4 @@ if __name__ == "__main__":
     # CLI instead of silently doing nothing.
     import sys
     sys.exit("the Codex arm has no standalone CLI.\n"
-             "use:  fb-bench run <bugs> --arm codex   (e.g. fb-bench run avro-03 --arm codex)")
+             "use:  fb-bench run <bugs> --arm codex")

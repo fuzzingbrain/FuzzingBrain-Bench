@@ -122,10 +122,10 @@ _UB_RUNTIME = [
     (re.compile(r"index \d+ out of bounds"), "oob-read"),
 ]
 
-# Java: the exception CLASS only, never the message. graal-01's message contains
+# Java: the exception CLASS only, never the message. A message can contain
 # the entire fuzz input, so a message in the signature would make every input its
-# own "unique bug". `Caused by:` is matched too and the LAST hit wins: graal-01
-# and graaljs-01 both surface as java.lang.RuntimeException at the top, with the
+# own "unique bug". `Caused by:` is matched too and the LAST hit wins: distinct
+# defects can both surface as java.lang.RuntimeException at the top, with the
 # real fault further down the chain.
 _JAVA_EXC = re.compile(r'(?:Exception in thread "[^"]*"|Caused by:)\s+([\w.$]+\.[\w$]+)')
 
@@ -183,7 +183,7 @@ _SYS_LIB = re.compile(
     r"|libgcc_s\.so|ld-linux")
 
 # The C++ standard library, which sits between the interceptor and the code that
-# actually owns the bug: flatbuffers-01 faults through char_traits::length and
+# actually owns the bug: a fault can run through char_traits::length and
 # basic_string::append before reaching flexbuffers::Reference::ToString.
 _STDLIB_HEADER = re.compile(r"/include/c\+\+/|/bits/", re.IGNORECASE)
 
@@ -202,7 +202,7 @@ _STDLIB_HEADER = re.compile(r"/include/c\+\+/|/bits/", re.IGNORECASE)
 # findings. 8 of the 64 golden PoCs signed that way.
 #
 # The other half of the same mistake is a crash whose ONLY frame is the runtime.
-# ghidra-01's harness OOMs in its own malloc at harness.c:19 before it reaches
+# a harness can OOM in its own malloc at harness.c:19 before it reaches
 # the library, so after the driver frames go there is nothing left; that must
 # read <no-frames>, not `main`, or an OOM in the benchmark's own harness is
 # indistinguishable from one in the target.
@@ -216,7 +216,7 @@ _SKIP_FILE = re.compile(r"compiler-rt|/sanitizer|libfuzzer", re.IGNORECASE)
 # NOTE: do NOT filter on the oracle directory or on "/asan/". A statically linked
 # target's own functions live inside the harness binary, so their frames read
 # "vp9_rc_get_svc_params (<oracle>/binaries/vuln/asan/harness+0x3c363f)" — path
-# filtering there drops the entire stack and libvpx-03/04 lose all frames. The
+# filtering there drops the entire stack and some targets lose all frames. The
 # driver is excluded by FUNCTION name (_SKIP_FUNC) instead.
 
 # The Java harness wrapper. Without this every JVM challenge signs as
@@ -282,12 +282,12 @@ def extract_frames(text: str) -> list[dict]:
 # functions. Both halves are load-bearing, and each one alone is wrong:
 #
 #   depth alone — an ordinary crash can sit far down a call chain.
-#   repetition alone — mongoose-02 faults four frames down with
+#   repetition alone — a target can fault four frames down with
 #     mg_mqtt_next_prop appearing twice, because the compiler inlined it into
 #     itself. Treating that as a cycle sorted its frames and merged seven
 #     distinct faults (lines 4121…4155) into one crash.
 #
-# openscreen-01, for contrast, is 66 frames drawn from 3 functions.
+# another, for contrast, is 66 frames drawn from 3 functions.
 RECURSION_MIN_DEPTH = 20
 RECURSION_MAX_DISTINCT = 0.5
 
@@ -425,7 +425,7 @@ def _norm_file(path: str) -> str:
 
         /tmp/fbgrade-f4p96gu7/oracle/binaries/vuln/asan/harness+0xacb92
         /tmp/fbgrade-q2wk1x8p/oracle/binaries/vuln/asan/harness+0xacb92
-        /opt/fbbench/oracle-root/cups-01/binaries/release-asan/harness+0xacb92
+        /opt/fbbench/oracle-root/<alias>/binaries/release-asan/harness+0xacb92
 
     Keeping the directory made crash identity a property of the grading run
     rather than of the crash. It went unnoticed because `sig_text` already cut
@@ -489,7 +489,7 @@ def _frame_keys(frames: list[dict], klass: str,
 
     Which traces those are is decided by the shape of the stack (`cyclic`, from
     _is_cyclic) as well as by the class name. ASan reports a recursion blowup as
-    whatever signal actually killed the process, so openscreen-01 — 66 frames of
+    whatever signal actually killed the process, so a 66-frame stack of
     readValue/readArray alternating — arrives classed `abrt` and the name test
     never fires. It signed three ways from one input shape, depending only on
     where in the cycle the stack ran out. The class test stays for the traces
@@ -498,7 +498,7 @@ def _frame_keys(frames: list[dict], klass: str,
     # Function names only. The identity is the readable joined form, and a name
     # is what stays stable across the rebuilds this benchmark does constantly:
     # bumping a toolchain moves every line number in a file without moving a
-    # single defect. harfbuzz-01 demonstrated exactly that — the same crash,
+    # single defect. That has been observed — the same crash,
     # from the same PoC, signed differently under rustc 1.88 and 1.97 because
     # `slice/mod.rs` had shifted from line 3746 to 4325.
     #
@@ -514,7 +514,7 @@ def _frame_keys(frames: list[dict], klass: str,
     if cyclic:
         # Identify the cycle by the frames that REPEAT. Sorting the top-of-stack
         # window is not enough on its own: which frames are in the window is
-        # itself decided by where the stack ran out, so openscreen-01 still
+        # itself decided by where the stack ran out, so such a stack still
         # signed three ways with the window sorted. What does not move is the set
         # of frames the recursion goes round — and taking only the repeating ones
         # leaves out the entry path below the cycle, which would otherwise win a
@@ -570,7 +570,7 @@ def signature(harness_output: dict) -> Signature | None:
     # and it misfired badly on the ones it did reach. A use-after-free report
     # carries THREE stacks (the fault, the free, the allocation), _all_frames
     # concatenates them, and the callers they share look exactly like recursion:
-    # libxml2-04 faults at xmlIsID and signed as xmlFreeNode|xmlFreeNs|
+    # One target faults at xmlIsID and signed as xmlFreeNode|xmlFreeNs|
     # xmlFreeNsList, naming where the memory was freed rather than the defect.
     # Two unrelated defects freed by the same cleanup function then collapse into
     # one crash, which costs the agent a find.

@@ -32,8 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp_run = sub.add_parser("run", help="run an LLM agent through one or many challenges")
     sp_run.add_argument("bugs", metavar="bugs", nargs="+",
-                        help="which challenge(s): a single alias (avro-03), a comma "
-                             "list (avro-03,jq-01), or 'all'. Whitespace around the "
+                        help="which challenge(s): a single alias, a comma-separated "
+                             "list, or 'all'. Whitespace around the "
                              "commas is fine, quoted or not")
     sp_run.add_argument("--arm", choices=("api", "codex", "claudecode", "external"),
                         default="api",

@@ -27,7 +27,7 @@ def grade_blob(bug_dir: Path, blob: Path, image: str | None = None,
     The blob is copied into the container's workspace, which is the only place
     run_poc_on_harness accepts a candidate from. `docker cp`, not base64 through
     exec(): the encoded text would become an argv entry, and four of the corpus's
-    own reference PoCs are large enough to blow past the argv cap (fwupd-01 is
+    own reference PoCs are large enough to blow past the argv cap (the largest is
     2.1 MB). That failure is silent — the write does not happen and grading then
     reports the candidate missing — so size must not decide what can be graded.
     """

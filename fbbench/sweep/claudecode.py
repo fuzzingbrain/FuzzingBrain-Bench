@@ -310,7 +310,7 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
                     # Snapshot what was graded, NOW. Only the workspace's final
                     # contents are scored at the end, so an agent that reuses one
                     # filename (observed: /workspace/poc.bin graded 8 times in a
-                    # single libpng-01 episode) silently loses every earlier
+                    # single episode) silently loses every earlier
                     # version -- including a crashing one. The longer the budget,
                     # the more often this happens.
                     _snapshot_graded(b.get("input") or {}, work, snap_dir,

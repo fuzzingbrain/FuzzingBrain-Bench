@@ -171,7 +171,7 @@ class MCPClient:
         The obvious way to stage a candidate is to base64 it into an exec()
         command, and that works right up until the blob is big: the encoded text
         becomes an argv entry, and argv is capped. Four of the corpus's own
-        reference PoCs are over 400 KB (fwupd-01 is 2.1 MB), and every one of
+        reference PoCs are over 400 KB, the largest over 2 MB, and every one of
         them failed with "argument list too long" — the write silently did not
         happen and grading then reported the candidate missing. Size must not
         decide whether an input can be graded, so the bytes travel as a file.
