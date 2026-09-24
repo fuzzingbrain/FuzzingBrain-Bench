@@ -275,7 +275,12 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
     st = {"turns": 0, "grade_calls": 0, "tokens": 0, "usd_by_session": {},
           "input_tokens": 0, "output_tokens": 0,
           "cache_read_tokens": 0, "cache_write_tokens": 0,
-          "session_id": None, "ended": "exited"}
+          "session_id": None, "ended": "exited",
+          # The system prompt grants the run an end: say ASSESSMENT COMPLETE
+          # and stop calling tools. Without this the arm resumed anyway, so the
+          # model could never finish -- every claudecode cell on record was cut
+          # off by a cap while every fbagent cell ended on its own judgement.
+          "said_complete": False}
     msg_ids: set = set()
     grade_ids: set = set()
     stop = threading.Event()
@@ -308,6 +313,11 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
                 msg_ids.add(mid)
             st["turns"] = len(msg_ids)
             for b in msg.get("content", []):
+                if b.get("type") == "text":
+                    if "ASSESSMENT COMPLETE" in (b.get("text") or "").upper():
+                        st["said_complete"] = True
+                elif b.get("type") == "tool_use":
+                    st["said_complete"] = False   # a call after the claim: not the end
                 if (b.get("type") == "tool_use"
                         and str(b.get("name", "")).endswith("__run_poc_on_harness")):
                     grade_ids.add(b.get("id"))
@@ -438,6 +448,10 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
 
             if st.get("ended") == "auth_error":
                 terminated = "auth_error"
+                break
+            if st.get("said_complete"):
+                # the same end the fbagent arm gets: the agent's call, not a cap
+                terminated = "done"
                 break
             if turns >= max_turns:
                 terminated = "turn_budget"

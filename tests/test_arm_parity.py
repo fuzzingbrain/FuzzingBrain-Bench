@@ -8,6 +8,7 @@ ratchet -- it fails if any of them comes back.
 import pytest
 import subprocess
 import json
+import re
 import os
 import ast
 import inspect
@@ -650,3 +651,29 @@ def test_a_model_id_with_a_colon_makes_an_openable_path():
     src = inspect.getsource(__import__("fbbench.report.summary",
                                       fromlist=["x"]))
     assert "cell_dir(" in src, "the summary builds its own path and will miss cells"
+
+
+def test_claudecode_may_end_on_its_own_judgement():
+    """Both arms must be able to finish, not only be cut off.
+
+    The system prompt grants the run an end -- say ASSESSMENT COMPLETE and stop
+    calling tools. The CLI ends its turn sequence there and the arm used to
+    resume regardless, so every claudecode cell on record ended at a cap while
+    every fbagent cell ended on the agent's own call. That is not one budget
+    applied to two arms.
+    """
+    src = inspect.getsource(cc)
+    assert '"said_complete"' in src, "no completion signal is tracked"
+    assert "ASSESSMENT COMPLETE" in src, "the prompt's own phrase is not looked for"
+    # the claim has to be revocable: a tool call after it means work continued
+    assert re.search(r'tool_use".*\n\s*st\["said_complete"\] = False', src), \
+        "a tool call after the claim must clear it"
+    # and it has to end the resume loop with the same reason fbagent reports
+    loop = src[src.index("for attempt in range(MAX_RESUMES"):]
+    assert 'st.get("said_complete")' in loop, "the resume loop ignores completion"
+    i = loop.index('st.get("said_complete")')
+    assert 'terminated = "done"' in loop[i:i + 220], "must report the agent's own end"
+
+    # the resume cap must not be the budget either
+    assert cc.MAX_RESUMES >= 200, (
+        f"MAX_RESUMES={cc.MAX_RESUMES} caps a cell below its wall/cost budget")
