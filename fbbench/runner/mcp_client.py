@@ -79,6 +79,30 @@ def _full_scan_alias(real_bug_dir: str) -> str:
     return f"{project}-{idx:02d}"
 
 
+_PULLED: set = set()
+
+
+def _pull_once(image: str, attempts: int = 3) -> None:
+    """Fetch `image` the first time this process needs it, then never again.
+
+    Retried: the failure this replaces was a transient TLS timeout from the
+    registry, and losing a whole cell to one is not acceptable. A pull that
+    still fails is left to `docker run` to report.
+    """
+    if image in _PULLED:
+        return
+    import time as _t
+    for n in range(attempts):
+        r = subprocess.run(["docker", "pull", "-q", image],
+                           capture_output=True, text=True)
+        if r.returncode == 0:
+            _PULLED.add(image)
+            return
+        if n + 1 < attempts:
+            _t.sleep(2 * (n + 1))
+    _PULLED.add(image)      # do not retry per candidate; run will surface it
+
+
 class MCPClient:
     def __init__(self, bug_dir: str, workspace: str, *, image: str):
         # Drive the PUBLIC challenge image's own mcp-server over stdio. The
@@ -99,12 +123,15 @@ class MCPClient:
         self._image = image
         self._cid_dir = tempfile.mkdtemp(prefix="fbcid-")
         self._cidfile = os.path.join(self._cid_dir, "cid")
+        # The image is fetched ONCE per process, not once per container. The
+        # intent below is intact -- a stale <image>:latest would score a run by
+        # rules nobody could see -- but a grading container starts per candidate,
+        # and --pull=always there made a registry request every time: a median
+        # cell grades 30 candidates, so a sweep asked Docker Hub a thousand
+        # times and Hub began refusing with TLS timeouts, failing whole cells.
+        _pull_once(image)
         cmd = ["docker", "run", "-i", "--rm",
-               # Always fetch the latest published image. Without this a stale
-               # locally-cached <image>:latest is reused silently, and a stale
-               # image bakes a stale harness and a stale grader — so a run would
-               # be scored by rules nobody could see from this checkout.
-               "--pull=always",
+               "--pull=missing",
                "--cidfile", self._cidfile,
                "--security-opt", "seccomp=unconfined",
                "-e", "BENCH_GRADE_REVEAL=1"]

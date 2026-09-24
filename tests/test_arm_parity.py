@@ -722,3 +722,39 @@ def test_a_bare_fatal_signal_is_not_reported_as_a_crash():
     assert _harness_output({"content": [{"text": inner}]}) is not None
     assert _harness_output({"structuredContent": silent}) is not None
     assert _harness_output("not json") is None
+
+
+def test_the_grader_does_not_pull_per_candidate():
+    """A grading container starts per candidate; pulling each time throttled us.
+
+    --pull=always there made one registry request per graded blob. A median cell
+    grades 30, so a sweep asked Docker Hub over a thousand times and Hub began
+    refusing with TLS timeouts, failing whole cells mid-run. The image is still
+    fetched once per process, so a stale :latest cannot score a run.
+    """
+    from fbbench.runner import mcp_client as mc
+
+    src = inspect.getsource(mc)
+    assert "--pull=missing" in src, "grading still pulls on every container"
+    assert "_pull_once(image)" in src, "the image is never fetched at all"
+
+    seen = []
+    real = mc.subprocess.run
+
+    class _Ok:
+        returncode = 0; stdout = ""; stderr = ""
+
+    def fake(cmd, *a, **k):
+        if isinstance(cmd, list) and cmd[:2] == ["docker", "pull"]:
+            seen.append(cmd[-1]); return _Ok()
+        return real(cmd, *a, **k)
+
+    mc.subprocess.run = fake
+    try:
+        mc._PULLED.discard("img:latest")
+        for _ in range(5):
+            mc._pull_once("img:latest")
+        assert len(seen) == 1, f"pulled {len(seen)} times, want 1"
+    finally:
+        mc.subprocess.run = real
+        mc._PULLED.discard("img:latest")
