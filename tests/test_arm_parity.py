@@ -758,3 +758,54 @@ def test_the_grader_does_not_pull_per_candidate():
     finally:
         mc.subprocess.run = real
         mc._PULLED.discard("img:latest")
+
+
+def test_gdb_is_given_sanitizer_settings_it_can_debug_with():
+    """Written on every episode, whether or not there is source to map.
+
+    With the sanitizer defaults, LeakSanitizer kills every clean run under gdb
+    ("does not work under ptrace", exit 01) and an ASan report exits instead of
+    raising a signal, so 'bt' says "No stack." even on a real crash."""
+    import fbbench.sweep.mcp_episode as me
+
+    written = []
+
+    def fake_exec(sock, cmd, timeout=0.0):
+        if "cat >" in cmd:
+            written.append(cmd)
+        return ""                       # no sources, no directories to map
+
+    orig = me._exec_once
+    me._exec_once = fake_exec
+    try:
+        assert me.install_gdb_source_map("s") == []
+    finally:
+        me._exec_once = orig
+    assert written, "no gdbinit written when there was no source to map"
+    assert "set environment ASAN_OPTIONS=detect_leaks=0:abort_on_error=1" in written[0]
+
+
+def test_gdb_is_only_offered_for_a_native_target():
+    """The JVM images ship gdb, but their harness is not a binary gdb can load."""
+    import fbbench.sweep.mcp_episode as me
+    orig = me._exec_once
+    try:
+        me._exec_once = lambda s, c, t=0.0: "GDB=1\nTARGET=1\nNATIVE=0\n"
+        assert me.probe_environment("s")["gdb"] is False
+        me._exec_once = lambda s, c, t=0.0: "GDB=1\nTARGET=1\nNATIVE=1\n"
+        assert me.probe_environment("s")["gdb"] is True
+    finally:
+        me._exec_once = orig
+
+
+def test_the_coverage_advice_is_the_form_that_reports_real_counts():
+    import fbbench.sweep.mcp_episode as me
+    note = me.agent_tools_note({"gdb": True, "target": me.ORACLE_HARNESS})
+    assert "-runs=0 -print_coverage=1" in note and "empty directory" in note
+    assert "thread apply all bt" in note
+
+
+def test_agents_are_told_a_silent_death_is_the_host_not_the_input():
+    import fbbench.sweep.mcp_episode as me
+    note = me.agent_tools_note({"gdb": True, "target": me.ORACLE_HARNESS})
+    assert "no output at all" in note and "run it again" in note and "\n" not in note

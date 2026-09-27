@@ -142,14 +142,65 @@ def probe_environment(sock_path: str, timeout: float = 120.0) -> dict:
     kernel refused. `target` is the empty string when the graded build is not
     readable, and the note then says nothing about it.
     """
+    # NATIVE: gdb can only debug a native binary. The JVM challenges ship gdb
+    # too, but their harness is not one ("not in executable format"), and
+    # offering a debugger there sent agents after a tool that cannot work.
     cmd = (f"command -v gdb >/dev/null 2>&1 && echo GDB=1 || echo GDB=0; "
-           f"test -r {ORACLE_HARNESS} && echo TARGET=1 || echo TARGET=0")
+           f"test -r {ORACLE_HARNESS} && echo TARGET=1 || echo TARGET=0; "
+           f"head -c 4 {ORACLE_HARNESS} 2>/dev/null | grep -q ELF "
+           f"&& echo NATIVE=1 || echo NATIVE=0")
     out = _exec_once(sock_path, cmd, timeout)
-    return {"gdb": "GDB=1" in out, "target": ORACLE_HARNESS if "TARGET=1" in out else ""}
+    return {"gdb": "GDB=1" in out and "NATIVE=1" in out,
+            "target": ORACLE_HARNESS if "TARGET=1" in out else ""}
 
 
 GDB_CONFIG_HOME = "/workspace/.config"
 GDB_INIT_PATH = GDB_CONFIG_HOME + "/gdb/gdbinit"
+
+# gdb's defaults are wrong for these binaries, and every agent ran gdb with them.
+# Each line below was verified in the challenge images (ots-01, openldap-02,
+# avro-03, fwupd-03, icu-01) on inputs the grader recorded as crashing.
+#
+#  - LeakSanitizer refuses to run under ptrace, so an input that does NOT crash
+#    ended "LeakSanitizer has encountered a fatal error ... exited with code
+#    01" -- which reads like a crash gdb failed to catch (42 of 204 gdb calls
+#    on record). detect_leaks=0 turns that into an honest "exited normally".
+#  - An ASan or UBSan report ends in exit(), not a signal, so gdb never stopped
+#    and 'bt' said "No stack." even when the input DID crash (verified on
+#    openldap-02's heap-buffer-overflow and dtc-01's misaligned load).
+#    abort_on_error=1 makes the report end in SIGABRT, where gdb stops with the
+#    faulting frame on the stack.
+#  - Address randomisation stays OFF, gdb's default, on purpose. On hosts with
+#    vm.mmap_rnd_bits=32 an ASan binary dies at start-up on a share of launches
+#    with ASLR on (see isPreInitFlake in tools/mcp-server/gradelocal.go); tried
+#    here, "set disable-randomization off" made avro-03 and libpng-01 SEGV in
+#    __sanitizer::internal_mmap before running the input.
+#  - libFuzzer's own deaths -- out-of-memory, a single oversized malloc, a
+#    timeout -- end in _Exit(), which gdb cannot stop on either. Internal
+#    breakpoints on libFuzzer's death paths stop there instead. Internal: they
+#    print nothing at startup and take no breakpoint number, so an agent's first
+#    breakpoint is still #1 and scripts that say "commands 1" still mean theirs.
+#    Not on Fuzzer::HandleMalloc: libFuzzer calls it on EVERY allocation, and a
+#    breakpoint there stopped at its own start-up. PrintStackTrace is only
+#    reached on a death path.
+# Only the debugged process sees any of this; grading runs are untouched.
+GDB_SETTINGS = (
+    "set environment ASAN_OPTIONS=detect_leaks=0:abort_on_error=1",
+    "set environment UBSAN_OPTIONS=halt_on_error=1:abort_on_error=1:print_stacktrace=1",
+    "python",
+    "import gdb",
+    "def _fbbench_libfuzzer_stops(_event):",
+    "    for fn in ('fuzzer::Fuzzer::RssLimitCallback', 'fuzzer::PrintStackTrace',",
+    "               'fuzzer::Fuzzer::AlarmCallback'):",
+    "        try:",
+    "            gdb.parse_and_eval(\"(long)&'\" + fn + \"'\")",
+    "        except gdb.error:",
+    "            continue",
+    "        gdb.Breakpoint(fn, internal=True)",
+    "    gdb.events.new_objfile.disconnect(_fbbench_libfuzzer_stops)",
+    "gdb.events.new_objfile.connect(_fbbench_libfuzzer_stops)",
+    "end",
+)
 
 
 def _source_roots(out: str) -> list[str]:
@@ -221,12 +272,14 @@ def install_gdb_source_map(sock_path: str, target: str = "",
     search = ":".join(d for d in dirs.split("\n") if d.startswith("/challenge"))
     if search:
         rules.append(f"set directories {search}")
-    if not rules:
-        return []
-    body = "\n".join(rules)
+    # Written even when there is no source to map: the settings are what make
+    # gdb usable on these binaries at all.
+    body = "\n".join((*GDB_SETTINGS, *rules))
     _exec_once(sock_path,
                f"mkdir -p {GDB_CONFIG_HOME}/gdb && "
                f"cat > {GDB_INIT_PATH} <<'FBEOF'\n{body}\nFBEOF", 60.0)
+    if not rules:
+        return []
     # Verified, not assumed. Writing the file proves nothing: a gdb older than
     # 11 never reads this path, and then the agent gets a debugger that cannot
     # show a line while we report that it can. Ask gdb what it loaded.
@@ -248,9 +301,27 @@ def agent_tools_note(env: dict | None = None) -> str:
     env = env or {}
     have_gdb, target = bool(env.get("gdb")), env.get("target") or ""
     if have_gdb and target:
+        # The coverage recipe is the one that works: run on a single file,
+        # libFuzzer reports every function UNCOVERED, the entry included, for
+        # an input that plainly ran (verified on ots-01 and openldap-02), and
+        # agents took that at face value. Loaded as a one-file corpus the counts
+        # are real. And an out-of-memory stop is in libFuzzer's watchdog thread,
+        # where a plain 'bt' shows nothing of the target's code. The last
+        # sentence: on hosts with vm.mmap_rnd_bits=32 an ASan binary dies at
+        # start-up, silently, on ~1 launch in 4 (7 of 30 measured here). The
+        # grader retries those (isPreInitFlake); an agent does not know to, and
+        # one spent 38 turns and seven gdb sessions chasing such a "crash".
         return (f"- You also have `gdb` and a readable copy of that binary, at "
                 f"{target}: you may run it, debug it, and ask it which functions "
-                f"an input reached (`-print_coverage=1`).")
+                f"an input reached - copy the input alone into a new empty "
+                f"directory and run the binary on that directory with "
+                f"`-runs=0 -print_coverage=1` (run on the file itself, it reports "
+                f"everything uncovered). Under gdb, sanitizer reports, "
+                f"out-of-memory and timeouts all stop the program; an "
+                f"out-of-memory stop is in libFuzzer's watchdog thread, so read "
+                f"it with `thread apply all bt`. A direct run that dies with no "
+                f"output at all, not even libFuzzer's banner, is a sanitizer "
+                f"start-up failure of this host, not a crash: run it again.")
     if have_gdb:
         return "- You also have `gdb`."
     if target:
