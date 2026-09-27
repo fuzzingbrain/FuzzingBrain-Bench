@@ -54,6 +54,11 @@ CATALOG: list[tuple[str, str, str]] = [
     # localhost:8000. The ":" keeps it on the keyless local path, so it prices
     # at $0. Listed after qwen3:30b-a3b so default_sweep() still picks that one.
     ("qwen3.8:27b",              "ollama",    "flagship"),
+    # The same model as a 4-bit GGUF (unsloth UD-Q4_K_M), served by llama.cpp
+    # on one A100; and Gemma 4 31B QAT W4A16 served by vLLM on one A100. Same
+    # tunnel on localhost:8000, one model at a time.
+    ("qwen3.8:27b-q4",           "ollama",    "flagship"),
+    ("gemma4:31b-qat",           "ollama",    "flagship"),
 ]
 
 SUPPORTED_MODELS = [m for m, _, _ in CATALOG]
@@ -97,6 +102,12 @@ CONTEXT_WINDOWS: dict[str, int] = {
     # The --max-model-len the HPRC vLLM server is started with, not the model's
     # published window: the server rejects anything longer.
     "qwen3.8:27b":              229_376,
+    # Placeholders until the one-A100 servers report what they fit.
+    "qwen3.8:27b-q4":           262_144,
+    # 141,760, not its native 256k: an A100 cannot hold an fp8 KV cache for it
+    # (Triton needs SM89+), and this is vLLM's own maximum for one request in
+    # bf16 on one card at --gpu-memory-utilization 0.95.
+    "gemma4:31b-qat":           141_760,
     "llama3.1:8b":              131_072,
 }
 
