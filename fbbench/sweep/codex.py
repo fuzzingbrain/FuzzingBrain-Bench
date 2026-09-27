@@ -38,6 +38,7 @@ from fbbench.grading import find_bug, grade_blob
 from fbbench.models import cost_usd
 from fbbench.prompts import CODEX_TASK_PROMPT
 from fbbench.runner.mcp_client import _full_scan_alias
+from fbbench.sandbox import sandbox_args
 
 # The raw codex model id written into config.toml. `--arm codex --model X` picks
 # X; omitted -> this default, preserving the historical gpt-5.5 behaviour.
@@ -101,7 +102,7 @@ persistence = "none"
 # ephemeral (--rm) container for post-hoc re-grading.
 [mcp_servers.harness]
 command = "docker"
-args = ["run", "-i", "--rm", "--pull=always", "--security-opt", "seccomp=unconfined", "-v", "{ws}:/workspace", "{image}", "mcp-server"]
+args = ["run", "-i", "--rm", "--pull=always", "--security-opt", "seccomp=unconfined", {sandbox}, "-v", "{ws}:/workspace", "{image}", "mcp-server"]
 tool_timeout_sec = 300
 startup_timeout_sec = 60
 """
@@ -137,7 +138,9 @@ def stage_codex_env(real_bug_dir: str, bug: str,
     if os.path.exists(auth):
         os.symlink(auth, os.path.join(ch, "auth.json"))
     with open(os.path.join(ch, "config.toml"), "w") as f:
-        f.write(_CODEX_CONFIG.format(image=image, ws=work, model=model, login=login))
+        f.write(_CODEX_CONFIG.format(
+            image=image, ws=work, model=model, login=login,
+            sandbox=", ".join(json.dumps(a) for a in sandbox_args())))
     return image, root, work
 
 

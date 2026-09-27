@@ -36,6 +36,7 @@ include = ["fbbench*"]
 
 [tool.setuptools.package-data]
 "fbbench.report" = ["*.html"]
+"fbbench" = ["nofuzz.so", "nofuzz.c"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

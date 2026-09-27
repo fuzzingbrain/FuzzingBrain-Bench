@@ -22,6 +22,7 @@ import threading
 from pathlib import Path
 
 from fbbench.images import pull_policy
+from fbbench.sandbox import NOFUZZ_REFUSED, sandbox_args
 
 
 # ------------------------------------------------------------- the tool set
@@ -455,6 +456,7 @@ class CandidateLog:
         self.entries: list[dict] = []
         self.blocked: list[dict] = []   # fuzzing attempts, refused
         self._pending: dict = {}          # jsonrpc id -> candidate path
+        self._execs: dict = {}            # jsonrpc id -> exec command
         self._out_buf = b""
         self._in_buf = b""
         self._progress = None
@@ -486,7 +488,11 @@ class CandidateLog:
         if msg.get("method") != "tools/call":
             return
         params = msg.get("params") or {}
-        if not str(params.get("name", "")).endswith("run_poc_on_harness"):
+        name = str(params.get("name", ""))
+        if name.endswith("exec") and msg.get("id") is not None:
+            self._execs[msg["id"]] = str((params.get("arguments") or {}).get("cmd", ""))
+            return
+        if not name.endswith("run_poc_on_harness"):
             return
         path = ((params.get("arguments") or {}).get("path") or "")
         if msg.get("id") is not None:
@@ -494,6 +500,14 @@ class CandidateLog:
 
     def _on_response(self, msg: dict) -> None:
         mid = msg.get("id")
+        if mid is not None and mid in self._execs:
+            cmd = self._execs.pop(mid)
+            # The preload's refusal (fbbench.sandbox) happens inside the
+            # container, past the relay's screen; its message is how we see it.
+            if NOFUZZ_REFUSED in json.dumps(msg.get("result")):
+                self.note_blocked(cmd, "started libFuzzer's fuzzing loop "
+                                       "(refused inside the container)")
+            return
         if mid is None or mid not in self._pending:
             return
         path = self._pending.pop(mid)
@@ -651,6 +665,7 @@ def _start_episode_server(image: str, work: str, root: str,
          # $XDG_CONFIG_HOME/gdb/gdbinit -- that is where install_gdb_source_map
          # puts the source mapping.
          "-e", f"XDG_CONFIG_HOME={GDB_CONFIG_HOME}",
+         *sandbox_args(),
          "-v", f"{work}:/workspace", image, "mcp-server"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, bufsize=0)

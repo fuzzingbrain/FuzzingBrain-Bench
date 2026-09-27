@@ -14,6 +14,8 @@ import tempfile
 import threading
 from typing import Any
 
+from fbbench.sandbox import sandbox_args
+
 # Upper bound (seconds) on an exec tool call's timeout_s. A single blocking
 # exec pins the whole episode (the client waits on the server's read), so a
 # model that asks for a multi-hour timeout on a runaway command would stall a
@@ -136,6 +138,7 @@ class MCPClient:
                "--security-opt", "seccomp=unconfined",
                "-e", "BENCH_GRADE_REVEAL=1"]
         cmd += sig_rules_args()
+        cmd += sandbox_args()
         cmd += [image, "mcp-server"]
         bug_dir, workspace = "/src", "/workspace"
         self._proc = subprocess.Popen(
