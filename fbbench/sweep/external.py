@@ -43,6 +43,7 @@ from __future__ import annotations
 
 import json
 import os
+import queue
 import shlex
 import re
 import shutil
@@ -708,6 +709,51 @@ def _write_run_artifacts(cell_dir: Path, ws: Path, log: str, judge: "Judge",
         print(f"  note: report.html skipped: {e}", flush=True)
 
 
+# Several copies of a self-hosted model, one episode each. A server that holds
+# one conversation at a time (llama.cpp with its full context in one slot, or
+# one vLLM replica per GPU) cannot take a second episode without both getting
+# slower, and an episode moved between servers loses the server's cached
+# conversation and re-reads it every turn. So each cell takes a free endpoint
+# for its whole episode and hands it back when the agent exits; with more jobs
+# than endpoints, a cell waits for one -- before its clock starts.
+#
+#   FBBENCH_AGENT_ENDPOINTS=http://localhost:8000/v1,http://localhost:8001/v1
+#
+# The agent is handed its endpoint as FB_AGENT_API_BASE. Unset: nothing changes.
+AGENT_ENDPOINTS_ENV = "FBBENCH_AGENT_ENDPOINTS"
+_endpoint_lock = threading.Lock()
+_endpoint_pools: dict[str, "queue.Queue[str]"] = {}
+
+
+def _endpoint_pool() -> "queue.Queue[str] | None":
+    """The shared pool for the endpoints in the environment, or None."""
+    spec = os.environ.get(AGENT_ENDPOINTS_ENV, "").strip()
+    if not spec:
+        return None
+    with _endpoint_lock:
+        pool = _endpoint_pools.get(spec)
+        if pool is None:
+            pool = queue.Queue()
+            for e in (x.strip() for x in spec.split(",")):
+                if e:
+                    pool.put(e)
+            _endpoint_pools[spec] = pool
+        return pool
+
+
+class _Endpoint:
+    """One endpoint held by one cell; release() is safe to call twice."""
+
+    def __init__(self):
+        self._pool = _endpoint_pool()
+        self.url = self._pool.get() if self._pool is not None else None
+
+    def release(self) -> None:
+        if self._pool is not None and self.url is not None:
+            self._pool.put(self.url)
+            self._pool = None
+
+
 def _kill_pg(proc: subprocess.Popen) -> None:
     """SIGKILL the child's whole process group, falling back to the child."""
     try:
@@ -806,6 +852,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
     ws = root / "workspace"
     ws.mkdir(parents=True, exist_ok=True)
     server = None
+    endpoint = None
     try:
 
         # The SAME per-episode mcp-server every other agent arm drives. The
@@ -871,6 +918,12 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         if api_key:
             env["ANTHROPIC_API_KEY"] = api_key
 
+        # Waits here, clock not yet running, until a server is free.
+        endpoint = _Endpoint()
+        if endpoint.url:
+            env["FB_AGENT_API_BASE"] = endpoint.url
+        agent_endpoint = endpoint.url
+
         started = time.time()
         terminated = "done"
         interrupted = False
@@ -904,6 +957,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             log = agent_log.read_text(errors="replace") if agent_log.is_file() else ""
             interrupted = True
         finally:
+            # The agent is done with the model; the re-check below does not
+            # need it, so the next cell can start on this server now.
+            endpoint.release()
             if prev_term is not None:
                 try:
                     signal.signal(signal.SIGTERM, prev_term)
@@ -986,6 +1042,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             # against gdb, not assumed from having written the file.
             "gdb_source_map": env_caps.get("gdb_source_map") or [],
             "network": "allowed" if manifest.allow_network else "blocked",
+            # Which model server this episode used, when several are pooled.
+            "agent_endpoint": agent_endpoint,
             "sandbox": sandbox_kind,
             "tokens_used": (usage.get("input_tokens", 0)
                             + usage.get("output_tokens", 0)) or None,
@@ -1019,6 +1077,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             raise KeyboardInterrupt
         return score
     finally:
+        if endpoint is not None:     # a failure before the agent ran
+            endpoint.release()
         if server is not None:
             try:
                 server.terminate()
