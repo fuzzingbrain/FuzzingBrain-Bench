@@ -63,7 +63,10 @@ KEEP_FRAMES = 4
 #      three function names — instead of a sha256 over (func, file, line)
 #      triples. Signatures from 3 and 4 are not comparable: the key changed
 #      shape, not just content.
-SIG_VERSION = 4
+#   5: resource exhaustion signs by the code that consumed the resource, not
+#      by where it ran out: a stack overflow by the functions its recursion
+#      repeats (_cycle_keys), a JVM OutOfMemoryError by its class alone.
+SIG_VERSION = 5
 
 # Signature text is display-only, so it can be cut. C++ templates demangle to
 # hundreds of characters and would otherwise dominate. The KEY is never cut —
@@ -130,8 +133,20 @@ _UB_RUNTIME = [
 _JAVA_EXC = re.compile(r'(?:Exception in thread "[^"]*"|Caused by:)\s+([\w.$]+\.[\w$]+)')
 
 # Recursion blows the stack at an arbitrary point in the cycle, so the frame
-# ORDER is not stable for these — see `_frame_keys`.
-_STACK_EXHAUSTION = {"stack-overflow", "stack-exhaustion"}
+# ORDER is not stable for these — see `_cycle_keys`. The JVM's own name for the
+# same fault is on the list too: it recurses exactly like native code does.
+_STACK_EXHAUSTION = {"stack-overflow", "stack-exhaustion", "java.lang.stackoverflowerror"}
+
+# Running out of heap is the other resource fault whose location is incidental,
+# and on the JVM nothing about the location is stable: the same bytes ran out in
+# JSONArray.put in one round and XMLTokener.nextContent in the next, and with a
+# large input sometimes while the harness was still reading the file, before
+# the library ran at all -- a trace with no application frame. The Qwen run's
+# json-java-01 had 12 of 23 such inputs rejected as flaky_location. So a JVM
+# OutOfMemoryError is identified by its class alone: one out-of-memory finding
+# per challenge, the same granularity libFuzzer's own out-of-memory (which
+# carries no stack) already has.
+_HEAP_EXHAUSTION = {"java.lang.outofmemoryerror"}
 
 
 def crash_class(text: str) -> str | None:
@@ -224,7 +239,7 @@ _SKIP_FILE = re.compile(r"compiler-rt|/sanitizer|libfuzzer", re.IGNORECASE)
 _SKIP_JAVA = re.compile(r"Harness|PocRunner|Fuzzer\.|fuzzerTestOneInput|jazzer", re.IGNORECASE)
 
 
-def _native_frames(text: str) -> list[dict]:
+def _native_frames(text: str, collapse: bool = True) -> list[dict]:
     out: list[dict] = []
     for line in text.splitlines():
         m = _FRAME.search(line) or _FRAME_NO_SRC.search(line)
@@ -244,12 +259,13 @@ def _native_frames(text: str) -> list[dict]:
         frame = {"func": func, "file": file, "line": int(line_no) if line_no else None}
         # Collapse consecutive repeats: a recursive cycle is hundreds of frames
         # of the same function and would otherwise fill TOP_FRAMES by itself.
-        if not out or (out[-1]["func"], out[-1]["file"]) != (func, file):
+        # _cycle_keys asks for them uncollapsed: to it, the repeats ARE the fault.
+        if not collapse or not out or (out[-1]["func"], out[-1]["file"]) != (func, file):
             out.append(frame)
     return out
 
 
-def _java_frames(text: str) -> list[dict]:
+def _java_frames(text: str, collapse: bool = True) -> list[dict]:
     out: list[dict] = []
     for line in text.splitlines():
         m = _JAVA_FRAME.search(line)
@@ -259,18 +275,18 @@ def _java_frames(text: str) -> list[dict]:
         if _SKIP_JAVA.search(func) or _SKIP_JAVA.search(file):
             continue
         line_no = m.groupdict().get("line")
-        if not out or (out[-1]["func"], out[-1]["file"]) != (func, file):
+        if not collapse or not out or (out[-1]["func"], out[-1]["file"]) != (func, file):
             out.append({"func": func, "file": file, "line": int(line_no) if line_no else None})
     return out
 
 
-def _all_frames(text: str) -> list[dict]:
+def _all_frames(text: str, collapse: bool = True) -> list[dict]:
     """Every application frame, top first, uncapped.
 
     Native frames win when both kinds are present: a JVM challenge that also
     prints a native trace crashed in native code.
     """
-    return _native_frames(text) or _java_frames(text)
+    return _native_frames(text, collapse) or _java_frames(text, collapse)
 
 
 def extract_frames(text: str) -> list[dict]:
@@ -529,6 +545,37 @@ def _frame_keys(frames: list[dict], klass: str,
     return keys[:TOP_FRAMES]
 
 
+def _cycle_keys(frames: list[dict]) -> list[tuple[str]]:
+    """The keys of a blown stack: the functions its recursion goes round.
+
+    A stack overflow's top frames are wherever the guard page fell, so the same
+    input signs differently from one run to the next, and the grader's
+    three-round check then rejects a crash that reproduced every time as
+    `flaky_location`. In the 77-challenge Qwen run that happened to 68
+    submissions across 10 challenges; where the rounds did agree, one recursion
+    was counted up to four times over (icu-01).
+
+    What is the same in every run is the SET of functions the cycle goes
+    round. It is read from the whole trace, not a top-of-stack window, and
+    only from functions that appear more than once in it, so neither the frame
+    the stack ran out in nor the entry path below the cycle takes part. The
+    trace has to arrive uncollapsed: a function that recurses into itself
+    (opencv-01's parseValue, 245 frames in a row) is one entry once
+    consecutive repeats are merged, and would not count as repeating at all.
+
+    Only called for stack-exhaustion classes, whose report carries one stack.
+    That is what keeps it clear of the misfire that retired the shape-based
+    cycle rule: a use-after-free report concatenates three stacks, and their
+    shared callers looked like recursion.
+    """
+    names = [_key_part(f) for f in frames]
+    counts: dict[str, int] = {}
+    for n in names:
+        counts[n] = counts.get(n, 0) + 1
+    repeated = sorted(n for n, c in counts.items() if c > 1)
+    return [(n,) for n in (repeated or sorted(counts))][:TOP_FRAMES]
+
+
 # --------------------------------------------------------------------------
 # Signature
 # --------------------------------------------------------------------------
@@ -578,7 +625,17 @@ def signature(harness_output: dict) -> Signature | None:
     # It also made `frames` and `canon_sig` disagree: the stored frames were the
     # fault stack while the identity came from somewhere else in the report.
     # They are now the same list.
-    keys = _frame_keys(frames, klass, cyclic=False)
+    #
+    # Resource exhaustion is the exception, because for it the top of the stack
+    # is where the resource ran out rather than where the fault is: see
+    # `_cycle_keys` and `_HEAP_EXHAUSTION`. Both key off the CLASS the sanitizer
+    # or the JVM reported, never off the stack's shape.
+    if klass in _STACK_EXHAUSTION:
+        keys = _cycle_keys(_all_frames(text, collapse=False))
+    elif klass in _HEAP_EXHAUSTION:
+        keys = []                        # the class alone; see _HEAP_EXHAUSTION
+    else:
+        keys = _frame_keys(frames, klass, cyclic=False)
 
     # The identity IS the joined string — "class|f1|f2|f3" — not a digest over
     # it. A reader can see which crash a run found without a lookup, which is

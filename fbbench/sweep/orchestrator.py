@@ -230,6 +230,32 @@ def _write_summary(out: Path, models: list[str], bugs: list[str], seeds: list[in
         print(f"  (summary generation skipped: {e})")
 
 
+def _run_images(arm: str, bugs: list[str], image_prefix: str | None) -> list[str]:
+    """The images a run of `arm` over `bugs` starts containers from.
+
+    Every arm grades its candidates at the end in the challenge image
+    (grading.grader), so that set is always needed. The agent arms work in the
+    agent image set, and codex in its own prefix's challenge images.
+    """
+    from fbbench.grading import find_bug
+    from fbbench.images import DEFAULT_IMAGE_PREFIX, agent_image, challenge_image
+    from fbbench.runner.mcp_client import _full_scan_alias
+    images = []
+    for b in bugs:
+        real = find_bug(b)
+        alias = _full_scan_alias(str(real)) if real else b
+        if arm == "api":
+            images.append(challenge_image(alias, image_prefix or DEFAULT_IMAGE_PREFIX))
+            continue
+        images.append(challenge_image(alias))
+        if arm in ("external", "claudecode"):
+            images.append(agent_image(alias))
+        elif arm == "codex":
+            from fbbench.sweep.codex import IMAGE_PREFIX
+            images.append(f"{IMAGE_PREFIX}{alias}")
+    return images
+
+
 def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
                output: str | None = None, max_turns: int = 100, timeout: int = 1800,
                jobs: int = 1, dashboard_pref: bool | None = None,
@@ -288,6 +314,18 @@ def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
     print(f"  {len(models)} model(s) x {len(bugs)} bug(s) x {samples} sample(s) "
           f"= {len(cells)} cell(s) ({done} already done, {len(cells)-done} to run)")
 
+    # Every image the remaining cells need, fetched before the first one starts.
+    # See images.prepull for why a cell must not fetch its own.
+    from fbbench.images import prepull
+    todo_bugs = sorted({b for m, b, s in cells
+                        if not (cell_dir(out, b, m, s) / "score.json").is_file()})
+    failed = prepull(_run_images(arm, todo_bugs, image_prefix))
+    if failed:
+        # Not fatal: a cell whose image is missing still reports that itself.
+        # But said here, once, before an hour of GPU time goes into the run.
+        print(f"  warning: {len(failed)} image(s) could not be fetched: {', '.join(failed)}",
+              flush=True)
+
     from rich.console import Console
     from fbbench.sweep.dashboard import STATUS, dashboard, run_cell_tailing
     console = Console()
@@ -305,6 +343,16 @@ def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
                      max_turns=max_turns, total=len(cells), already_done=done)
 
     def _cell(model, bug, sample):
+        try:
+            return _dispatch(model, bug, sample)
+        finally:
+            # The cell is over, whatever became of it: shrink what it preserved
+            # while the next one runs. See fbbench/pocs.py.
+            if preserve_pocs:
+                from fbbench.pocs import compress_in_background
+                compress_in_background(cell_dir(out, bug, model, sample))
+
+    def _dispatch(model, bug, sample):
         # Per-cell dispatch by arm — every arm writes score.json into the SAME
         # cell dir, so resume / aggregate / report downstream are arm-agnostic.
         #
@@ -429,5 +477,8 @@ def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
                 print(f"      log: {r['error_log']}")
     aggregate(out, models, bugs, seeds)
 
+    # The summary reads the cells, so their compression has to be finished first.
+    from fbbench.pocs import wait_for_compression
+    wait_for_compression()
     _write_summary(out, models, bugs, seeds, max_turns, elapsed_s=elapsed)
     return 0

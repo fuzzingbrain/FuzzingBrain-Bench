@@ -14,7 +14,9 @@ import tempfile
 import threading
 from typing import Any
 
-from fbbench.sandbox import sandbox_args
+# The scoring rules are part of the sandbox every container gets; re-exported
+# here because callers have always found them in this module.
+from fbbench.sandbox import SIG_RULES, SIG_RULES_IN_CONTAINER, sandbox_args, sig_rules_args  # noqa: F401
 
 # Upper bound (seconds) on an exec tool call's timeout_s. A single blocking
 # exec pins the whole episode (the client waits on the server's read), so a
@@ -23,45 +25,6 @@ from fbbench.sandbox import sandbox_args
 # baked into the (unrebuilt) challenge image.
 EXEC_TIMEOUT_CAP_S = 300
 
-# This checkout's crash-signature rules, and where they are mounted so the
-# in-image grader uses them. See `sig_rules_args`.
-SIG_RULES = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                         "grading", "signature.py")
-SIG_RULES_IN_CONTAINER = "/opt/fbbench/signature.current.py"
-
-
-def sig_rules_args() -> list[str]:
-    """`docker run` flags making the in-image grader score with THIS checkout's
-    crash-signature rules instead of the copy baked into the image.
-
-    A self-contained image grades locally, and names each crash with the
-    signature script `build_challenge` vendored into it when the image was
-    built. That copy is frozen at build time, so a rules fix reaches a published
-    image only by rebuilding and republishing all of them — and until it does,
-    the image counts distinct crashes by one set of rules while everything
-    downstream reads them by another. Mounting the current file closes that gap
-    for every runner-driven episode, which is what a sweep is.
-
-    Read-only, and deliberately so: the agent has exec in this container, and a
-    writable scoring rule is one `printf` away from every crash being novel.
-
-    Two things this does NOT cover, both by nature. An image driven directly by
-    an external user gets its baked copy — nothing here runs for them. And the
-    baked copy is what an external user gets, so the two still have to be moved
-    together; this only removes runner-driven episodes from that list.
-
-    Set BENCH_SIG_SCRIPT on the host to override (including to the baked path,
-    to measure exactly what an external user would get).
-    """
-    if os.environ.get("BENCH_SIG_SCRIPT"):
-        return ["-e", f"BENCH_SIG_SCRIPT={os.environ['BENCH_SIG_SCRIPT']}"]
-    if not os.path.isfile(SIG_RULES):
-        # Better to grade with the baked rules than to mount nothing at the path
-        # we then point the server at: a missing script makes every crash
-        # `<unsigned>`, which silently collapses them all into one.
-        return []
-    return ["-v", f"{SIG_RULES}:{SIG_RULES_IN_CONTAINER}:ro",
-            "-e", f"BENCH_SIG_SCRIPT={SIG_RULES_IN_CONTAINER}"]
 
 
 # The neutral <project>-NN alias for a bug dir (the image tag is named by it).
@@ -91,7 +54,8 @@ def _pull_once(image: str, attempts: int = 3) -> None:
     registry, and losing a whole cell to one is not acceptable. A pull that
     still fails is left to `docker run` to report.
     """
-    if image in _PULLED:
+    from fbbench.images import PREPULLED
+    if image in _PULLED or image in PREPULLED:
         return
     import time as _t
     for n in range(attempts):
@@ -137,7 +101,6 @@ class MCPClient:
                "--cidfile", self._cidfile,
                "--security-opt", "seccomp=unconfined",
                "-e", "BENCH_GRADE_REVEAL=1"]
-        cmd += sig_rules_args()
         cmd += sandbox_args()
         cmd += [image, "mcp-server"]
         bug_dir, workspace = "/src", "/workspace"

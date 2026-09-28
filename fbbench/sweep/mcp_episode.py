@@ -647,6 +647,59 @@ def _screen_frame(line: bytes, candidates: "CandidateLog | None"):
                                    "structuredContent": body}}) + "\n").encode()
 
 
+# Tool errors, said in words every client shows.
+#
+# The mcp-server reports a failed tool call as a JSON-RPC error whose message is
+# always "tool error", with the actual reason in the `data` field. Clients differ
+# in what they show: fb-agent printed the whole error object, so its model read
+# the reason; Claude Code shows the message alone, so Haiku was told "tool error"
+# and nothing else -- 54 failed submissions across 32 of 77 challenges in the
+# full Haiku run, about 228 turns spent finding out why (bad path 35 times,
+# missing file 19). The same fault gave two arms different information.
+#
+# The relay is where every agent arm's calls pass, so this is where the reason
+# is made the answer: the error becomes an ordinary tool result, flagged
+# isError, whose text IS the reason -- phrased in the agent's own paths, not the
+# server's environment variables.
+_TOOL_ERROR_REASONS = [
+    ("grade target must live under BENCH_WORKSPACE",
+     "the input must be a file under /workspace{path}"),
+    ("grade target not found or is a directory",
+     "no such file, or it is a directory{path}"),
+    ("permission denied",
+     "permission denied{path}: only paths under /workspace and /challenge are allowed"),
+]
+
+
+def _explain_tool_error(line: bytes, paths: dict) -> bytes:
+    """`line` with a bare "tool error" turned into a result that says why."""
+    if b'"tool error"' not in line:
+        return line
+    try:
+        msg = json.loads(line)
+    except ValueError:
+        return line
+    err = msg.get("error") if isinstance(msg, dict) else None
+    if not isinstance(err, dict) or err.get("message") != "tool error":
+        return line
+    raw = str(err.get("data") or "the tool failed without saying why")
+    graded = msg.get("id") in paths      # a run_poc_on_harness call, by its id
+    path = paths.pop(msg.get("id"), "")
+    where = f" (got {path})" if path else ""
+    if graded and raw.startswith("permission denied"):
+        # Only /workspace can be graded; "/challenge is allowed" is true of
+        # reading files, not of submitting them.
+        raw = "grade target must live under BENCH_WORKSPACE"
+    reason = raw.replace("BENCH_WORKSPACE", "/workspace").replace("BENCH_BUG_DIR", "/challenge")
+    for needle, text in _TOOL_ERROR_REASONS:
+        if raw.startswith(needle):
+            reason = text.format(path=where)
+            break
+    return (json.dumps({"jsonrpc": "2.0", "id": msg.get("id"),
+                        "result": {"content": [{"type": "text", "text": f"error: {reason}"}],
+                                   "isError": True}}) + "\n").encode()
+
+
 def _start_episode_server(image: str, work: str, root: str,
                           candidates: "CandidateLog | None" = None) -> tuple:
     """Start one mcp-server for the episode and expose it on a unix socket.
@@ -684,7 +737,10 @@ def _start_episode_server(image: str, work: str, root: str,
     # it blocks on the server's stdout after the client has gone.
     state = {"conn": None}
 
+    paths: dict = {}                     # jsonrpc id -> path a grade call named
+
     def _pump_out():
+        pend = b""
         while True:
             try:
                 b = os.read(proc.stdout.fileno(), 65536)
@@ -692,6 +748,15 @@ def _start_episode_server(image: str, work: str, root: str,
                 return
             if not b:
                 return
+            # Whole frames only, so a tool error can be rewritten before any
+            # client sees it (_explain_tool_error). A partial frame waits for
+            # the rest of its line.
+            pend += b
+            if b"\n" not in pend:
+                continue
+            done, pend = pend.rsplit(b"\n", 1)
+            b = b"".join(_explain_tool_error(ln + b"\n", paths)
+                         for ln in done.split(b"\n"))
             if candidates is not None:
                 candidates.saw_response(b)
             c = state["conn"]
@@ -727,6 +792,13 @@ def _start_episode_server(image: str, work: str, root: str,
                         if reply is not None:
                             conn.sendall(reply)
                         elif line.strip():
+                            if b"run_poc_on_harness" in line:
+                                try:
+                                    m = json.loads(line)
+                                    paths[m.get("id")] = str(
+                                        ((m.get("params") or {}).get("arguments") or {}).get("path", ""))
+                                except (ValueError, AttributeError):
+                                    pass
                             allow += line + b"\n"
                     if allow:
                         proc.stdin.write(allow)
