@@ -809,3 +809,24 @@ def test_agents_are_told_a_silent_death_is_the_host_not_the_input():
     import fbbench.sweep.mcp_episode as me
     note = me.agent_tools_note({"gdb": True, "target": me.ORACLE_HARNESS})
     assert "no output at all" in note and "run it again" in note and "\n" not in note
+
+
+def test_the_tools_note_gives_the_commands_not_just_the_idea():
+    """Each clause answers a mistake measured in the 77-challenge Qwen run's
+    893 gdb calls (see the comment in agent_tools_note); none names a bug."""
+    import fbbench.sweep.mcp_episode as me
+    t = me.ORACLE_HARNESS
+    note = me.agent_tools_note({"gdb": True, "target": t})
+    # the coverage command, written out, with the directory it runs on
+    assert f'{t} -runs=0 -print_coverage=1 "$d"' in note
+    assert "an input that crashes stops before the report" in note
+    # a directory is fuzzing unless -runs=0 (the preload refuses it)
+    assert "a directory without `-runs=0` is treated as fuzzing and refused" in note
+    # gdb gets the input after --args, and libFuzzer flags never go to gdb
+    assert f"`gdb -batch -ex run -ex bt --args {t} /workspace/in`" in note
+    assert "never to gdb itself" in note
+    # the three ways gdb calls went wrong
+    assert "<optimized out>" in note and "info args" in note
+    assert "info functions NAME" in note
+    assert "grep or head" in note
+    assert "\n" not in note

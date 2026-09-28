@@ -312,17 +312,39 @@ def agent_tools_note(env: dict | None = None) -> str:
         # start-up, silently, on ~1 launch in 4 (7 of 30 measured here). The
         # grader retries those (isPreInitFlake); an agent does not know to, and
         # one spent 38 turns and seven gdb sessions chasing such a "crash".
+        #
+        # The rest is from the 77-challenge Qwen run's 893 gdb calls, and each
+        # clause answers a measured mistake, none of them about any bug: the
+        # coverage recipe given in words had the directory dropped (23 refused
+        # runs across 19 challenges); libFuzzer flags were handed to gdb itself;
+        # 18% of calls hit <optimized out> and 262 guessed from raw registers;
+        # 42 set breakpoints on macros or inlined functions, which in batch mode
+        # vanish without an error the reader notices; 512 piped gdb through
+        # grep or head, often cutting the line that said why it stopped.
+        t = target
         return (f"- You also have `gdb` and a readable copy of that binary, at "
-                f"{target}: you may run it, debug it, and ask it which functions "
-                f"an input reached - copy the input alone into a new empty "
-                f"directory and run the binary on that directory with "
-                f"`-runs=0 -print_coverage=1` (run on the file itself, it reports "
-                f"everything uncovered). Under gdb, sanitizer reports, "
-                f"out-of-memory and timeouts all stop the program; an "
-                f"out-of-memory stop is in libFuzzer's watchdog thread, so read "
-                f"it with `thread apply all bt`. A direct run that dies with no "
-                f"output at all, not even libFuzzer's banner, is a sanitizer "
-                f"start-up failure of this host, not a crash: run it again.")
+                f"{t}: you may run it, debug it, and ask it which functions an "
+                f"input reached. Run it on an input file (`{t} /workspace/in`); a "
+                f"directory without `-runs=0` is treated as fuzzing and refused. "
+                f"For coverage, copy the input alone into a new empty directory "
+                f"and run on that directory: `d=$(mktemp -d); cp /workspace/in "
+                f"\"$d\"/; {t} -runs=0 -print_coverage=1 \"$d\"` (run on the file "
+                f"itself, it reports everything uncovered; an input that crashes "
+                f"stops before the report, so read those with gdb). Debug with `gdb -batch "
+                f"-ex run -ex bt --args {t} /workspace/in`: the input and any "
+                f"libFuzzer flags go after `--args`, never to gdb itself. Under "
+                f"gdb, sanitizer reports, out-of-memory and timeouts all stop the "
+                f"program; an out-of-memory stop is in libFuzzer's watchdog "
+                f"thread, so read it with `thread apply all bt`. The build is "
+                f"optimized, so many values print `<optimized out>`: read `bt`, "
+                f"`frame N` and `info args` rather than guessing from raw "
+                f"registers. A breakpoint on a macro or an inlined function "
+                f"silently does not exist, so check a name with `info functions "
+                f"NAME` first, and do not filter gdb's output through grep or "
+                f"head, which can hide why the program stopped. A direct run that "
+                f"dies with no output at all, not even libFuzzer's banner, is a "
+                f"sanitizer start-up failure of this host, not a crash: run it "
+                f"again.")
     if have_gdb:
         return "- You also have `gdb`."
     if target:
