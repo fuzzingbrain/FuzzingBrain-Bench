@@ -753,12 +753,13 @@ def _graded_paths(log_path: str, work: str) -> list[str]:
 def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
              r: dict, blobs: list[str], alias: str, preserve_pocs: bool = True,
              fuzzing_attempts: int = 0) -> dict:
-    """Re-grade blobs in the challenge image, write score.json + report.
+    """Re-grade blobs in the agent image the episode ran in, write score.json + report.
     With preserve_pocs, every graded candidate is kept under pocs/{crashed,clean}/
     (same forensic record as the API arm)."""
     cell_dir.mkdir(parents=True, exist_ok=True)
     sigs, best_blob = _crash_signatures(
-        Path(real), blobs, pocs_dir=str(cell_dir / "pocs") if preserve_pocs else None)
+        Path(real), blobs, pocs_dir=str(cell_dir / "pocs") if preserve_pocs else None,
+        image=agent_image(alias))
     if best_blob:
         shutil.copy(best_blob, cell_dir / "best_blob")
     if Path(r["log_path"]).is_file():

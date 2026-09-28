@@ -231,11 +231,12 @@ def _write_summary(out: Path, models: list[str], bugs: list[str], seeds: list[in
 
 
 def _run_images(arm: str, bugs: list[str], image_prefix: str | None) -> list[str]:
-    """The images a run of `arm` over `bugs` starts containers from.
+    """The images a run of `arm` over `bugs` starts containers from: ONE per
+    challenge.
 
-    Every arm grades its candidates at the end in the challenge image
-    (grading.grader), so that set is always needed. The agent arms work in the
-    agent image set, and codex in its own prefix's challenge images.
+    The agent arms both work in and are graded in the agent image (see
+    sweep.external / sweep.claudecode); the api arm and codex use the challenge
+    image for both.
     """
     from fbbench.grading import find_bug
     from fbbench.images import DEFAULT_IMAGE_PREFIX, agent_image, challenge_image
@@ -244,15 +245,13 @@ def _run_images(arm: str, bugs: list[str], image_prefix: str | None) -> list[str
     for b in bugs:
         real = find_bug(b)
         alias = _full_scan_alias(str(real)) if real else b
-        if arm == "api":
-            images.append(challenge_image(alias, image_prefix or DEFAULT_IMAGE_PREFIX))
-            continue
-        images.append(challenge_image(alias))
         if arm in ("external", "claudecode"):
             images.append(agent_image(alias))
         elif arm == "codex":
             from fbbench.sweep.codex import IMAGE_PREFIX
             images.append(f"{IMAGE_PREFIX}{alias}")
+        else:
+            images.append(challenge_image(alias, image_prefix or DEFAULT_IMAGE_PREFIX))
     return images
 
 

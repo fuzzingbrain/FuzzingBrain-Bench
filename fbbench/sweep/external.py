@@ -992,7 +992,7 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         candidates.close()
         blobs = candidates.host_blobs()
         pocs_dir = str(cell_dir / "pocs") if preserve_pocs else None
-        sigs, best = _crash_signatures(Path(real), blobs, pocs_dir)
+        sigs, best = _crash_signatures(Path(real), blobs, pocs_dir, image=image)
         # Per-candidate crashed/clean comes from the live verdicts, not from
         # `b == best`: several candidates can crash, and marking only the first
         # would understate every summary row built from this.

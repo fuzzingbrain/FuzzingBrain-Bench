@@ -35,14 +35,22 @@ def test_a_failed_prepull_is_reported_not_fatal(monkeypatch):
     assert images.pull_policy(img) == "always"
 
 
-def test_each_arm_prepulls_the_images_it_starts():
+def test_each_arm_prepulls_one_image_per_challenge():
     from fbbench.sweep.orchestrator import _run_images
-    ext = _run_images("external", ["avro-03"], None)
-    assert any("fbbench-agent-avro-03" in i for i in ext)
-    assert any("fbbench-challenge-avro-03" in i for i in ext)     # end-of-run grading
-    assert _run_images("claudecode", ["avro-03"], None) == ext
+    ext = _run_images("external", ["avro-03", "dtc-01"], None)
+    assert len(ext) == 2 and all("fbbench-agent-" in i for i in ext)
+    assert _run_images("claudecode", ["avro-03", "dtc-01"], None) == ext
     api = _run_images("api", ["avro-03"], None)
     assert len(api) == 1 and "fbbench-challenge-avro-03" in api[0]
+
+
+def test_the_agent_arms_are_graded_in_the_image_they_ran_in():
+    """Same graded tree (identical by SHA-256 in all 77 pairs) and the current
+    grader, which the challenge images, built 14 Aug, do not carry."""
+    import inspect
+    from fbbench.sweep import claudecode, external
+    assert "_crash_signatures(Path(real), blobs, pocs_dir, image=image)" in inspect.getsource(external.run_cell)
+    assert "image=agent_image(alias)" in inspect.getsource(claudecode._persist)
 
 
 # ------------------------------------------------------------ compression

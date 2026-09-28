@@ -364,7 +364,8 @@ def _candidate_blobs(ws: str) -> list[str]:
 
 
 def _crash_signatures(bug_dir: Path, blobs: list[str],
-                      pocs_dir: str | None = None) -> tuple[set[str], str | None]:
+                      pocs_dir: str | None = None,
+                      image: str | None = None) -> tuple[set[str], str | None]:
     """Grade each blob in the challenge image; return (signatures, first blob to
     crash).
 
@@ -376,13 +377,16 @@ def _crash_signatures(bug_dir: Path, blobs: list[str],
     When `pocs_dir` is given, EVERY graded candidate is preserved under
     pocs_dir/{crashed,clean}/ with its verdict — the same forensic record the API
     arm keeps, so no attempt is lost (matches --preserve-pocs).
+
+    `image` is where the grading happens; None is the challenge image. The
+    agent arms pass their agent image (sweep.external, sweep.claudecode).
     """
     sigs: set[str] = set()
     first_crash: str | None = None
     poc_root = Path(pocs_dir) if pocs_dir else None
     for i, b in enumerate(blobs):
         try:
-            r, _ = grade_blob(bug_dir, Path(b))
+            r, _ = grade_blob(bug_dir, Path(b), image=image)
         except Exception as e:
             # Do NOT swallow a grading failure into a silent zero: an all-clean
             # cell would be indistinguishable from a genuine miss and then frozen

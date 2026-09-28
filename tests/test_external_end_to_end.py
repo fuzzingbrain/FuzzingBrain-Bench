@@ -121,7 +121,7 @@ def wired(tmp_path, monkeypatch):
 
     monkeypatch.setattr(ex, "_start_episode_server", fake_server)
 
-    def fake_grade(bug, blobs, pocs_dir=None):
+    def fake_grade(bug, blobs, pocs_dir=None, image=None):
         sigs, best = set(), None
         for b in blobs:
             if Path(b).read_bytes() == CRASHING:
