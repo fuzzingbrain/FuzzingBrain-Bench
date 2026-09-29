@@ -79,6 +79,18 @@ NOFUZZ_IN_CONTAINER = "/opt/fbbench-guard/nofuzz.so"
 NOFUZZ_REFUSED = "[fbbench] refused: this would start libFuzzer's own fuzzing loop"
 
 
+# --no-gdb: the same setting with the debugger taken away, for measuring what gdb
+# is worth. Set by the CLI for the whole run, so every container of every arm
+# sees it; read here and in mcp_episode.probe_environment, and nowhere else.
+NO_GDB_ENV = "FBBENCH_NO_GDB"
+GDB_STUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gdb-unavailable.sh")
+GDB_PATHS = ("/usr/bin/gdb", "/usr/bin/gdbtui")
+
+
+def no_gdb() -> bool:
+    return os.environ.get(NO_GDB_ENV) == "1"
+
+
 def sandbox_args() -> list[str]:
     """`docker run` flags for a challenge container. Raises if the guard is missing:
     a sandbox that silently allows fuzzing would score a different benchmark."""
@@ -88,4 +100,5 @@ def sandbox_args() -> list[str]:
     return ["--network", "none",
             "-v", f"{NOFUZZ_SO}:{NOFUZZ_IN_CONTAINER}:ro",
             "-e", f"LD_PRELOAD={NOFUZZ_IN_CONTAINER}",
-            *sig_rules_args()]
+            *sig_rules_args(),
+            *[a for p in (GDB_PATHS if no_gdb() else ()) for a in ("-v", f"{GDB_STUB}:{p}:ro")]]

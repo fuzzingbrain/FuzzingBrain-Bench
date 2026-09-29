@@ -770,6 +770,8 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "fuzzing_attempts": fuzzing_attempts,
         "arm": "claudecode",
         "agent_image": agent_image(alias),
+        # Whether gdb was offered at all (fb-bench run --no-gdb).
+        "gdb_available": not __import__("fbbench.sandbox", fromlist=["no_gdb"]).no_gdb(),
         "agent_image_digest": image_digest(agent_image(alias)),
         # Whether gdb in this container could actually show source. Verified
         # against gdb, not assumed from having written the file.

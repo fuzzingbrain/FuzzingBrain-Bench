@@ -78,6 +78,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                         help="save every graded blob into <out>/pocs/{crashed,clean}/ "
                              "(default on; --no-preserve-pocs to disable)")
+    sp_run.add_argument("--no-gdb", action="store_true",
+                        help="[agent arms] take gdb away: the tools note drops the gdb "
+                             "sentences and gdb in the container says it is unavailable. "
+                             "Everything else is the same setting")
     sp_run.add_argument("--stop-on-crash", action=argparse.BooleanOptionalAction, default=False,
                         help="end at the first crash (default OFF, so the agent "
                              "keeps hunting for more distinct crashes until it stops "

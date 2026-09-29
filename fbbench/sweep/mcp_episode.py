@@ -151,7 +151,9 @@ def probe_environment(sock_path: str, timeout: float = 120.0) -> dict:
            f"head -c 4 {ORACLE_HARNESS} 2>/dev/null | grep -q ELF "
            f"&& echo NATIVE=1 || echo NATIVE=0")
     out = _exec_once(sock_path, cmd, timeout)
-    return {"gdb": "GDB=1" in out and "NATIVE=1" in out,
+    from fbbench.sandbox import no_gdb
+    return {"gdb": "GDB=1" in out and "NATIVE=1" in out and not no_gdb(),
+            "native": "NATIVE=1" in out,
             "target": ORACLE_HARNESS if "TARGET=1" in out else ""}
 
 
@@ -345,6 +347,21 @@ def agent_tools_note(env: dict | None = None) -> str:
                 f"dies with no output at all, not even libFuzzer's banner, is a "
                 f"sanitizer start-up failure of this host, not a crash: run it "
                 f"again.")
+    if target and env.get("native"):
+        # --no-gdb: the note with only the gdb sentences taken out, so the
+        # ablation changes one thing.
+        t = target
+        return (f"- You also have a readable copy of that binary, at {t}: you may "
+                f"run it and ask it which functions an input reached. Run it on "
+                f"an input file (`{t} /workspace/in`); a directory without "
+                f"`-runs=0` is treated as fuzzing and refused. For coverage, copy "
+                f"the input alone into a new empty directory and run on that "
+                f"directory: `d=$(mktemp -d); cp /workspace/in \"$d\"/; {t} "
+                f"-runs=0 -print_coverage=1 \"$d\"` (run on the file itself, it "
+                f"reports everything uncovered; an input that crashes stops "
+                f"before the report). A direct run that dies with no output at "
+                f"all, not even libFuzzer's banner, is a sanitizer start-up "
+                f"failure of this host, not a crash: run it again.")
     if have_gdb:
         return "- You also have `gdb`."
     if target:

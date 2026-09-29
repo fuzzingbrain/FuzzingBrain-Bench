@@ -40,7 +40,7 @@ def test_it_is_named_by_the_functions_the_recursion_repeats():
     s = signature(_native_overflow(0))
     assert s.canon_sig == ("stack-overflow|AcquireExceptionInfo|AcquireSemaphoreInfo|"
                            "InitializeExceptionInfo")
-    assert s.version == SIG_VERSION == 5
+    assert s.version == SIG_VERSION == 6
 
 
 def test_a_function_recursing_into_itself_signs_by_itself():
@@ -129,3 +129,47 @@ def test_every_arm_scores_with_these_rules():
     assert any(a.startswith(SIG_RULES + ":") for a in args)
     # and the grading client no longer adds its own copy on top
     assert "sig_rules_args()" not in inspect.getsource(mcp_client.MCPClient.__init__)
+
+
+def _asan(klass: str, funcs: list[str], summary: str) -> dict:
+    lines = [f"    #{i} 0x55 in {f} /src/x.cc:{i + 1}:1" for i, f in enumerate(funcs)]
+    return {"exit_code": 1, "signal": "", "stdout": "",
+            "stderr": f"ERROR: {klass}\n" + "\n".join(lines) + f"\nSUMMARY: {summary}"}
+
+
+def test_helpers_seen_twice_at_the_top_do_not_join_the_cycle():
+    """icu-01, second sweep: parseSection recursed ~240 frames; in some runs
+    TransliteratorRegistry::find and Locale::init also appeared twice at the
+    top, and the same input signed two ways."""
+    cyc = ["icu_79::RuleHalf::parseSection"] * 240
+    plain = ["icu_79::Locale::init", "icu_79::TransliteratorRegistry::find"] + cyc
+    noisy = ["icu_79::Locale::init", "icu_79::TransliteratorRegistry::find",
+             "icu_79::Locale::init", "icu_79::TransliteratorRegistry::find"] + cyc
+    sigs = {signature(_asan("AddressSanitizer: stack-overflow on address 0x7f", f,
+                            "AddressSanitizer: stack-overflow")).canon_sig for f in (plain, noisy)}
+    assert sigs == {"stack-overflow|icu_79::RuleHalf::parseSection"}
+
+
+def test_a_multi_function_cycle_keeps_all_its_functions():
+    cyc = ["fwupd_json_parser_load_array", "fwupd_json_parser_helper", "fwupd_json_parser_load_value"] * 80
+    s = signature(_asan("AddressSanitizer: stack-overflow on address 0x7f", ["g_malloc"] + cyc,
+                        "AddressSanitizer: stack-overflow")).canon_sig
+    assert s == ("stack-overflow|fwupd_json_parser_helper|fwupd_json_parser_load_array|"
+                 "fwupd_json_parser_load_value")
+
+
+def test_native_oom_inside_a_recursion_is_named_by_the_cycle():
+    """ghidra-01: the demangler ran out of heap 250 frames deep; the allocating
+    frame on top was different each run."""
+    cyc = ["demangle_type", "demangle_path", "demangle_generic_arg"] * 80
+    runs = [["str_buf_reserve", "str_buf_append"] + cyc, ["print_ident"] + cyc, cyc]
+    sigs = {signature(_asan("libFuzzer: out-of-memory (malloc(2147483648))", r,
+                            "libFuzzer: out-of-memory")).canon_sig for r in runs}
+    assert sigs == {"out-of-memory|demangle_generic_arg|demangle_path|demangle_type"}
+
+
+def test_an_ordinary_native_oom_keeps_its_allocation_site():
+    s = signature(_asan("libFuzzer: out-of-memory (malloc(2147483648))",
+                        ["str_buf_reserve", "str_buf_append", "str_buf_demangle_callback"],
+                        "libFuzzer: out-of-memory")).canon_sig
+    assert s == "out-of-memory|str_buf_reserve|str_buf_append|str_buf_demangle_callback"

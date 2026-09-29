@@ -1041,6 +1041,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             # Whether gdb in this container could actually show source. Verified
             # against gdb, not assumed from having written the file.
             "gdb_source_map": env_caps.get("gdb_source_map") or [],
+            # Whether the agent was given gdb at all (fb-bench run --no-gdb).
+            "gdb_available": bool(env_caps.get("gdb")),
             "network": "allowed" if manifest.allow_network else "blocked",
             # Which model server this episode used, when several are pooled.
             "agent_endpoint": agent_endpoint,
