@@ -12,6 +12,7 @@ the crash's signature.
 """
 from __future__ import annotations
 
+import os
 import time
 from pathlib import Path
 
@@ -36,6 +37,15 @@ def grade_blob(bug_dir: Path, blob: Path, image: str | None = None,
 
     alias = _full_scan_alias(str(bug_dir))
     image = image or challenge_image(alias)
+
+    # An agent may chmod its own candidate to 000; the bytes are what is
+    # graded, so make the host copy readable for docker cp rather than fail.
+    src = Path(blob)
+    if src.is_file() and not os.access(src, os.R_OK):
+        try:
+            src.chmod(src.stat().st_mode | 0o400)
+        except OSError:
+            pass
 
     t0 = time.time()
     mcp = MCPClient(str(bug_dir), "/workspace", image=image)
