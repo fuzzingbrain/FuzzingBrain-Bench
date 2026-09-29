@@ -15,6 +15,7 @@ from __future__ import annotations
 from fbbench.sweep.orchestrator import cell_dir
 
 import json
+import re
 from pathlib import Path
 
 _TEMPLATE = Path(__file__).with_name("summary_template.html")
@@ -248,12 +249,18 @@ def write_summary(exp_dir: str | Path, **meta) -> Path:
     """Build the summary and write <exp_dir>/index.html (self-contained)."""
     exp_dir = Path(exp_dir)
     data = build_summary(exp_dir, **meta)
+    out = exp_dir / "index.html"
+    if not data.get("elapsed_s"):
+        # A re-render (--report-only) does not know how long the sweep took;
+        # keep the figure the original page recorded rather than dropping it.
+        m = re.search(r'"elapsed_s": ([0-9.]+)', out.read_text()) if out.exists() else None
+        if m:
+            data["elapsed_s"] = float(m.group(1))
     tmpl = _TEMPLATE.read_text()
     # Inject as the textContent of <script type="application/json">; escape the
     # only sequence that could close that tag early. The blob is answer-free.
     blob = json.dumps(data, ensure_ascii=False).replace("</", "<\\/")
     html = (tmpl.replace("__SUMMARY_JSON__", blob)
                 .replace("__EXP__", data["exp"]))
-    out = exp_dir / "index.html"
     out.write_text(html)
     return out

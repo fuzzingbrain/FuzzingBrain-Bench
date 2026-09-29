@@ -106,7 +106,7 @@ def _config_rows(score: dict, max_turns_fallback) -> list[tuple[str, str]]:
     rows.append(("grading", cfg.get("grading") or score.get("grading")
                  or "not recorded"))
     img = cfg.get("image")
-    if img:
+    if img and img != agent_image:
         rows.append(("challenge image", img))
     return rows
 
@@ -430,7 +430,7 @@ def _findings_section(score: dict) -> tuple[str, str, str]:
     uniq = score.get("unique_crashes", 0)
     sigs = score.get("crash_signatures") or []
     rows = "".join(
-        f'<tr><td class="r">{i}</td><td><code>{_esc(s)}</code></td></tr>'
+        f'<tr><td class="r">{i}</td><td>{_sig_html(s)}</td></tr>'
         for i, s in enumerate(sigs, 1)
     ) or ('<tr><td colspan="2" class="muted">no crash was produced in this '
           'episode</td></tr>')
@@ -444,6 +444,40 @@ def _findings_section(score: dict) -> tuple[str, str, str]:
         f'<tbody>{rows}</tbody></table>'
     )
     return html, str(uniq), "distinct crashes"
+
+
+def _split_sig(sig: str) -> list[str]:
+    """Split a canonical signature on its unescaped `|` separators."""
+    parts, cur, esc = [], "", False
+    for ch in sig:
+        if esc:
+            cur, esc = cur + ch, False
+        elif ch == "\\":
+            esc = True
+        elif ch == "|":
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    return parts + [cur]
+
+
+def _short_frame(f: str) -> str:
+    # Java frames carry the full package; the class and method are what reads.
+    if "::" in f or "." not in f:
+        return f
+    seg = f.split(".")
+    return ".".join(seg[-2:]) if len(seg) > 2 else f
+
+
+def _sig_html(sig: str) -> str:
+    """Fault type, then its top frames innermost first -- the same rendering
+    as the sweep index. The full signature stays on hover."""
+    kind, *frames = _split_sig(sig)
+    body = '<span class="sep">&lsaquo;</span>'.join(
+        f'<span class="fr">{_esc(_short_frame(f))}</span>' for f in frames)
+    return (f'<div class="sig" title="{_esc(sig)}"><span class="ty">{_esc(kind)}</span>'
+            f'{body}</div>')
 
 
 def _turns_from_transcript(tpath: Path) -> int:
@@ -626,6 +660,9 @@ th{{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase
 td.r{{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;}}
 td.mk{{text-align:center;}}td.muted,.muted{{color:var(--muted);}}
 code{{background:#0d1117;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:.9em;color:#ff7b72;}}
+.sig{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8rem;line-height:1.5;overflow-wrap:anywhere;}}
+.sig .ty{{color:var(--amber);font-weight:600;margin-right:8px;}}
+.sig .sep{{color:#454d57;margin:0 5px;}}
 .mini td{{padding:5px 8px;}}.mini td:first-child{{font-weight:600;}}
 table.cfg{{max-width:560px;}}table.cfg td:first-child{{color:var(--muted);font-weight:500;}}
 table.cfg td.r{{color:var(--txt);font-weight:600;text-align:right;word-break:break-all;}}

@@ -72,16 +72,61 @@ def _grade_out(result: dict) -> tuple[str, bool]:
     return "  ".join(parts), crash
 
 
+def _as_int(v, default=None):
+    try:
+        return int(v)
+    except (TypeError, ValueError):
+        return default
+
+
+def _unwrap(result):
+    """External agents hand back a shell-style JSON string
+    ({"returncode": N, "output": "..."}, maybe followed by a budget line).
+    Turn it into the dict shape the other arms record, so it summarises the
+    same way instead of showing raw JSON."""
+    if not isinstance(result, str):
+        return result
+    try:
+        obj, _ = json.JSONDecoder().raw_decode(result.lstrip())
+    except ValueError:
+        return result
+    if isinstance(obj, dict) and "returncode" in obj:
+        # Long output arrives as output_head/output_tail with the middle elided.
+        text = obj.get("output", obj.get("output_head", ""))
+        return {"shell": True, "exit_code": obj["returncode"], "stdout": str(text)}
+    return obj
+
+
+def _shell_out(tool: str, result: dict) -> tuple[str, bool]:
+    text = result.get("stdout") or ""
+    try:
+        inner = json.loads(text)
+    except ValueError:
+        inner = None
+    if tool == "setup" and isinstance(inner, dict):
+        return f"project={inner.get('project', '?')}  language={inner.get('language', '?')}", False
+    if tool in GRADE_TOOLS:
+        m = _CRASH_RE.search(text)
+        if m:
+            line = next((l for l in text.splitlines() if m.group(0) in l), m.group(0))
+            return f"exit={result.get('exit_code')}  " + _short(line, 70), True
+        return f"exit={result.get('exit_code')}  no crash", False
+    first = next((l for l in text.splitlines() if l.strip()), "")
+    return _short(f"exit={result.get('exit_code')}  {first}", 80), False
+
+
 def _out_summary(tool: str, result, is_error: bool) -> tuple[str, bool]:
     if is_error:
         data = result.get("data") if isinstance(result, dict) else result
         return "ERROR " + _short(data or "", 70), False
     if not isinstance(result, dict):
         return _short(result, 80), False
+    if result.get("shell"):
+        return _shell_out(tool, result)
     if tool in GRADE_TOOLS:
         return _grade_out(result)
     if tool == "setup":
-        return f"bug={result.get('bug_id', '?')}", False
+        return f"project={result.get('project', '?')}  language={result.get('language', '?')}", False
     if tool == "list_directory":
         return f"{len(result.get('entries', []))} entries", False
     if tool == "read_file":
@@ -89,13 +134,20 @@ def _out_summary(tool: str, result, is_error: bool) -> tuple[str, bool]:
     if tool == "write_file":
         return f"{result.get('bytes_written', 0)}B written", False
     if tool == "exec":
-        return _short(f"exit={result.get('exit_code')}  {result.get('stdout', '')}", 80), False
+        text = result.get("stdout") or result.get("stderr") or ""
+        first = next((l for l in text.splitlines() if l.strip()), "")
+        return _short(f"exit={result.get('exit_code')}  {first}", 80), False
     return _short(json.dumps(result), 80), False
 
 
 def build_traj(transcript_path: str | Path) -> list[dict]:
     """One node per tool call: {n, turn, tool, arg, ok, out, crash}."""
     nodes: list[dict] = []
+    # Arms differ in where they record a call's argument and turn: some put
+    # them on the tool_result, others only on the assistant message that made
+    # the call. Remember the latter by call id so every row gets both.
+    calls: dict[str, tuple] = {}
+    turn = None
     for line in Path(transcript_path).read_text().splitlines():
         if not line.strip():
             continue
@@ -105,15 +157,23 @@ def build_traj(transcript_path: str | Path) -> list[dict]:
             e = json.loads(line)
         except ValueError:
             continue
+        if e.get("event") == "assistant":
+            turn = _as_int(e.get("turn"), turn)
+            for c in e.get("tool_calls") or []:
+                if isinstance(c, dict) and c.get("id"):
+                    calls[c["id"]] = (turn, c.get("input"))
+            continue
         if e.get("event") != "tool_result":
             continue
         tool = e.get("tool", "?")
-        out, crash = _out_summary(tool, e.get("result"), e.get("is_error", False))
+        call_turn, call_input = calls.get(e.get("id"), (turn, None))
+        inp = e.get("input") or call_input
+        out, crash = _out_summary(tool, _unwrap(e.get("result")), e.get("is_error", False))
         nodes.append({
             "n": len(nodes) + 1,
-            "turn": e.get("turn"),
+            "turn": _as_int(e.get("turn"), call_turn),
             "tool": tool,
-            "arg": _arg_summary(tool, e.get("input")),
+            "arg": _arg_summary(tool, inp if isinstance(inp, dict) else {}),
             "ok": not e.get("is_error", False),
             "out": out,
             "crash": crash,

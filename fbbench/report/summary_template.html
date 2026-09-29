@@ -40,7 +40,7 @@ padding:7px 10px;font-size:.86rem;outline:none;min-width:220px;}
 .bar input:focus{border-color:var(--accent);}
 .bar .count{color:var(--muted);font-size:.82rem;}
 .legend{color:var(--muted);font-size:.78rem;margin-left:auto;}
-.legend b{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin:0 3px 0 9px;}
+.legend:not(table) b{display:inline-block;width:11px;height:11px;border-radius:3px;vertical-align:-1px;margin:0 3px 0 9px;}
 table{width:100%;border-collapse:collapse;font-size:.86rem;}
 th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:center;}
 th{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.03em;position:sticky;top:0;background:var(--bg);}
@@ -83,6 +83,9 @@ line-height:1.5;color:var(--txt);overflow-wrap:anywhere;}
 .sig+.sig{border-top:1px dashed var(--line);margin-top:3px;padding-top:3px;}
 .sig .ty{color:var(--amber);font-weight:600;margin-right:6px;}
 .sig .sep{color:#454d57;margin:0 4px;}
+details.more>summary{cursor:pointer;color:var(--accent);font-size:.75rem;margin-top:4px;list-style:none;}
+details.more>summary::-webkit-details-marker{display:none;}
+details.more[open]>summary{margin-bottom:3px;}
 a.rep{color:var(--accent);text-decoration:none;font-size:.8rem;white-space:nowrap;}
 a.rep:hover{text-decoration:underline;}
 .foot{color:var(--muted);font-size:.8rem;margin-top:48px;border-top:1px solid var(--line);padding-top:16px;}
@@ -149,7 +152,7 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":
 // --- header tags + stats ---
 const tags = [];
 tags.push(`${D.models.length} models`, `${D.bugs.length} bugs`, `${D.samples.length} sample(s)`,
-          `max_turns ${D.max_turns}`);
+          `max_turns ${(D.config||{}).max_turns ?? D.max_turns}`);
 document.getElementById("tags").innerHTML = tags.map(t => `<span class="tag">${esc(t)}</span>`).join("");
 document.getElementById("exp").textContent = D.exp;
 
@@ -171,6 +174,17 @@ const unscored = new Set(Object.values(SC).flatMap(s => s.unscored||[]));
 // seed-1 is one. This is the headline number under in-image grading, where
 // there is no answer key to score against.
 const sigKey = (bug, s) => bug + " " + s;
+// Long signature lists (a challenge can yield dozens) show the first few and
+// fold the rest behind a "+N more" toggle so one row cannot swamp the table.
+const SIG_SHOWN = 4;
+function sigList(sigs){
+  if (!sigs.length) return '<span class="muted">—</span>';
+  const head = sigs.slice(0, SIG_SHOWN).map(sigHtml).join("");
+  const rest = sigs.slice(SIG_SHOWN);
+  return rest.length
+    ? head + `<details class="more"><summary>+${rest.length} more</summary>${rest.map(sigHtml).join("")}</details>`
+    : head;
+}
 const allSigs = new Set(), sigsByModel = {}, bugsCrashed = new Set();
 for (const c of cells){
   for (const s of (c.sigs || [])){
@@ -205,7 +219,7 @@ document.getElementById("stats").innerHTML =
   stat(`${bugsCrashed.size}<span class="den"> / ${D.bugs.length}</span>`,"challenges crashed","a") +
   (errs ? stat(`${errs}`,"errors") : "") +
   stat(`$${(D.total_cost||0).toFixed(2)}`,"total cost") +
-  stat(elapsed,"elapsed","a");
+  (D.elapsed_s ? stat(elapsed,"elapsed","a") : "");
 
 // --- run configuration panel ---
 const C = D.config || {};
@@ -328,8 +342,7 @@ function renderTable(filter){
     rows += `<td class="num ${val===0?'t0':'hit'}">${c ? String(val) : "—"}</td>`;
     rows += `<td class="num ${d&&hit?'hit':'t0'}">${d ? Math.min(val,CAP)*d : "—"}</td>`;
     const sigs = c ? pairSigs(b, m) : [];
-    rows += `<td class="sigs">${sigs.length ? sigs.map(sigHtml).join("")
-                                            : '<span class="muted">—</span>'}</td>`;
+    rows += `<td class="sigs">${sigList(sigs)}</td>`;
     rows += `<td class="cost">${c ? "$"+(c.cost||0).toFixed(3) : "—"}</td>`;
     rows += `<td>${c && c.report ? `<a class="rep" href="${esc(c.report)}">view ›</a>` : "—"}</td>`;
     rows += `</tr>`;
