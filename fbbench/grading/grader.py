@@ -36,7 +36,6 @@ def grade_blob(bug_dir: Path, blob: Path, image: str | None = None,
 
     alias = _full_scan_alias(str(bug_dir))
     image = image or challenge_image(alias)
-    data = Path(blob).read_bytes()
 
     t0 = time.time()
     mcp = MCPClient(str(bug_dir), "/workspace", image=image)

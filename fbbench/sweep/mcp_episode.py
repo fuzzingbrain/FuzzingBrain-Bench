@@ -656,6 +656,26 @@ while True:
 """
 
 
+# A server reply larger than this is not forwarded (see _pump_out). Real replies
+# are kilobytes to a few megabytes; only a command dumping a multi-gigabyte file
+# comes near it.
+MAX_FRAME_BYTES = 64 << 20
+
+
+def _oversized_reply(head: bytes) -> bytes:
+    """A JSON-RPC tool error in place of a reply too large to relay."""
+    import re as _re
+    m = _re.search(rb'"id"\s*:\s*(\d+|"[^"]*")', head[:4096])
+    rid = json.loads(m.group(1)) if m else None
+    text = (f"The command's output was larger than {MAX_FRAME_BYTES >> 20} MB and was "
+            "not returned. Write large output to a file and inspect it with head, "
+            "tail or grep instead.")
+    return (json.dumps({"jsonrpc": "2.0", "id": rid,
+                        "result": {"content": [{"type": "text", "text": text}],
+                                   "isError": True}}) + "\n").encode()
+
+
+
 def _screen_frame(line: bytes, candidates: "CandidateLog | None"):
     """A refusal to send back instead of forwarding, or None to let it through.
 
@@ -780,6 +800,7 @@ def _start_episode_server(image: str, work: str, root: str,
 
     def _pump_out():
         pend = b""
+        skipping = False
         while True:
             try:
                 b = os.read(proc.stdout.fileno(), 65536)
@@ -790,8 +811,28 @@ def _start_episode_server(image: str, work: str, root: str,
             # Whole frames only, so a tool error can be rewritten before any
             # client sees it (_explain_tool_error). A partial frame waits for
             # the rest of its line.
+            if skipping:
+                # Dropping the rest of an oversized frame, up to its newline.
+                if b"\n" not in b:
+                    continue
+                b = b.split(b"\n", 1)[1]
+                skipping = False
             pend += b
             if b"\n" not in pend:
+                if len(pend) > MAX_FRAME_BYTES:
+                    # An agent command printed gigabytes (e.g. cat of a huge
+                    # file). Buffering it whole ran the host out of memory and
+                    # took every run down; answer with an error instead.
+                    b = _oversized_reply(pend)
+                    pend, skipping = b"", True
+                    if candidates is not None:
+                        candidates.saw_response(b)
+                    c = state["conn"]
+                    if c is not None:
+                        try:
+                            c.sendall(b)
+                        except OSError:
+                            state["conn"] = None
                 continue
             done, pend = pend.rsplit(b"\n", 1)
             b = b"".join(_explain_tool_error(ln + b"\n", paths)
