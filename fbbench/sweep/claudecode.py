@@ -181,14 +181,26 @@ def stage_claude_env(
 
 def claude_cmd(prompt: str, mcp_cfg: str, model: str, max_turns: int,
                system_prompt_for_run: str = "",
-               resume_session: str | None = None) -> list[str]:
-    """The hardened `claude -p` argv (see module docstring for the threat model)."""
+               resume_session: str | None = None,
+               usd_budget: float | None = None) -> list[str]:
+    """The hardened `claude -p` argv (see module docstring for the threat model).
+
+    `usd_budget` is this invocation's dollar ceiling: the CLI stops the session
+    itself when it is reached. AGENT_USD_CAP was only checked BETWEEN sessions,
+    so a single uninterrupted session ran far past it (Opus 5 reached $32 under
+    a $10 cap). The caller passes what is LEFT of the cell's cap -- the CLI
+    counts each session from zero, so passing the full cap every resume would
+    let a resumed cell spend the cap again.
+    """
     cmd = ["claude", "-p", prompt,
            "--output-format", "stream-json", "--verbose",
            "--model", model,
            "--mcp-config", mcp_cfg, "--strict-mcp-config",
            "--allowedTools", _BENCH_TOOLS,
-           "--disallowedTools", _DENY_TOOLS,
+           "--disallowedTools", _DENY_TOOLS,]
+    if usd_budget is not None and usd_budget > 0:
+        cmd += ["--max-budget-usd", f"{usd_budget:.2f}"]
+    cmd += [
            # The api arm's system prompt, appended rather than replacing Claude
            # Code's own: its default system prompt carries the instructions its
            # harness depends on, and overriding that changes the agent rather
@@ -411,9 +423,15 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             if remaining <= 0:
                 terminated = "turn_budget"
                 break
+            # What is LEFT of the cell's dollar cap. usd_eff holds the spend
+            # already accounted (0 on the first attempt, the running total on a
+            # resume); the CLI counts each session from zero, so it gets the
+            # remainder and stops the session itself at the cap -- the between-
+            # sessions check below is now only a backstop.
+            budget_left = max(AGENT_USD_CAP - usd_eff, 0.01) if AGENT_USD_CAP else None
             argv = claude_cmd(prompt, mcp_cfg, model, remaining,
                               agent_system_prompt(env_caps),
-                              resume_session=resume)
+                              resume_session=resume, usd_budget=budget_left)
             st = _run_claude_once(argv, lf, deadline, work, snap_dir, env)
             turns += st["turns"]
             grade_calls += st["grade_calls"]
@@ -859,7 +877,14 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
         try:
             server.wait(timeout=5)
         except Exception:  # noqa: BLE001
-            _kill_pg(server)
+            # Kill the docker client alone, as external.py does. It was started
+            # without start_new_session, so its process group is the bench's
+            # own: _kill_pg here SIGKILLed fb-bench itself whenever the client
+            # took over 5 s to exit (twice in one run on a busy host).
+            try:
+                server.kill()
+            except Exception:  # noqa: BLE001
+                pass
         shutil.rmtree(root, ignore_errors=True)
     return score
 
