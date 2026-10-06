@@ -561,6 +561,8 @@ def _write_exchange(log_path: str, out_path: Path, *, system_prompt: str,
     seen_msg: dict[str, int] = {}     # message.id -> index in `out`
     for r in recs:
         t, msg = r.get("type"), r.get("message") or {}
+        if not isinstance(msg, dict):   # some stream events carry a string here
+            msg = {}
         if t == "assistant":
             model_name = msg.get("model") or model_name
             # One response is split across several stream events sharing a
@@ -728,6 +730,10 @@ def _usage_floor(log_path: str) -> dict:
             except ValueError:
                 continue
             msg = ev.get("message") or {}
+            # Some stream events carry `message` as a plain string; only an
+            # API message object has usage.
+            if not isinstance(msg, dict):
+                continue
             u, mid = msg.get("usage"), msg.get("id")
             if not u or not mid or mid in seen:
                 continue
@@ -757,7 +763,12 @@ def _graded_paths(log_path: str, work: str) -> list[str]:
                 ev = json.loads(line)
             except ValueError:
                 continue
-            for b in ((ev.get("message") or {}).get("content") or []):
+            msg = ev.get("message") or {}
+            # A string `message` (some stream events) used to raise here and
+            # cost the cell its score.json after a full episode.
+            if not isinstance(msg, dict):
+                continue
+            for b in (msg.get("content") or []):
                 if (isinstance(b, dict) and b.get("type") == "tool_use"
                         and str(b.get("name", "")).endswith("run_poc_on_harness")):
                     p = (b.get("input") or {}).get("path") or ""
