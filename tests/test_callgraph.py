@@ -70,6 +70,7 @@ def test_the_note_is_one_bullet_added_under_the_dynamic_one():
     without = agent_tools_note(base)
     with_cg = agent_tools_note({**base, "callgraph": True})
     assert with_cg == without + "\n" + CALLGRAPH_NOTE
+    assert "LLVMFuzzerTestOneInput" in CALLGRAPH_NOTE and "depth" in CALLGRAPH_NOTE
     assert CALLGRAPH_NOTE.startswith("- ")
     for tool in CALLGRAPH_TOOL_NAMES:
         assert f"{tool}()" in CALLGRAPH_NOTE
@@ -85,7 +86,8 @@ def test_the_note_is_one_bullet_added_under_the_dynamic_one():
     # nothing else moved: the gdb note is byte-identical with or without the graph
     assert agent_tools_note(base) == without
     # a JVM image (no gdb, no native binary) still gets the graph alone
-    assert agent_tools_note({"gdb": False, "native": False, "target": t, "callgraph": True}).endswith(CALLGRAPH_NOTE)
+    jvm = agent_tools_note({"gdb": False, "native": False, "target": t, "callgraph": True})
+    assert "fuzzerTestOneInput" in jvm and "LLVMFuzzerTestOneInput" not in jvm
     assert "callgraph" not in agent_tools_note({}) and agent_tools_note({}) == ""
 
 
@@ -120,20 +122,24 @@ def test_converter_builds_the_contract(tmp_path):
     assert r.returncode == 0, r.stderr
     db = sqlite3.connect(f"file:{out}?mode=ro&immutable=1", uri=True)
     meta = dict(db.execute("SELECT key, value FROM meta"))
-    assert meta["schema_version"] == "1"
+    assert meta["schema_version"] == "2"
     assert meta["challenge"] == "toy-01"
     assert meta["entry"] == "LLVMFuzzerTestOneInput@harness.c:10"
     assert meta["n_functions"] == "5"
     assert meta["n_calls"] == "3", "duplicate call site collapsed, dangling edge dropped"
     assert meta["reachable_from_entry"] == "3"
     assert "1 edges to unknown nodes dropped" in meta["issues"]
-    # depth/parent: entry 0, parse 1, helper@util 2 with parent parse; the rest -1
-    rows = {uid: (d, p) for uid, d, p in db.execute("SELECT uid, depth, parent FROM functions")}
-    assert rows["LLVMFuzzerTestOneInput@harness.c:10"][0] == 0
-    assert rows["parse@parse.c:5"][0] == 1
+    # depth/parent: entry 0, parse 1, helper@util 2 with parent parse; the rest
+    # unreachable: reachable 0, parent NULL, depth the large sentinel so that a
+    # plain ORDER BY depth lists the reachable ones first
+    rows = {uid: (r, d, p) for uid, r, d, p in db.execute("SELECT uid, reachable, depth, parent FROM functions")}
+    assert rows["LLVMFuzzerTestOneInput@harness.c:10"][:2] == (1, 0)
+    assert rows["parse@parse.c:5"][:2] == (1, 1)
     parse_id, = db.execute("SELECT id FROM functions WHERE uid='parse@parse.c:5'").fetchone()
-    assert rows["helper@util.c:1"] == (2, parse_id)
-    assert rows["helper@other.c:1"][0] == -1 and rows["orphan@dead.c:3"][0] == -1
+    assert rows["helper@util.c:1"] == (1, 2, parse_id)
+    assert rows["helper@other.c:1"] == (0, 1_000_000, None) and rows["orphan@dead.c:3"] == (0, 1_000_000, None)
+    assert [n for n, in db.execute("SELECT name FROM functions ORDER BY depth, line LIMIT 3")] == \
+        ["LLVMFuzzerTestOneInput", "parse", "helper"], "the naive sort the first live agent wrote"
     # content is NOT shipped
     assert "content" not in [c[1] for c in db.execute("PRAGMA table_info(functions)")]
     # indexes the tools rely on exist
@@ -178,10 +184,15 @@ def test_binary_answers_as_cg_when_go_is_available(tmp_path):
         ["LLVMFuzzerTestOneInput", "parse", "helper"] and res["depth"] == 2
     rc, res, _ = cg("path", "orphan")
     assert rc == 0 and res["reachable"] is False
+    assert res["function"]["depth"] is None and res["function"]["reachable"] is False
+    rc, res, _ = cg("callers", "helper", "other.c")
+    assert rc == 0 and res["function"]["depth"] is None and res["callers"][0]["name"] == "orphan"
     rc, res, _ = cg("callers", "nope")
     assert rc == 0 and "no function named" in res["error"]
-    rc, res, _ = cg("sql", "SELECT count(*) FROM functions WHERE depth >= 0")
+    rc, res, _ = cg("sql", "SELECT count(*) FROM functions WHERE reachable = 1")
     assert rc == 0 and res["rows"] == [[3]]
+    rc, res, _ = cg("sql", "SELECT name FROM functions ORDER BY depth LIMIT 3")
+    assert rc == 0 and [r[0] for r in res["rows"]] == ["LLVMFuzzerTestOneInput", "parse", "helper"]
     rc, res, _ = cg("info")
     assert rc == 0 and res["examples"] and "cg sql" in res["how_to_query"]
     for ex in res["examples"]:          # every example must at least parse and run

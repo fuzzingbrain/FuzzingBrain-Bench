@@ -36,6 +36,9 @@ const (
 	callgraphDefaultPath = "/challenge/callgraph.sqlite"
 	callgraphPathEnv     = "BENCH_CALLGRAPH"    // override the file (tests)
 	callgraphDisableEnv  = "BENCH_NO_CALLGRAPH" // "1": the tools are not advertised (ablation)
+	// The file's meta.schema_version this reader was written against. A file
+	// from another version is refused with a message, not misread.
+	callgraphSchemaVersion = "2"
 
 	cgDefaultLimit = 50
 	cgMaxLimit     = 500
@@ -114,28 +117,48 @@ func openCallgraph() (*callgraph, error) {
 		if id := cg.meta["entry_id"]; id != "" {
 			fmt.Sscan(id, &cg.entryID)
 		}
+		if v := cg.meta["schema_version"]; v != callgraphSchemaVersion {
+			cgErr = fmt.Errorf("call graph schema %q, this server reads %q: rebuild with tools/callgraph/build_sqlite.py", v, callgraphSchemaVersion)
+			return
+		}
 		cgInst = cg
 	})
 	return cgInst, cgErr
 }
 
-// fn is one row of `functions` as the agent sees it.
+// fn is one row of `functions` as the agent sees it. depth is the number of
+// calls from the harness entry and null when the static graph has no path
+// (the file stores a large sentinel there so `ORDER BY depth` sorts those
+// last -- see build_sqlite.py).
 type fn struct {
-	ID      int64  `json:"id"`
-	Name    string `json:"name"`
-	File    string `json:"file"`
-	Line    int64  `json:"line"`
-	LineEnd int64  `json:"line_end"`
-	Depth   int64  `json:"depth"` // -1: not reachable from the harness entry in this graph
+	ID        int64  `json:"id"`
+	Name      string `json:"name"`
+	File      string `json:"file"`
+	Line      int64  `json:"line"`
+	LineEnd   int64  `json:"line_end"`
+	Reachable bool   `json:"reachable"`
+	Depth     *int64 `json:"depth"`
 }
 
-const fnCols = "id, name, file, line, line_end, depth"
+const fnCols = "id, name, file, line, line_end, reachable, depth"
+
+func scanFn(sc interface{ Scan(...any) error }, f *fn) error {
+	var reach, depth int64
+	if err := sc.Scan(&f.ID, &f.Name, &f.File, &f.Line, &f.LineEnd, &reach, &depth); err != nil {
+		return err
+	}
+	f.Reachable = reach == 1
+	if f.Reachable {
+		f.Depth = &depth
+	}
+	return nil
+}
 
 func scanFns(rows *sql.Rows) ([]fn, error) {
 	var out []fn
 	for rows.Next() {
 		var f fn
-		if err := rows.Scan(&f.ID, &f.Name, &f.File, &f.Line, &f.LineEnd, &f.Depth); err != nil {
+		if err := scanFn(rows, &f); err != nil {
 			return nil, err
 		}
 		out = append(out, f)
@@ -174,7 +197,7 @@ func (cg *callgraph) resolve(ctx context.Context, name, file string) ([]fn, erro
 		q += " AND (file = ? OR file LIKE ?)"
 		args = append(args, file, "%/"+strings.TrimPrefix(file, "/"))
 	}
-	q += " ORDER BY depth >= 0 DESC, depth, file, line LIMIT 50"
+	q += " ORDER BY depth, file, line LIMIT 50"
 	rows, err := cg.db.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err
@@ -263,9 +286,9 @@ func (cg *callgraph) neighbors(ctx context.Context, p cgLookupParams, dir string
 		return nil, err
 	}
 	rows, err := cg.db.QueryContext(ctx, fmt.Sprintf(
-		"SELECT f.id, f.name, f.file, f.line, f.line_end, f.depth FROM calls c "+
+		"SELECT f.id, f.name, f.file, f.line, f.line_end, f.reachable, f.depth FROM calls c "+
 			"JOIN functions f ON f.id = c.%s WHERE c.%s = ? "+
-			"ORDER BY f.depth >= 0 DESC, f.depth, f.file, f.line LIMIT ?", from, to), t.ID, limit)
+			"ORDER BY f.depth, f.file, f.line LIMIT ?", from, to), t.ID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +314,7 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 	if err != nil || miss != nil {
 		return miss, err
 	}
-	if t.Depth < 0 {
+	if !t.Reachable {
 		return map[string]any{
 			"function":  t,
 			"reachable": false,
@@ -300,19 +323,15 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 	}
 	chain := []fn{*t}
 	cur := t.ID
-	for i := int64(0); i <= t.Depth && cur != cg.entryID; i++ {
+	for i := int64(0); i <= *t.Depth && cur != cg.entryID; i++ {
 		var parent sql.NullInt64
-		var f fn
-		err := cg.db.QueryRowContext(ctx,
-			"SELECT "+fnCols+", parent FROM functions WHERE id = ?", cur).
-			Scan(&f.ID, &f.Name, &f.File, &f.Line, &f.LineEnd, &f.Depth, &parent)
-		if err != nil || !parent.Valid {
+		if err := cg.db.QueryRowContext(ctx, "SELECT parent FROM functions WHERE id = ?", cur).
+			Scan(&parent); err != nil || !parent.Valid {
 			break
 		}
 		cur = parent.Int64
 		var pf fn
-		if err := cg.db.QueryRowContext(ctx, "SELECT "+fnCols+" FROM functions WHERE id = ?", cur).
-			Scan(&pf.ID, &pf.Name, &pf.File, &pf.Line, &pf.LineEnd, &pf.Depth); err != nil {
+		if err := scanFn(cg.db.QueryRowContext(ctx, "SELECT "+fnCols+" FROM functions WHERE id = ?", cur), &pf); err != nil {
 			break
 		}
 		chain = append(chain, pf)
@@ -324,7 +343,7 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 	return map[string]any{
 		"function":  t,
 		"reachable": true,
-		"depth":     t.Depth,
+		"depth":     *t.Depth,
 		"path":      chain,
 	}, nil
 }
@@ -448,26 +467,30 @@ func isCallgraphTool(name string) bool {
 	return false
 }
 
-const cgSchemaDoc = "Tables: functions(id, uid 'name@file:line', name, file, line, line_end, depth, parent) " +
+const cgSchemaDoc = "Tables: functions(id, uid 'name@file:line', name, file, line, line_end, reachable, depth, parent) " +
 	"and calls(caller, callee) where caller/callee are functions.id; meta(key, value). " +
-	"depth is the BFS distance from the harness entry (-1 = not reachable in this graph), " +
-	"parent the predecessor on one shortest path. Indexed: functions.name, functions.file, " +
-	"calls.caller, calls.callee."
+	"depth is the number of calls from the harness entry (0 = the entry itself), parent the " +
+	"predecessor on one shortest path; reachable = 1 when such a path exists. A function with no " +
+	"static path has reachable = 0, parent NULL and depth = 1000000, so ORDER BY depth puts the " +
+	"harness's own functions first and the rest of the library last. Indexed: functions.name, " +
+	"functions.file, functions.depth, calls.caller, calls.callee."
 
 // cgExamples is what `cg info` shows under "how to query": the questions the
 // fixed tools do not answer, each as one SELECT that runs in milliseconds on
 // the largest graph.
 var cgExamples = []map[string]string{
+	{"question": "everything the harness reaches, nearest the entry first",
+		"sql": "SELECT name, file, line, line_end, depth FROM functions WHERE reachable = 1 ORDER BY depth, file, line"},
 	{"question": "every function in a file that the harness reaches, shallowest first",
-		"sql": "SELECT name, line, line_end, depth FROM functions WHERE file LIKE '%parser.c' AND depth >= 0 ORDER BY depth"},
+		"sql": "SELECT name, line, line_end, depth FROM functions WHERE file LIKE '%parser.c' AND reachable = 1 ORDER BY depth"},
 	{"question": "the most-called functions among those the harness reaches",
-		"sql": "SELECT f.name, f.file, f.line, count(*) n FROM calls c JOIN functions f ON f.id = c.callee WHERE f.depth >= 0 GROUP BY f.id ORDER BY n DESC LIMIT 20"},
-	{"question": "functions whose name mentions a sink, reachable or not",
-		"sql": "SELECT name, file, line, depth FROM functions WHERE name LIKE '%memcpy%' OR name LIKE '%strcpy%' ORDER BY depth >= 0 DESC, depth"},
+		"sql": "SELECT f.name, f.file, f.line, count(*) n FROM calls c JOIN functions f ON f.id = c.callee WHERE f.reachable = 1 GROUP BY f.id ORDER BY n DESC LIMIT 20"},
+	{"question": "functions whose name mentions a sink, reachable ones first",
+		"sql": "SELECT name, file, line, reachable, depth FROM functions WHERE name LIKE '%memcpy%' OR name LIKE '%strcpy%' ORDER BY depth"},
 	{"question": "everything within two calls of a function (callees of callees)",
 		"sql": "WITH RECURSIVE r(id, d) AS (SELECT id, 0 FROM functions WHERE name = 'parse_header' UNION SELECT c.callee, r.d + 1 FROM calls c JOIN r ON c.caller = r.id WHERE r.d < 2) SELECT DISTINCT f.name, f.file, f.line, r.d FROM r JOIN functions f ON f.id = r.id ORDER BY r.d"},
 	{"question": "the leaves: reachable functions that call nothing else in the graph",
-		"sql": "SELECT f.name, f.file, f.line, f.depth FROM functions f WHERE f.depth >= 0 AND NOT EXISTS (SELECT 1 FROM calls c WHERE c.caller = f.id) ORDER BY f.depth"},
+		"sql": "SELECT f.name, f.file, f.line, f.depth FROM functions f WHERE f.reachable = 1 AND NOT EXISTS (SELECT 1 FROM calls c WHERE c.caller = f.id) ORDER BY f.depth"},
 }
 
 func callgraphToolSchemas() []map[string]any {
@@ -485,7 +508,7 @@ func callgraphToolSchemas() []map[string]any {
 	// What the graph is and is not (static, approximate both ways, the source
 	// is the truth) is said once, in the bench's system prompt. These say only
 	// what each call returns.
-	common := " Each function is {id, name, file, line, line_end, depth}; file is under /challenge/src."
+	common := " Each function is {id, name, file, line, line_end, reachable, depth}: depth = calls from the harness entry, null when the graph has no path; file is under /challenge/src."
 	return []map[string]any{
 		{
 			"name":        "get_callers",

@@ -9,16 +9,20 @@ builder and the mcp-server's call-graph tools -- rebuild the graph with any tool
 you like, emit this schema, and nothing downstream changes.
 
   meta(key, value)                      challenge, lang, entry, builder, counts
-  functions(id, uid, name, file, line, line_end, depth, parent)
+  functions(id, uid, name, file, line, line_end, reachable, depth, parent)
   calls(caller, callee)                 caller/callee are functions.id
 
 `content` (the full source of every function) is dropped: the source is in the
 image at /challenge/src, and the agent reads it with sed by file:line-line_end.
 graal-01 goes from 191 MB to ~80 MB; a typical challenge is under 1 MB.
 
-depth/parent are a BFS from meta.entry (the harness entrypoint), computed here
-once so "is this reachable from the harness" and "how do I get there" are
-indexed lookups, not recursive queries. depth -1 = not reachable in this graph.
+reachable/depth/parent are a BFS from meta.entry (the harness entrypoint),
+computed here once so "is this reachable from the harness" and "how do I get
+there" are indexed lookups, not recursive queries. A function the BFS does not
+reach has reachable = 0 and depth = UNREACHABLE_DEPTH, a large number: the first
+live run sorted `ORDER BY depth` and, with -1 as the sentinel, got the 1600
+unreachable functions FIRST. Unreachable means "no static path", not "nearer
+than the entry", so it sorts last. The Go tools show it as null.
 
 Usage:
   build_sqlite.py <graph.json> [-o out.sqlite]
@@ -36,8 +40,9 @@ import sqlite3
 import sys
 import time
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 DB_SUFFIX = ".callgraph.sqlite"
+UNREACHABLE_DEPTH = 1_000_000   # sorts after every real depth; the tools render it as null
 
 SCHEMA = """
 CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
@@ -48,8 +53,9 @@ CREATE TABLE functions(
   file     TEXT NOT NULL,          -- relative to the challenge source root
   line     INTEGER NOT NULL,
   line_end INTEGER NOT NULL,
-  depth    INTEGER NOT NULL,       -- BFS distance from the harness entry; -1 unreachable
-  parent   INTEGER                 -- predecessor on one shortest path from the entry
+  reachable INTEGER NOT NULL,      -- 1 if a static call chain from the harness entry exists
+  depth    INTEGER NOT NULL,       -- calls from the harness entry (0 = the entry); 1000000 when unreachable
+  parent   INTEGER                 -- predecessor on one shortest path from the entry; NULL when unreachable
 );
 CREATE TABLE calls(
   caller INTEGER NOT NULL REFERENCES functions(id),
@@ -59,6 +65,7 @@ CREATE TABLE calls(
 INDEXES = """
 CREATE INDEX functions_name ON functions(name);
 CREATE INDEX functions_file ON functions(file);
+CREATE INDEX functions_depth ON functions(depth);
 CREATE INDEX calls_caller ON calls(caller, callee);
 CREATE INDEX calls_callee ON calls(callee, caller);
 """
@@ -99,18 +106,18 @@ def build(json_path: str, out_path: str, quiet: bool = False) -> dict:
         pairs.append((a, b))
         out_adj[a].append(b)
 
-    depth = [-1] * len(nodes)
+    depth = [UNREACHABLE_DEPTH] * len(nodes)
     parent: list[int | None] = [None] * len(nodes)
     if entry is not None:
         depth[entry] = 0
         queue = [entry]
         for u in queue:
             for v in out_adj[u]:
-                if depth[v] < 0:
+                if depth[v] == UNREACHABLE_DEPTH:
                     depth[v] = depth[u] + 1
                     parent[v] = u
                     queue.append(v)
-    reachable = sum(1 for d in depth if d >= 0)
+    reachable = sum(1 for d in depth if d != UNREACHABLE_DEPTH)
 
     issues = list(meta.get("issues") or [])
     if entry is None:
@@ -127,9 +134,10 @@ def build(json_path: str, out_path: str, quiet: bool = False) -> dict:
     db = sqlite3.connect(tmp)
     db.executescript(SCHEMA)
     db.executemany(
-        "INSERT INTO functions VALUES (?,?,?,?,?,?,?,?)",
+        "INSERT INTO functions VALUES (?,?,?,?,?,?,?,?,?)",
         ((i, n["id"], n["name"], n.get("file") or "", int(n.get("line") or 0),
-          int(n.get("line_end") or n.get("line") or 0), depth[i], parent[i])
+          int(n.get("line_end") or n.get("line") or 0),
+          int(depth[i] != UNREACHABLE_DEPTH), depth[i], parent[i])
          for i, n in enumerate(nodes)))
     db.executemany("INSERT INTO calls VALUES (?,?)", pairs)
     db.executescript(INDEXES)
@@ -149,6 +157,7 @@ def build(json_path: str, out_path: str, quiet: bool = False) -> dict:
         "edges_resolved": str(meta.get("edges_resolved", "")),
         "edges_byname": str(meta.get("edges_byname", "")),
         "reachable_from_entry": str(reachable),
+        "unreachable_depth": str(UNREACHABLE_DEPTH),
         "issues": json.dumps(issues),
     }
     db.executemany("INSERT INTO meta VALUES (?,?)", rows.items())

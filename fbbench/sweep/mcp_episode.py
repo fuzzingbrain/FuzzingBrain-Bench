@@ -317,7 +317,7 @@ def agent_tools_note(env: dict | None = None) -> str:
     have_gdb, target = bool(env.get("gdb")), env.get("target") or ""
     note = _dynamic_tools_note(have_gdb, target, bool(env.get("native")))
     if env.get("callgraph"):
-        note = (note + "\n" if note else "") + CALLGRAPH_NOTE
+        note = (note + "\n" if note else "") + callgraph_note(bool(env.get("native")))
     return note
 
 
@@ -328,21 +328,35 @@ def agent_tools_note(env: dict | None = None) -> str:
 # about its holes -- an agent told the graph is complete will stop at
 # reachable:false, and on fwupd (GObject vfuncs) or opencv (unresolved C++
 # methods) that is where the bug is.
-CALLGRAPH_NOTE = (
+CALLGRAPH_NOTE_TEMPLATE = (
     "- You also have the static call graph of this build, through the tools "
     "get_callers(), get_callees() and call_path() (shortest chain from the harness "
-    "entry); the same three exist in the shell as `cg callers|callees|path NAME "
-    "[FILE]`. For any other question query the graph with SQL from the shell: "
-    "`cg sql \"SELECT ...\"`, over functions(name, file, line, line_end, depth, "
-    "parent) and calls(caller, callee); `cg info` prints the schema and example "
-    "queries. Every answer gives file:line-line_end, so read the function with "
-    "`sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is static and "
-    "approximate in both directions: it misses calls through function pointers, "
-    "virtual dispatch and files it did not parse, so `reachable: false` or an "
-    "empty list is a hint, not a verdict; and it invents calls by matching a call "
-    "site to every function of that name, including code #ifdef'd out of this "
-    "build, so a listed caller or callee may not exist at runtime. The source is "
-    "the truth; use the graph to decide what to read.")
+    "entry {entry}); the same three exist in the shell as `cg callers|callees|path "
+    "NAME [FILE]`. Every function comes with `depth`, the number of calls from "
+    "{entry} (0 = the entry itself), and `reachable`: reachable=0 means the graph "
+    "has no static path from {entry} to it, its depth is null, and it sorts after "
+    "every reachable function. For any other question query the graph with SQL "
+    "from the shell: `cg sql \"SELECT ...\"`, over functions(name, file, line, "
+    "line_end, reachable, depth, parent) and calls(caller, callee); `cg info` "
+    "prints the schema and example queries. Every answer gives file:line-line_end, "
+    "so read the function with `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The "
+    "graph is static and approximate in both directions: it misses calls through "
+    "function pointers, virtual dispatch and files it did not parse, so "
+    "reachable=0 or an empty list is a hint, not a verdict; and it invents calls "
+    "by matching a call site to every function of that name, including code "
+    "#ifdef'd out of this build, so a listed caller or callee may not exist at "
+    "runtime. The source is the truth; use the graph to decide what to read.")
+
+
+def callgraph_note(native: bool = True) -> str:
+    """The bullet, naming the entry the graph is rooted at: libFuzzer's on a
+    native target, Jazzer's on a JVM one."""
+    entry = "LLVMFuzzerTestOneInput" if native else "fuzzerTestOneInput"
+    return CALLGRAPH_NOTE_TEMPLATE.format(entry=entry)
+
+
+# Kept for callers that only need the native wording (tests, docs).
+CALLGRAPH_NOTE = callgraph_note(True)
 
 
 def _dynamic_tools_note(have_gdb: bool, target: str, native: bool) -> str:
