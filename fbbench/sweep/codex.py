@@ -150,8 +150,9 @@ def codex_cmd(work: str, max_turns: int = MAX_TURNS_DEFAULT) -> list[str]:
     The target source lives at /src INSIDE the container and is reached only via
     the MCP tools, so Codex needs no host --add-dir. Codex's own shell/web are
     HARD-OFF in config.toml ([features] shell_tool=false, web_search="disabled");
-    --disable web_search_request and the run_cell log scan are kept as
-    belt-and-suspenders. --dangerously-bypass-approvals-and-sandbox lets Codex
+    the run_cell log scan is kept as belt-and-suspenders. (No --disable
+    web_search_request: codex >= 0.15x deprecates it, and its warning text
+    lands in the log and trips that scan.) --dangerously-bypass-approvals-and-sandbox lets Codex
     spawn the bench `docker run` MCP subprocess (the container is the real sandbox).
 
     The turn budget is appended to the prompt because Codex (unlike the API arm)
@@ -173,8 +174,7 @@ def codex_cmd(work: str, max_turns: int = MAX_TURNS_DEFAULT) -> list[str]:
     )
     cmd = ["codex", "exec", "--json",
            "--dangerously-bypass-approvals-and-sandbox",
-           "--cd", work, "--skip-git-repo-check",
-           "--disable", "web_search_request"]
+           "--cd", work, "--skip-git-repo-check"]
     cmd.append(CODEX_TASK_PROMPT + budget)
     return cmd
 
@@ -314,8 +314,11 @@ def run_codex(root: str, work: str, timeout_s: int,
     # --auth api: make the key available to codex even when it lives only in ./.env
     # (run_codex spawns the `codex` binary, which does not read our dotenv). Under
     # --auth sub this is None and codex uses the ChatGPT sign-in in auth.json.
+    # codex >= 0.15x reads CODEX_API_KEY in exec mode and ignores OPENAI_API_KEY
+    # (every call 401s with "Missing bearer"), so set both.
     if api_key:
         env["OPENAI_API_KEY"] = api_key
+        env["CODEX_API_KEY"] = api_key
     codex_home = env["CODEX_HOME"]
     log_path = os.path.join(work, "codex.log")
     t0 = time.time()
@@ -324,7 +327,7 @@ def run_codex(root: str, work: str, timeout_s: int,
     # `resume` keeps the session's recorded cwd, so no --cd (it rejects it).
     resume_base = ["codex", "exec", "resume", "--last", "--json",
                    "--dangerously-bypass-approvals-and-sandbox",
-                   "--skip-git-repo-check", "--disable", "web_search_request"]
+                   "--skip-git-repo-check"]
 
     terminated = "resumes_exhausted"
     with open(log_path, "w") as lf:
@@ -564,7 +567,10 @@ def run_cell(cell_dir: Path, bug: str, timeout_s: int,
         log_path = r["log_path"]
 
         log_text = Path(log_path).read_text(errors="replace") if Path(log_path).is_file() else ""
-        cheated_web = bool(re.search(r"web search:|web_search\b|browser_use|fetch.*http", log_text, re.I))
+        # Skip codex's own error items: its config deprecation notice names
+        # `web_search`, which would flag every cell as a web cheat.
+        agent_text = "\n".join(l for l in log_text.splitlines() if '"type":"error"' not in l)
+        cheated_web = bool(re.search(r"web search:|web_search\b|browser_use|fetch.*http", agent_text, re.I))
 
         blobs = _candidate_blobs(work)
         sigs, best_blob = _crash_signatures(
