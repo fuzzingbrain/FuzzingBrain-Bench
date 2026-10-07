@@ -203,11 +203,6 @@ func (cg *callgraph) similar(ctx context.Context, name string) []string {
 	return out
 }
 
-func (cg *callgraph) graphNote() string {
-	return fmt.Sprintf("static call graph of this build (%s functions, %s calls; %s reachable from %s)",
-		cg.meta["n_functions"], cg.meta["n_calls"], cg.meta["reachable_from_entry"], cg.meta["entry"])
-}
-
 type cgLookupParams struct {
 	Name  string `json:"name"`
 	File  string `json:"file,omitempty"`
@@ -287,7 +282,6 @@ func (cg *callgraph) neighbors(ctx context.Context, p cgLookupParams, dir string
 		dir:         list,
 		"total":     total,
 		"truncated": int64(len(list)) < total,
-		"graph":     cg.graphNote(),
 	}, nil
 }
 
@@ -302,7 +296,6 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 			"function":  t,
 			"reachable": false,
 			"message":   "no path from the harness entry to this function in the static graph",
-			"graph":     cg.graphNote(),
 		}, nil
 	}
 	chain := []fn{*t}
@@ -333,7 +326,6 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 		"reachable": true,
 		"depth":     t.Depth,
 		"path":      chain,
-		"graph":     cg.graphNote(),
 	}, nil
 }
 
