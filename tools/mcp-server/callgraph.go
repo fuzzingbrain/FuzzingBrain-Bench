@@ -303,7 +303,8 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 			"reachable": false,
 			"message": "not reachable from the harness entry in this static graph. That is not proof " +
 				"it is unreachable: calls through function pointers, virtual dispatch and some " +
-				"files are missing from the graph. get_callers() still works on it.",
+				"files are missing from the graph. get_callers() still works on it; read the " +
+				"source of the candidates it names.",
 			"graph": cg.graphNote(),
 		}, nil
 	}
@@ -335,7 +336,7 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 		"reachable": true,
 		"depth":     t.Depth,
 		"path":      chain,
-		"note":      "one shortest path in the static graph; other call chains may exist",
+		"note":      "one shortest path in the static graph; other chains may exist, and an edge on this one may be a name match that this build does not compile -- confirm each hop in the source",
 		"graph":     cg.graphNote(),
 	}, nil
 }
@@ -493,7 +494,7 @@ func callgraphToolSchemas() []map[string]any {
 			"required": []string{"name"},
 		}
 	}
-	common := " Each result is {id, name, file, line, line_end, depth}: read its source with exec `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is STATIC and from the harness build: calls through function pointers, virtual dispatch and some files are missing, so an empty answer is evidence, not proof. For any other question run SQL on the graph from the shell: `cg sql \"SELECT ...\"` (schema and examples: `cg info`)."
+	common := " Each result is {id, name, file, line, line_end, depth}: read its source with exec `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is STATIC and APPROXIMATE in both directions: it misses calls through function pointers, virtual dispatch and files it did not parse (an empty answer is a hint, not proof), and it invents calls by matching a call site to every function of that name, including ones #ifdef'd out of this build (a listed caller or callee may not exist at runtime). The source is the truth; use the graph to decide what to read. For any other question run SQL on the graph from the shell: `cg sql \"SELECT ...\"` (schema and examples: `cg info`)."
 	return []map[string]any{
 		{
 			"name":        "get_callers",

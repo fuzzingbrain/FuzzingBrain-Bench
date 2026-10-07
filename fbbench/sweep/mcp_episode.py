@@ -336,10 +336,13 @@ CALLGRAPH_NOTE = (
     "`cg sql \"SELECT ...\"`, over functions(name, file, line, line_end, depth, "
     "parent) and calls(caller, callee); `cg info` prints the schema and example "
     "queries. Every answer gives file:line-line_end, so read the function with "
-    "`sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is static: calls "
-    "through function pointers, virtual dispatch and some files are missing from "
-    "it, so `reachable: false` or an empty callers list is a hint to read the "
-    "code, not a verdict.")
+    "`sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is static and "
+    "approximate in both directions: it misses calls through function pointers, "
+    "virtual dispatch and files it did not parse, so `reachable: false` or an "
+    "empty list is a hint, not a verdict; and it invents calls by matching a call "
+    "site to every function of that name, including code #ifdef'd out of this "
+    "build, so a listed caller or callee may not exist at runtime. The source is "
+    "the truth; use the graph to decide what to read.")
 
 
 def _dynamic_tools_note(have_gdb: bool, target: str, native: bool) -> str:
