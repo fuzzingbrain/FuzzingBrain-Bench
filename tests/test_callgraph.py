@@ -73,7 +73,8 @@ def test_the_note_is_one_bullet_added_under_the_dynamic_one():
     assert CALLGRAPH_NOTE.startswith("- ")
     for tool in CALLGRAPH_TOOL_NAMES:
         assert f"{tool}()" in CALLGRAPH_NOTE
-    assert "cg " in CALLGRAPH_NOTE
+    assert "cg sql" in CALLGRAPH_NOTE and "cg info" in CALLGRAPH_NOTE
+    assert "query_graph" not in CALLGRAPH_NOTE
     # nothing else moved: the gdb note is byte-identical with or without the graph
     assert agent_tools_note(base) == without
     # a JVM image (no gdb, no native binary) still gets the graph alone
@@ -174,6 +175,11 @@ def test_binary_answers_as_cg_when_go_is_available(tmp_path):
     assert rc == 0 and "no function named" in res["error"]
     rc, res, _ = cg("sql", "SELECT count(*) FROM functions WHERE depth >= 0")
     assert rc == 0 and res["rows"] == [[3]]
+    rc, res, _ = cg("info")
+    assert rc == 0 and res["examples"] and "cg sql" in res["how_to_query"]
+    for ex in res["examples"]:          # every example must at least parse and run
+        rc, r2, err = cg("sql", ex["sql"])
+        assert rc == 0, (ex["sql"], err)
     for bad in ("DELETE FROM functions", "PRAGMA table_info(functions)", "SELECT 1; SELECT 2",
                 "WITH x AS (SELECT 1) SELECT * FROM x; ATTACH 'a' AS b"):
         rc, _, err = cg("sql", bad)

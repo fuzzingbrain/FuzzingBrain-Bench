@@ -214,7 +214,7 @@ func (s *server) handleToolCall(req *rpcRequest) {
 		result, err = s.toolExec(p.Arguments)
 	case "run_poc_on_harness":
 		result, err = s.toolGrade(p.Arguments)
-	case "get_callers", "get_callees", "call_path", "query_graph":
+	case "get_callers", "get_callees", "call_path":
 		result, err = s.toolCallgraph(p.Name, p.Arguments)
 	default:
 		s.writeError(req.ID, -32602, "unknown tool", p.Name)

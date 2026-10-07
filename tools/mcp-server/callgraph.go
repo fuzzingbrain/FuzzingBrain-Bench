@@ -5,10 +5,12 @@
 // from. Its schema (meta / functions / calls, see that script) is the contract:
 // swap the graph builder, keep the schema, and nothing here changes.
 //
-// Three fixed tools (get_callers, get_callees, call_path) cover what an agent
-// asks nine times in ten; query_graph takes read-only SQL for the tenth. The
-// same four are reachable from the agent's shell as `cg ...`, because an agent
-// that has gdb in its shell reaches for the shell -- see cgMain.
+// Three tools (get_callers, get_callees, call_path) cover what an agent asks
+// nine times in ten, and are worth a tool slot: high frequency, short schema.
+// Free SQL is the tenth question and lives in the shell only, as `cg sql`: an
+// agent that writes SQL reaches for the shell anyway, and a tool whose
+// description is a schema would ride along in every turn's context. `cg info`
+// carries the schema and worked examples for the moment they are needed.
 //
 // The file is opened read-only and immutable (it never changes inside an
 // image), so SQLite creates no journal next to it on the read-only root.
@@ -45,7 +47,7 @@ const (
 // CallgraphToolNames is the order they are advertised in. The Python side
 // (fbbench.sweep.mcp_episode.CALLGRAPH_TOOL_NAMES) mirrors this list and the
 // parity test checks the two agree.
-var CallgraphToolNames = []string{"get_callers", "get_callees", "call_path", "query_graph"}
+var CallgraphToolNames = []string{"get_callers", "get_callees", "call_path"}
 
 func callgraphPath() string {
 	if p := os.Getenv(callgraphPathEnv); p != "" {
@@ -444,14 +446,6 @@ func (s *server) toolCallgraph(name string, raw json.RawMessage) (any, error) {
 			}
 		}
 		return cg.path(ctx, p)
-	case "query_graph":
-		var p cgQueryParams
-		if len(raw) > 0 {
-			if err := json.Unmarshal(raw, &p); err != nil {
-				return nil, fmt.Errorf("invalid params: %w", err)
-			}
-		}
-		return cg.query(ctx, p)
 	}
 	return nil, fmt.Errorf("unknown call-graph tool %q", name)
 }
@@ -471,6 +465,22 @@ const cgSchemaDoc = "Tables: functions(id, uid 'name@file:line', name, file, lin
 	"parent the predecessor on one shortest path. Indexed: functions.name, functions.file, " +
 	"calls.caller, calls.callee."
 
+// cgExamples is what `cg info` shows under "how to query": the questions the
+// fixed tools do not answer, each as one SELECT that runs in milliseconds on
+// the largest graph.
+var cgExamples = []map[string]string{
+	{"question": "every function in a file that the harness reaches, shallowest first",
+		"sql": "SELECT name, line, line_end, depth FROM functions WHERE file LIKE '%parser.c' AND depth >= 0 ORDER BY depth"},
+	{"question": "the most-called functions among those the harness reaches",
+		"sql": "SELECT f.name, f.file, f.line, count(*) n FROM calls c JOIN functions f ON f.id = c.callee WHERE f.depth >= 0 GROUP BY f.id ORDER BY n DESC LIMIT 20"},
+	{"question": "functions whose name mentions a sink, reachable or not",
+		"sql": "SELECT name, file, line, depth FROM functions WHERE name LIKE '%memcpy%' OR name LIKE '%strcpy%' ORDER BY depth >= 0 DESC, depth"},
+	{"question": "everything within two calls of a function (callees of callees)",
+		"sql": "WITH RECURSIVE r(id, d) AS (SELECT id, 0 FROM functions WHERE name = 'parse_header' UNION SELECT c.callee, r.d + 1 FROM calls c JOIN r ON c.caller = r.id WHERE r.d < 2) SELECT DISTINCT f.name, f.file, f.line, r.d FROM r JOIN functions f ON f.id = r.id ORDER BY r.d"},
+	{"question": "the leaves: reachable functions that call nothing else in the graph",
+		"sql": "SELECT f.name, f.file, f.line, f.depth FROM functions f WHERE f.depth >= 0 AND NOT EXISTS (SELECT 1 FROM calls c WHERE c.caller = f.id) ORDER BY f.depth"},
+}
+
 func callgraphToolSchemas() []map[string]any {
 	lookup := func(desc string) map[string]any {
 		return map[string]any{
@@ -483,7 +493,7 @@ func callgraphToolSchemas() []map[string]any {
 			"required": []string{"name"},
 		}
 	}
-	common := " Each result is {id, name, file, line, line_end, depth}: read its source with exec `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is STATIC and from the harness build: calls through function pointers, virtual dispatch and some files are missing, so an empty answer is evidence, not proof."
+	common := " Each result is {id, name, file, line, line_end, depth}: read its source with exec `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is STATIC and from the harness build: calls through function pointers, virtual dispatch and some files are missing, so an empty answer is evidence, not proof. For any other question run SQL on the graph from the shell: `cg sql \"SELECT ...\"` (schema and examples: `cg info`)."
 	return []map[string]any{
 		{
 			"name":        "get_callers",
@@ -500,28 +510,16 @@ func callgraphToolSchemas() []map[string]any {
 			"description": "Static call graph: one shortest call chain from the harness entry (LLVMFuzzerTestOneInput / fuzzerTestOneInput) down to NAME, as a list of functions entry-first, with its depth. reachable:false means no path in this graph -- which can be a gap in the graph (indirect calls) rather than the truth." + common,
 			"inputSchema": lookup(""),
 		},
-		{
-			"name":        "query_graph",
-			"description": "Static call graph: run one read-only SQL SELECT against it (SQLite) when the fixed tools do not fit -- e.g. every function in a file that the entry reaches, functions with many callers, k-hop neighbourhoods with a recursive CTE. " + cgSchemaDoc + " 5 s timeout, rows capped by `limit`. Example: SELECT name, file, line, depth FROM functions WHERE file LIKE '%parser%' AND depth >= 0 ORDER BY depth",
-			"inputSchema": map[string]any{
-				"type": "object",
-				"properties": map[string]any{
-					"sql":   map[string]any{"type": "string", "description": "One SELECT (or WITH ... SELECT) statement."},
-					"limit": map[string]any{"type": "integer", "description": fmt.Sprintf("Max rows (default %d, max %d).", cgSQLDefRows, cgSQLMaxRows)},
-				},
-				"required": []string{"sql"},
-			},
-		},
 	}
 }
 
 // ---------------------------------------------------------------- cg CLI
 //
 // `cg` is this binary under another name (a wrapper script in the image), so the
-// agent's shell has the same four questions without the MCP envelope:
+// agent's shell has the three tools without the MCP envelope, plus free SQL:
 //
 //   cg callers NAME [FILE]      cg callees NAME [FILE]
-//   cg path NAME [FILE]         cg sql "SELECT ..."        cg info
+//   cg path NAME [FILE]         cg sql "SELECT ..." [LIMIT]        cg info
 //
 // Output is JSON (the tool result verbatim) -- pipes into jq-less shells still
 // read it, and it is exactly what the MCP tool would have said.
@@ -574,7 +572,14 @@ func cgMain(args []string) int {
 		}
 		res, err = cg.query(ctx, p)
 	case "info":
-		res = map[string]any{"meta": cg.meta, "schema": cgSchemaDoc, "path": callgraphPath()}
+		res = map[string]any{
+			"meta":   cg.meta,
+			"schema": cgSchemaDoc,
+			"path":   callgraphPath(),
+			"how_to_query": fmt.Sprintf("cg sql \"SELECT ...\" [LIMIT]: one read-only SELECT or WITH, %s timeout, at most %d rows (default %d). "+
+				"Results carry file and line/line_end: read a function with sed -n LINE,LINE_ENDp /challenge/src/FILE.", cgSQLTimeout, cgSQLMaxRows, cgSQLDefRows),
+			"examples": cgExamples,
+		}
 	default:
 		return usage()
 	}

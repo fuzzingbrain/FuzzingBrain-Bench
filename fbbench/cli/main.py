@@ -85,7 +85,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("--no-callgraph", action="store_true",
                         help="[agent arms] take the static call graph away: the tools note "
                              "drops its bullet and the server advertises neither the "
-                             "get_callers/get_callees/call_path/query_graph tools nor `cg`. "
+                             "get_callers/get_callees/call_path tools nor `cg`. "
                              "Everything else is the same setting")
     sp_run.add_argument("--stop-on-crash", action=argparse.BooleanOptionalAction, default=False,
                         help="end at the first crash (default OFF, so the agent "

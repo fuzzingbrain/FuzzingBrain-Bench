@@ -30,7 +30,7 @@ What the agent sees, identical on every arm:
 | the oracle | `run_poc_on_harness(path)` — raw harness stdout/stderr, crash novelty, per-round detail |
 | network | none |
 | debugger | `gdb`, where the challenge image ships one |
-| static call graph | `/challenge/callgraph.sqlite`, where the image ships one: the tools `get_callers`, `get_callees`, `call_path`, `query_graph` on the same server, and `cg` in the shell (`cg callers\|callees\|path NAME [FILE]`, `cg sql "SELECT ..."`, `cg info`). Built from the harness build by `tools/callgraph/build_sqlite.py`; `fb-bench run --no-callgraph` takes it away for an ablation |
+| static call graph | `/challenge/callgraph.sqlite`, where the image ships one: the tools `get_callers`, `get_callees`, `call_path` on the same server, and `cg` in the shell (`cg callers\|callees\|path NAME [FILE]`, free SQL with `cg sql "SELECT ..."`, schema and examples with `cg info`). Built from the harness build by `tools/callgraph/build_sqlite.py`; `fb-bench run --no-callgraph` takes it away for an ablation |
 
 The agent never touches Docker, never learns the image name, and never learns
 which version it is looking at — the source it reads and the harness its
