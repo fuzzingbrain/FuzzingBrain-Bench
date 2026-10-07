@@ -81,6 +81,9 @@ type server struct {
 }
 
 func main() {
+	if args, ok := invokedAsCG(os.Args); ok {
+		os.Exit(cgMain(args))
+	}
 	log.SetPrefix("mcp-server: ")
 	log.SetOutput(os.Stderr)
 
@@ -177,7 +180,11 @@ func (s *server) dispatch(req *rpcRequest) {
 	case "notifications/initialized":
 		// no response for notifications
 	case "tools/list":
-		s.writeResult(req.ID, map[string]any{"tools": toolSchemas()})
+		tools := toolSchemas()
+		if callgraphAvailable() {
+			tools = append(tools, callgraphToolSchemas()...)
+		}
+		s.writeResult(req.ID, map[string]any{"tools": tools})
 	case "tools/call":
 		s.handleToolCall(req)
 	default:
@@ -207,6 +214,8 @@ func (s *server) handleToolCall(req *rpcRequest) {
 		result, err = s.toolExec(p.Arguments)
 	case "run_poc_on_harness":
 		result, err = s.toolGrade(p.Arguments)
+	case "get_callers", "get_callees", "call_path", "query_graph":
+		result, err = s.toolCallgraph(p.Name, p.Arguments)
 	default:
 		s.writeError(req.ID, -32602, "unknown tool", p.Name)
 		return

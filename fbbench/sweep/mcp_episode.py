@@ -33,6 +33,12 @@ from fbbench.sandbox import NOFUZZ_REFUSED, sandbox_args
 # It lives here because all three arms must name the same set. Anything that
 # needs a tool list builds it from this and nothing keeps its own copy.
 BENCH_TOOL_NAMES = ("setup", "exec", "run_poc_on_harness")
+# The static call graph's tools, advertised by the same server only when the
+# image carries /challenge/callgraph.sqlite and --no-callgraph is not set. Same
+# order as CallgraphToolNames in tools/mcp-server/callgraph.go; a test holds the
+# two together.
+CALLGRAPH_TOOL_NAMES = ("get_callers", "get_callees", "call_path", "query_graph")
+CALLGRAPH_PATH = "/challenge/callgraph.sqlite"
 
 _RESERVED = {"mcp-server", "llvm-symbolizer", "sh", "bash", "env"}
 _CACHE_ROOT = os.environ.get(
@@ -149,12 +155,18 @@ def probe_environment(sock_path: str, timeout: float = 120.0) -> dict:
     cmd = (f"command -v gdb >/dev/null 2>&1 && echo GDB=1 || echo GDB=0; "
            f"test -r {ORACLE_HARNESS} && echo TARGET=1 || echo TARGET=0; "
            f"head -c 4 {ORACLE_HARNESS} 2>/dev/null | grep -q ELF "
-           f"&& echo NATIVE=1 || echo NATIVE=0")
+           f"&& echo NATIVE=1 || echo NATIVE=0; "
+           # The call graph counts only if its tools are reachable: the file is
+           # in the image AND the `cg` entry of the same server answers (which
+           # it refuses to under BENCH_NO_CALLGRAPH).
+           f"test -r {CALLGRAPH_PATH} && cg info >/dev/null 2>&1 "
+           f"&& echo CALLGRAPH=1 || echo CALLGRAPH=0")
     out = _exec_once(sock_path, cmd, timeout)
-    from fbbench.sandbox import no_gdb
+    from fbbench.sandbox import no_callgraph, no_gdb
     return {"gdb": "GDB=1" in out and "NATIVE=1" in out and not no_gdb(),
             "native": "NATIVE=1" in out,
-            "target": ORACLE_HARNESS if "TARGET=1" in out else ""}
+            "target": ORACLE_HARNESS if "TARGET=1" in out else "",
+            "callgraph": "CALLGRAPH=1" in out and not no_callgraph()}
 
 
 GDB_CONFIG_HOME = "/workspace/.config"
@@ -303,6 +315,31 @@ def agent_tools_note(env: dict | None = None) -> str:
     """
     env = env or {}
     have_gdb, target = bool(env.get("gdb")), env.get("target") or ""
+    note = _dynamic_tools_note(have_gdb, target, bool(env.get("native")))
+    if env.get("callgraph"):
+        note = (note + "\n" if note else "") + CALLGRAPH_NOTE
+    return note
+
+
+# The static counterpart of the gdb line. Four tools and a shell command, the
+# same server, the same graph: the file was built from the harness build with
+# Joern (tools/callgraph/build_sqlite.py). Honest about its holes -- an agent
+# told the graph is complete will stop at reachable:false, and on fwupd (GObject
+# vfuncs) or opencv (unresolved C++ methods) that is where the bug is.
+CALLGRAPH_NOTE = (
+    "- You also have the static call graph of this build, through the tools "
+    "get_callers(), get_callees(), call_path() (shortest chain from the harness "
+    "entry) and query_graph() (one read-only SQL SELECT over functions(name, "
+    "file, line, line_end, depth, parent) and calls(caller, callee)); the same "
+    "four exist in the shell as `cg callers|callees|path NAME [FILE]`, `cg sql "
+    "\"SELECT ...\"` and `cg info`. Every answer gives file:line-line_end, so "
+    "read the function with `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph "
+    "is static: calls through function pointers, virtual dispatch and some files "
+    "are missing from it, so `reachable: false` or an empty callers list is a hint "
+    "to read the code, not a verdict.")
+
+
+def _dynamic_tools_note(have_gdb: bool, target: str, native: bool) -> str:
     if have_gdb and target:
         # The coverage recipe is the one that works: run on a single file,
         # libFuzzer reports every function UNCOVERED, the entry included, for
@@ -347,7 +384,7 @@ def agent_tools_note(env: dict | None = None) -> str:
                 f"dies with no output at all, not even libFuzzer's banner, is a "
                 f"sanitizer start-up failure of this host, not a crash: run it "
                 f"again.")
-    if target and env.get("native"):
+    if target and native:
         # --no-gdb: the note with only the gdb sentences taken out, so the
         # ablation changes one thing.
         t = target

@@ -1043,6 +1043,8 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             "gdb_source_map": env_caps.get("gdb_source_map") or [],
             # Whether the agent was given gdb at all (fb-bench run --no-gdb).
             "gdb_available": bool(env_caps.get("gdb")),
+            # Whether the static call graph was offered (image has it, no --no-callgraph).
+            "callgraph_available": bool(env_caps.get("callgraph")),
             "network": "allowed" if manifest.allow_network else "blocked",
             # Which model server this episode used, when several are pooled.
             "agent_endpoint": agent_endpoint,

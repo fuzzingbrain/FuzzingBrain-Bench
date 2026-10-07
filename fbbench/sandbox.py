@@ -91,6 +91,23 @@ def no_gdb() -> bool:
     return os.environ.get(NO_GDB_ENV) == "1"
 
 
+# --no-callgraph: the same setting with the static call graph taken away. The
+# mcp-server in the image reads BENCH_NO_CALLGRAPH and then neither advertises
+# the call-graph tools nor answers `cg`; probe_environment reports it absent, so
+# the tools note says nothing about it. Read here and there, nowhere else.
+NO_CALLGRAPH_ENV = "FBBENCH_NO_CALLGRAPH"
+NO_CALLGRAPH_CONTAINER_ENV = "BENCH_NO_CALLGRAPH"
+# The shell entry is a wrapper script in the image (tools/callgraph/Dockerfile),
+# so a stub can be mounted over it the way gdb's is; the server does not pass
+# the env switch on to the agent's shell, so the mount is what takes `cg` away.
+CG_STUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cg-unavailable.sh")
+CG_PATH = "/usr/local/bin/cg"
+
+
+def no_callgraph() -> bool:
+    return os.environ.get(NO_CALLGRAPH_ENV) == "1"
+
+
 def sandbox_args() -> list[str]:
     """`docker run` flags for a challenge container. Raises if the guard is missing:
     a sandbox that silently allows fuzzing would score a different benchmark."""
@@ -101,4 +118,6 @@ def sandbox_args() -> list[str]:
             "-v", f"{NOFUZZ_SO}:{NOFUZZ_IN_CONTAINER}:ro",
             "-e", f"LD_PRELOAD={NOFUZZ_IN_CONTAINER}",
             *sig_rules_args(),
-            *[a for p in (GDB_PATHS if no_gdb() else ()) for a in ("-v", f"{GDB_STUB}:{p}:ro")]]
+            *[a for p in (GDB_PATHS if no_gdb() else ()) for a in ("-v", f"{GDB_STUB}:{p}:ro")],
+            *(["-e", f"{NO_CALLGRAPH_CONTAINER_ENV}=1", "-v", f"{CG_STUB}:{CG_PATH}:ro"]
+              if no_callgraph() else [])]

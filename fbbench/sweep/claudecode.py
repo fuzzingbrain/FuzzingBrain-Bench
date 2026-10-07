@@ -67,13 +67,15 @@ MAX_RESUMES = 400
 from fbbench.images import agent_image, image_digest
 from fbbench.sweep.external import agent_opening, agent_system_prompt
 from fbbench.sweep.mcp_episode import (
-    BENCH_TOOL_NAMES, agent_tools_note, fetch_setup, install_gdb_source_map,
-    probe_environment)
+    BENCH_TOOL_NAMES, CALLGRAPH_TOOL_NAMES, agent_tools_note, fetch_setup,
+    install_gdb_source_map, probe_environment)
 
 # The only tools the agent may call: the bench MCP tools, named from the one
 # list every arm shares. Everything else is a host-side cheat/contamination
 # surface and is hard-denied below.
-_BENCH_TOOLS = ",".join(f"mcp__bench__{t}" for t in BENCH_TOOL_NAMES)
+# The call-graph tools are allowed too: when the image does not advertise them
+# the allowance is inert, and when it does the agent must not be prompted.
+_BENCH_TOOLS = ",".join(f"mcp__bench__{t}" for t in BENCH_TOOL_NAMES + CALLGRAPH_TOOL_NAMES)
 # Exhaustive built-in denylist. `--allowedTools` is NOT exclusive (tools absent
 # from it can still run if they don't require a prompt — Skill/SlashCommand slip
 # through), so we ALSO name every built-in here. Audited: with this list an agent
@@ -100,7 +102,7 @@ def claude_task_prompt(setup_resp: dict | None = None,
     # that says mcp__bench__run_poc_on_harness() everywhere else and the bare
     # name here would be pointing this arm at a tool it cannot call.
     p = agent_opening(setup_resp, env_caps)
-    for tool in BENCH_TOOL_NAMES:
+    for tool in BENCH_TOOL_NAMES + CALLGRAPH_TOOL_NAMES:
         p = p.replace(f"{tool}()", f"mcp__bench__{tool}()")
     return p
 
@@ -511,6 +513,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             # what was actually sent, so the cell cannot record something else
             "system_prompt_sent": agent_system_prompt(env_caps),
             "gdb_source_map": (env_caps or {}).get("gdb_source_map") or [],
+            "callgraph_available": bool((env_caps or {}).get("callgraph")),
             "user_turn_sent": prompt}
 
 
@@ -801,6 +804,8 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "agent_image": agent_image(alias),
         # Whether gdb was offered at all (fb-bench run --no-gdb).
         "gdb_available": not __import__("fbbench.sandbox", fromlist=["no_gdb"]).no_gdb(),
+        # Whether the static call graph was offered (image has it, no --no-callgraph).
+        "callgraph_available": bool(r.get("callgraph_available")),
         "agent_image_digest": image_digest(agent_image(alias)),
         # Whether gdb in this container could actually show source. Verified
         # against gdb, not assumed from having written the file.

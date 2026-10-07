@@ -175,6 +175,10 @@ def cmd_run(args) -> int:
         import os as _os
         from fbbench.sandbox import NO_GDB_ENV
         _os.environ[NO_GDB_ENV] = "1"
+    if getattr(args, "no_callgraph", False):
+        import os as _os
+        from fbbench.sandbox import NO_CALLGRAPH_ENV
+        _os.environ[NO_CALLGRAPH_ENV] = "1"
     from fbbench.sweep.orchestrator import run_matrix, resolve_models, resolve_bugs
 
     env_combined = {**read_dotenv(), **os.environ}

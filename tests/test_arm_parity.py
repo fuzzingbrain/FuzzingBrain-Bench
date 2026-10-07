@@ -199,7 +199,9 @@ def test_claudecode_is_allowed_exactly_the_tools_that_exist():
     """
     from fbbench.sweep import claudecode as cc
     allowed = {t.removeprefix("mcp__bench__") for t in cc._BENCH_TOOLS.split(",")}
-    assert allowed == set(mcp_episode.BENCH_TOOL_NAMES)
+    # Both lists are shared: the call-graph tools come from the same server and
+    # the same image for every arm (advertised only where the image has a graph).
+    assert allowed == set(mcp_episode.BENCH_TOOL_NAMES + mcp_episode.CALLGRAPH_TOOL_NAMES)
 
 
 def test_the_api_arm_does_not_filter_tools_so_every_arm_sees_the_same_set():

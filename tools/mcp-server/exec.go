@@ -29,6 +29,9 @@ var execEnvDeny = map[string]bool{
 	"BENCH_SIG_SCRIPT":   true,
 	"BENCH_GRADE_REVEAL": true,
 	"BENCH_DETECT_LEAKS": true,
+	// The call-graph ablation switch: an agent that can read it learns it is
+	// in a without-graph arm.
+	"BENCH_NO_CALLGRAPH": true,
 }
 
 // agentEnv returns the process environment with the oracle/privsep vars
