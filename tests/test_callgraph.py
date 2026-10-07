@@ -77,7 +77,10 @@ def test_the_note_is_one_bullet_added_under_the_dynamic_one():
     # both failure modes of a static graph are named, and the source is the truth
     assert "misses" in CALLGRAPH_NOTE and "invents" in CALLGRAPH_NOTE
     assert "source is the truth" in CALLGRAPH_NOTE
-    assert "approximate in both directions" in GO_SRC.read_text().lower()
+    # ...and ONLY here: the tool descriptions and results do not repeat it
+    # (they would, in every turn's tool list and every answer)
+    go = GO_SRC.read_text()
+    assert go.count("approximate") == 1 and "source is the truth" not in go.split("func callgraphToolSchemas")[1]
     assert "query_graph" not in CALLGRAPH_NOTE
     # nothing else moved: the gdb note is byte-identical with or without the graph
     assert agent_tools_note(base) == without

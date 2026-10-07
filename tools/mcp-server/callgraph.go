@@ -301,11 +301,8 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 		return map[string]any{
 			"function":  t,
 			"reachable": false,
-			"message": "not reachable from the harness entry in this static graph. That is not proof " +
-				"it is unreachable: calls through function pointers, virtual dispatch and some " +
-				"files are missing from the graph. get_callers() still works on it; read the " +
-				"source of the candidates it names.",
-			"graph": cg.graphNote(),
+			"message":   "no path from the harness entry to this function in the static graph",
+			"graph":     cg.graphNote(),
 		}, nil
 	}
 	chain := []fn{*t}
@@ -336,7 +333,6 @@ func (cg *callgraph) path(ctx context.Context, p cgLookupParams) (any, error) {
 		"reachable": true,
 		"depth":     t.Depth,
 		"path":      chain,
-		"note":      "one shortest path in the static graph; other chains may exist, and an edge on this one may be a name match that this build does not compile -- confirm each hop in the source",
 		"graph":     cg.graphNote(),
 	}, nil
 }
@@ -494,21 +490,24 @@ func callgraphToolSchemas() []map[string]any {
 			"required": []string{"name"},
 		}
 	}
-	common := " Each result is {id, name, file, line, line_end, depth}: read its source with exec `sed -n LINE,LINE_ENDp /challenge/src/FILE`. The graph is STATIC and APPROXIMATE in both directions: it misses calls through function pointers, virtual dispatch and files it did not parse (an empty answer is a hint, not proof), and it invents calls by matching a call site to every function of that name, including ones #ifdef'd out of this build (a listed caller or callee may not exist at runtime). The source is the truth; use the graph to decide what to read. For any other question run SQL on the graph from the shell: `cg sql \"SELECT ...\"` (schema and examples: `cg info`)."
+	// What the graph is and is not (static, approximate both ways, the source
+	// is the truth) is said once, in the bench's system prompt. These say only
+	// what each call returns.
+	common := " Each function is {id, name, file, line, line_end, depth}; file is under /challenge/src."
 	return []map[string]any{
 		{
 			"name":        "get_callers",
-			"description": "Static call graph: the functions that call NAME, nearest to the harness entry first (total and truncated flag included). If several functions share the name you get the candidates back and pass `file`." + common,
+			"description": "Static call graph: the functions that call NAME, nearest to the harness entry first, with the total and a truncated flag. Several functions of that name: the candidates come back, call again with `file`." + common,
 			"inputSchema": lookup(""),
 		},
 		{
 			"name":        "get_callees",
-			"description": "Static call graph: the functions NAME calls, nearest to the harness entry first (total and truncated flag included). If several functions share the name you get the candidates back and pass `file`." + common,
+			"description": "Static call graph: the functions NAME calls, nearest to the harness entry first, with the total and a truncated flag. Several functions of that name: the candidates come back, call again with `file`." + common,
 			"inputSchema": lookup(""),
 		},
 		{
 			"name":        "call_path",
-			"description": "Static call graph: one shortest call chain from the harness entry (LLVMFuzzerTestOneInput / fuzzerTestOneInput) down to NAME, as a list of functions entry-first, with its depth. reachable:false means no path in this graph -- which can be a gap in the graph (indirect calls) rather than the truth." + common,
+			"description": "Static call graph: one shortest call chain from the harness entry down to NAME, entry first, with its depth; reachable:false when the graph has no path." + common,
 			"inputSchema": lookup(""),
 		},
 	}
