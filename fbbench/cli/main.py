@@ -61,9 +61,12 @@ def build_parser() -> argparse.ArgumentParser:
                         help="repeat count: run each (model, bug) N times, stored as "
                              "seed-0..seed-(N-1) (default 1)")
     sp_run.add_argument("--max-turns", type=int, default=100,
-                        help="turn budget per episode (default 100)")
+                        help="turn budget per episode; 0 = no turn limit, api arm only "
+                             "(default 100)")
     sp_run.add_argument("--timeout", type=int, default=1800,
                         help="per-episode wall-clock seconds (default 1800)")
+    sp_run.add_argument("--cost-cap", type=float, default=10.0,
+                        help="[api arm] dollar cap per episode; 0 disables it (default 10.0)")
     sp_run.add_argument("--jobs", "-j", type=int, default=1,
                         help="run N cells concurrently (default 1). 4-6 is usually the "
                              "sweet spot before model rate limits kick in")

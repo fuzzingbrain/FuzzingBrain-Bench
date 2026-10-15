@@ -280,6 +280,7 @@ def cmd_run(args) -> int:
         models, bugs,
         samples=args.samples, output=args.output,
         max_turns=args.max_turns, timeout=args.timeout, jobs=args.jobs,
+        cost_cap=getattr(args, "cost_cap", 10.0),
         dashboard_pref=getattr(args, "dashboard", None),
         preserve_pocs=args.preserve_pocs,
         stop_on_crash=getattr(args, "stop_on_crash", False),

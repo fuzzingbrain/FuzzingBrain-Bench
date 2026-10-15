@@ -16,6 +16,7 @@ from fbbench.env import load_dotenv
 from fbbench.grading.bench_yaml import find_bug, read_bench
 from fbbench.images import DEFAULT_IMAGE_PREFIX, challenge_image
 from fbbench.models import CATALOG, PRICES, cost_usd, default_sweep
+from fbbench.sweep.mcp_episode import AGENT_USD_CAP, AGENT_WALL_CAP_S
 from fbbench.paths import REPO
 from fbbench.runner.backends import make_backend
 from fbbench.runner.episode import run_episode
@@ -44,12 +45,16 @@ def main() -> int:
                                  description="FuzzingBrain Bench episode driver")
     ap.add_argument("--bug", help="challenge alias")
     ap.add_argument("--model", default="claude-opus-4-8", help="model id (claude*/gpt*/gemini*)")
-    ap.add_argument("--max-turns", type=int, default=100,
-                    help="turn budget per episode (default 100)")
-    ap.add_argument("--timeout", type=int, default=1800,
+    ap.add_argument("--max-turns", type=int, default=0,
+                    help="turn budget per episode; 0 = no turn limit (default 0: "
+                         "the episode is bounded by --timeout and --cost-cap only)")
+    ap.add_argument("--cost-cap", type=float, default=AGENT_USD_CAP,
+                    help="dollar cap per episode; 0 disables it (default: the agent "
+                         f"arms' cap, ${AGENT_USD_CAP:g})")
+    ap.add_argument("--timeout", type=int, default=AGENT_WALL_CAP_S,
                     help="wall-clock seconds per episode; the agent is told its "
                          "remaining time and the episode self-stops at the limit "
-                         "(default 1800)")
+                         f"(default: the agent arms' cap, {AGENT_WALL_CAP_S}s)")
     ap.add_argument("--output", default="output", help="output root (legacy nesting <output>/<bug>/<model>/)")
     ap.add_argument("--out-dir", default=None,
                     help="literal output dir; takes precedence over --output")
@@ -95,6 +100,8 @@ def main() -> int:
                else Path(args.output) / args.bug / args.model)
     out_dir.mkdir(parents=True, exist_ok=True)
 
+    if args.cost_cap and cost_usd(args.model, 0, 0).get("total_usd") is None:
+        ap.error(f"--cost-cap needs a price for {args.model!r} in fbbench/models/pricing.py")
     backend = make_backend(args.model, api_key=args.api_key)
     pocs_dir = (out_dir / "pocs") if args.preserve_pocs else None
     # One id per episode, recorded in score.json so a result can be traced back
@@ -116,6 +123,7 @@ def main() -> int:
         image=image,
         max_turns=args.max_turns,
         time_budget_s=args.timeout,
+        cost_cap_usd=args.cost_cap or None,
         episode_log=str(out_dir / "episode.jsonl"),
         pocs_dir=str(pocs_dir) if pocs_dir else None,
         stop_on_crash=args.stop_on_crash,
@@ -136,6 +144,7 @@ def main() -> int:
             "mode": "full-scan",
             "max_turns": args.max_turns,
             "timeout_s": args.timeout,
+            "cost_cap_usd": args.cost_cap,
             "stop_on_crash": bool(args.stop_on_crash),
             "preserve_pocs": bool(args.preserve_pocs),
             # Observed, not assumed: recorded only once something was actually

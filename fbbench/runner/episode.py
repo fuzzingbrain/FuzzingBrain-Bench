@@ -7,6 +7,7 @@ episode.jsonl / score.json / cost.json (the latter two by the caller).
 """
 from __future__ import annotations
 
+import itertools
 import json
 import os
 import time
@@ -21,6 +22,7 @@ from dataclasses import replace
 from fbbench.grading.bench_yaml import harness_sanitizer
 from fbbench.grading.signature import signature as crash_signature
 from fbbench.models.catalog import context_window
+from fbbench.models.pricing import cost_usd
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
 
@@ -273,6 +275,7 @@ def run_episode(
     image: str,
     max_turns: int = 300,
     time_budget_s: float | None = None,
+    cost_cap_usd: float | None = None,
     episode_log: str | None = None,
     oracle_dir: str | None = None,
     pocs_dir: str | None = None,
@@ -329,6 +332,8 @@ def run_episode(
 
     tlog({"event": "start", "model": backend.model, "bug_id": bug_id,
           "max_turns": max_turns,
+          "time_budget_s": time_budget_s,
+          "cost_cap_usd": cost_cap_usd,
           "preserve_pocs": bool(poc_root),
           "system_prompt": sysp,
           "initial_user_message": user_text,
@@ -390,7 +395,9 @@ def run_episode(
 
     consecutive_trunc = 0
     try:
-        for turn in range(max_turns):
+        # max_turns <= 0 means no turn limit: the clock and the dollar cap end
+        # the episode, the same two limits the agent arms run under.
+        for turn in (range(max_turns) if max_turns > 0 else itertools.count()):
             result.turns_used = turn + 1
             comp = complete_once()
             # A refusal / malformed-function-call means we got NO usable reply
@@ -537,7 +544,7 @@ def run_episode(
             # doesn't clutter every turn. The crash "keep hunting" nudge is separate
             # and fires on ANY crash turn.
             done_t = turn + 1
-            remaining = max_turns - done_t
+            remaining = max_turns - done_t if max_turns > 0 else 0
             now = time.time()
             elapsed = now - start
             rem_s = (deadline - now) if deadline is not None else None
@@ -583,6 +590,20 @@ def run_episode(
                 tlog({"event": "time_budget", "turn": turn,
                       "elapsed_s": round(time.time() - start, 1)})
                 break
+            # Dollar cap: checked between turns, like the clock, so the turn that
+            # crosses it finishes and nothing after it starts. Same cap the agent
+            # arms enforce, passed in by the runner.
+            if cost_cap_usd:
+                spent = cost_usd(backend.model, result.input_tokens, result.output_tokens,
+                                 result.cache_read_tokens,
+                                 result.cache_write_tokens).get("total_usd") or 0.0
+                if spent >= cost_cap_usd:
+                    result.terminated_reason = "cost_cap"
+                    ev = {"event": "cost_cap", "turn": turn, "spent_usd": round(spent, 4),
+                          "cap_usd": cost_cap_usd}
+                    log(ev)
+                    tlog(ev)
+                    break
         else:
             result.terminated_reason = "max_turns"
     except Exception as e:

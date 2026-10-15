@@ -361,6 +361,15 @@ _BUDGET_NOTE_FMT = _reg("budget_note",
     fills="done (turns used), max_turns, remaining; time_clause (elapsed / "
           "remaining wall-clock, present only when a time budget is set)")
 
+_BUDGET_NOTE_UNCAPPED_FMT = _reg("budget_note_uncapped",
+    "[Budget: turn {done}.{time_clause}]",
+    when="The budget note of a run with no turn limit (--max-turns 0): the same "
+         "intervals, without a turn ceiling to count down to.",
+    why="With time and money as the only limits there is no turn budget to state; "
+        "the wall-clock clause is the part the model can pace against. Spend is "
+        "not shown, as the agent arms do not show it either.",
+    fills="done (turns used); time_clause (as in budget_note)")
+
 _BUDGET_LOW_SUFFIX = _reg("budget_low_suffix", """
  You are running low on turns; submit any candidate you have not run through \
 run_poc_on_harness() yet, and spend what is left reaching a fault you have not already \
@@ -420,6 +429,8 @@ def budget_note(done: int, max_turns: int, remaining: int, *,
         rem_s = remaining_s if remaining_s is not None else max(0.0, time_budget_s - elapsed_s)
         time_clause = (f" Time ~{_fmt_dur(elapsed_s)} elapsed, "
                        f"~{_fmt_dur(rem_s)} left of {_fmt_dur(time_budget_s)}.")
+    if max_turns <= 0:
+        return _BUDGET_NOTE_UNCAPPED_FMT.format(done=done, time_clause=time_clause)
     note = _BUDGET_NOTE_FMT.format(done=done, max_turns=max_turns,
                                    remaining=remaining, time_clause=time_clause)
     if remaining > 0 and _crosses_low_mark(done, max_turns):

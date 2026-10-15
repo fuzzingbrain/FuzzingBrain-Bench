@@ -108,6 +108,52 @@ def no_callgraph() -> bool:
     return os.environ.get(NO_CALLGRAPH_ENV) == "1"
 
 
+# Host-local, not part of the benchmark: on a machine shared with other pinned
+# workloads, FBBENCH_AVOID_CONTAINERS=<name prefix> keeps every challenge container
+# off the CPUs (and their hyperthread siblings) those containers are pinned to,
+# read afresh at each container start. Unset, nothing changes.
+AVOID_CONTAINERS_ENV = "FBBENCH_AVOID_CONTAINERS"
+
+
+def _parse_cpuset(spec: str) -> set[int]:
+    out: set[int] = set()
+    for part in filter(None, spec.split(",")):
+        lo, _, hi = part.partition("-")
+        out.update(range(int(lo), int(hi or lo) + 1))
+    return out
+
+
+def cpuset_args() -> list[str]:
+    prefix = os.environ.get(AVOID_CONTAINERS_ENV)
+    if not prefix:
+        return []
+    import subprocess
+    ids = subprocess.run(["docker", "ps", "-q", "--filter", f"name=^{prefix}"],
+                         capture_output=True, text=True).stdout.split()
+    busy: set[int] = {0}
+    if ids:
+        specs = subprocess.run(["docker", "inspect", "--format",
+                                "{{.HostConfig.CpusetCpus}}", *ids],
+                               capture_output=True, text=True).stdout.split()
+        for spec in specs:
+            busy |= _parse_cpuset(spec)
+    n = os.cpu_count() or 1
+    half = n // 2
+    busy |= {(c + half) % n for c in busy}
+    free = [c for c in range(n) if c not in busy]
+    return ["--cpuset-cpus", ",".join(map(str, free))] if free else []
+
+
+MEMORY_ENV = "FBBENCH_CONTAINER_MEMORY"
+
+
+def memory_args() -> list[str]:
+    """A per-container memory cap (e.g. "8g") from the environment, so a runaway
+    PoC is OOM-killed inside its own container instead of taking down the host."""
+    mem = os.environ.get(MEMORY_ENV, "").strip()
+    return ["--memory", mem, "--memory-swap", mem] if mem else []
+
+
 def sandbox_args() -> list[str]:
     """`docker run` flags for a challenge container. Raises if the guard is missing:
     a sandbox that silently allows fuzzing would score a different benchmark."""
@@ -115,6 +161,8 @@ def sandbox_args() -> list[str]:
         raise FileNotFoundError(
             f"{NOFUZZ_SO} is missing; build it from nofuzz.c (see the header there)")
     return ["--network", "none",
+            *cpuset_args(),
+            *memory_args(),
             "-v", f"{NOFUZZ_SO}:{NOFUZZ_IN_CONTAINER}:ro",
             "-e", f"LD_PRELOAD={NOFUZZ_IN_CONTAINER}",
             *sig_rules_args(),

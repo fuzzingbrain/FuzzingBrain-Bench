@@ -128,6 +128,7 @@ def _tidy_stderr_log(cd: Path) -> None:
 
 def cell_cmd(model: str, bug: str, cd: Path, max_turns: int, *,
              timeout: int | None = None,
+             cost_cap: float | None = None,
              seed: int | None = None,
              preserve_pocs: bool = True, stop_on_crash: bool = False,
              api_key: str | None = None, image_prefix: str | None = None,
@@ -138,6 +139,8 @@ def cell_cmd(model: str, bug: str, cd: Path, max_turns: int, *,
                                 "--max-turns", str(max_turns), "--out-dir", str(cd)]
     if timeout is not None:
         cmd += ["--timeout", str(timeout)]
+    if cost_cap is not None:
+        cmd += ["--cost-cap", str(cost_cap)]
     if seed is not None:
         cmd += ["--seed", str(seed)]
     cmd.append("--preserve-pocs" if preserve_pocs else "--no-preserve-pocs")
@@ -152,13 +155,14 @@ def cell_cmd(model: str, bug: str, cd: Path, max_turns: int, *,
 
 def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
              timeout: int, preserve_pocs: bool = True, *,
+             cost_cap: float | None = None,
              stop_on_crash: bool = False, api_key: str | None = None,
              image_prefix: str | None = None,
              runner: list[str] | None = None,
              ) -> dict | None:
     cd = cell_dir(out, bug, model, sample)
     cmd = cell_cmd(model, bug, cd, max_turns, timeout=timeout,
-                   seed=sample,
+                   cost_cap=cost_cap, seed=sample,
                    preserve_pocs=preserve_pocs, stop_on_crash=stop_on_crash,
                    api_key=api_key, image_prefix=image_prefix,
                    runner=runner)
@@ -257,6 +261,7 @@ def _run_images(arm: str, bugs: list[str], image_prefix: str | None) -> list[str
 
 def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
                output: str | None = None, max_turns: int = 100, timeout: int = 1800,
+               cost_cap: float | None = 10.0,
                jobs: int = 1, dashboard_pref: bool | None = None,
                preserve_pocs: bool = True, stop_on_crash: bool = False,
                api_key: str | None = None, image_prefix: str | None = None,
@@ -382,7 +387,7 @@ def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
                                     timeout, max_turns, manifest=mani,
                                     api_key=api_key, preserve_pocs=preserve_pocs)
             return run_cell(model, bug, sample, max_turns, out, timeout,
-                            preserve_pocs=preserve_pocs, stop_on_crash=stop_on_crash,
+                            cost_cap=cost_cap, preserve_pocs=preserve_pocs, stop_on_crash=stop_on_crash,
                             api_key=api_key, image_prefix=image_prefix, runner=runner,
                             )
         except Exception as e:  # noqa: BLE001
@@ -434,7 +439,7 @@ def run_matrix(models: list[str], bugs: list[str], *, samples: int = 1,
                 if use_dash:
                     STATUS.cell_start(model, bug, sample)
                     cmd = cell_cmd(model, bug, cd, max_turns, timeout=timeout,
-                                   seed=sample,
+                                   cost_cap=cost_cap, seed=sample,
                                    preserve_pocs=preserve_pocs,
                                    stop_on_crash=stop_on_crash,
                                    api_key=api_key, image_prefix=image_prefix, runner=runner)

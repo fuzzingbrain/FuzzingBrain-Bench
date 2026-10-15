@@ -118,11 +118,19 @@ def test_every_agent_arm_shares_one_budget_ceiling():
     assert "AGENT_USD_CAP" in inspect.getsource(cc.run_claude)
 
 
-def test_the_api_arm_is_not_given_a_dollar_cap():
-    """The rule is for agents. Capping the bare model would change what the
-    agent arms are being compared against."""
-    from fbbench.runner import episode
-    assert "AGENT_USD_CAP" not in inspect.getsource(episode)
+def test_the_api_arm_runs_under_the_agent_arms_limits():
+    """LLM mode and agent mode are one benchmark with one budget: time and money,
+    no turn limit. The runner's defaults are the agent arms' constants, not
+    copies of them, and the episode loop enforces the dollar cap itself."""
+    from fbbench.runner import __main__ as runner, episode
+    from fbbench.sweep import mcp_episode as ep
+
+    src = inspect.getsource(runner.main)
+    assert "default=AGENT_USD_CAP" in src
+    assert "default=AGENT_WALL_CAP_S" in src
+    assert 'add_argument("--max-turns", type=int, default=0' in src
+    assert '"cost_cap"' in inspect.getsource(episode.run_episode)
+    assert runner.AGENT_USD_CAP is ep.AGENT_USD_CAP
 
 
 def test_no_arm_is_told_a_search_strategy_the_others_are_not():
