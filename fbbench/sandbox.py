@@ -79,16 +79,20 @@ NOFUZZ_IN_CONTAINER = "/opt/fbbench-guard/nofuzz.so"
 NOFUZZ_REFUSED = "[fbbench] refused: this would start libFuzzer's own fuzzing loop"
 
 
-# --no-gdb: the same setting with the debugger taken away, for measuring what gdb
+# --no-debugging-tool: the same setting with the debugger taken away -- gdb on a
+# native target, jdb on a JVM one (no challenge has both) -- for measuring what it
 # is worth. Set by the CLI for the whole run, so every container of every arm
 # sees it; read here and in mcp_episode.probe_environment, and nowhere else.
-NO_GDB_ENV = "FBBENCH_NO_GDB"
-GDB_STUB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "gdb-unavailable.sh")
-GDB_PATHS = ("/usr/bin/gdb", "/usr/bin/gdbtui")
+NO_DEBUGGING_TOOL_ENV = "FBBENCH_NO_DEBUGGING_TOOL"
+DEBUGGER_STUB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "debugging-tool-unavailable.sh")
+# jdb and jdb-run exist only in the JVM agent images (tools/jdb); mounting the stub
+# where a native image has no such file just leaves a stub there.
+DEBUGGER_PATHS = ("/usr/bin/gdb", "/usr/bin/gdbtui", "/usr/bin/jdb", "/usr/local/bin/jdb-run")
 
 
-def no_gdb() -> bool:
-    return os.environ.get(NO_GDB_ENV) == "1"
+def no_debugging_tool() -> bool:
+    return os.environ.get(NO_DEBUGGING_TOOL_ENV) == "1"
 
 
 # --no-callgraph: the same setting with the static call graph taken away. The
@@ -166,6 +170,7 @@ def sandbox_args() -> list[str]:
             "-v", f"{NOFUZZ_SO}:{NOFUZZ_IN_CONTAINER}:ro",
             "-e", f"LD_PRELOAD={NOFUZZ_IN_CONTAINER}",
             *sig_rules_args(),
-            *[a for p in (GDB_PATHS if no_gdb() else ()) for a in ("-v", f"{GDB_STUB}:{p}:ro")],
+            *[a for p in (DEBUGGER_PATHS if no_debugging_tool() else ())
+              for a in ("-v", f"{DEBUGGER_STUB}:{p}:ro")],
             *(["-e", f"{NO_CALLGRAPH_CONTAINER_ENV}=1", "-v", f"{CG_STUB}:{CG_PATH}:ro"]
               if no_callgraph() else [])]

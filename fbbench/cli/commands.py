@@ -170,11 +170,12 @@ def cmd_run(args) -> int:
     go through the SAME engine (orchestrator.run_matrix). Always pulls the public
     challenge image, which grades inside itself with no network at all.
     """
-    if getattr(args, "no_gdb", False):
-        # Process-wide, so every container any arm starts sees it (sandbox.no_gdb).
+    if getattr(args, "no_debugging_tool", False):
+        # Process-wide, so every container any arm starts sees it
+        # (sandbox.no_debugging_tool).
         import os as _os
-        from fbbench.sandbox import NO_GDB_ENV
-        _os.environ[NO_GDB_ENV] = "1"
+        from fbbench.sandbox import NO_DEBUGGING_TOOL_ENV
+        _os.environ[NO_DEBUGGING_TOOL_ENV] = "1"
     if getattr(args, "no_callgraph", False):
         import os as _os
         from fbbench.sandbox import NO_CALLGRAPH_ENV

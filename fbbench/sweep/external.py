@@ -63,7 +63,7 @@ from fbbench.sweep.codex import _crash_signatures
 from fbbench.sweep.mcp_episode import (
     fetch_setup, probe_environment,
     AGENT_USD_CAP, AGENT_WALL_CAP_S, CandidateLog, _start_episode_server,
-    agent_tools_note, install_gdb_source_map, with_agent_tools)
+    agent_tools_note, debugger_offered, install_gdb_source_map, with_agent_tools)
 from fbbench.runner.mcp_client import _full_scan_alias
 
 # The first user turn an external agent gets: the api arm's opening, verbatim.
@@ -1041,7 +1041,9 @@ def run_cell(cell_dir: Path, bug: str, model: str, timeout_s: int,
             # Whether gdb in this container could actually show source. Verified
             # against gdb, not assumed from having written the file.
             "gdb_source_map": env_caps.get("gdb_source_map") or [],
-            # Whether the agent was given gdb at all (fb-bench run --no-gdb).
+            # Which debugger was offered: "gdb" (native), "jdb" (JVM), or "" when
+            # none was (fb-bench run --no-debugging-tool, or the image has none).
+            "debugger": debugger_offered(env_caps),
             "gdb_available": bool(env_caps.get("gdb")),
             # Whether the static call graph was offered (image has it, no --no-callgraph).
             "callgraph_available": bool(env_caps.get("callgraph")),

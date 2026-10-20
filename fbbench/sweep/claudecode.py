@@ -68,7 +68,7 @@ from fbbench.images import agent_image, image_digest
 from fbbench.sweep.external import agent_opening, agent_system_prompt
 from fbbench.sweep.mcp_episode import (
     BENCH_TOOL_NAMES, CALLGRAPH_TOOL_NAMES, agent_tools_note, fetch_setup,
-    install_gdb_source_map, probe_environment)
+    install_gdb_source_map, probe_environment, debugger_offered)
 
 # The only tools the agent may call: the bench MCP tools, named from the one
 # list every arm shares. Everything else is a host-side cheat/contamination
@@ -513,6 +513,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             # what was actually sent, so the cell cannot record something else
             "system_prompt_sent": agent_system_prompt(env_caps),
             "gdb_source_map": (env_caps or {}).get("gdb_source_map") or [],
+            "debugger": debugger_offered(env_caps),
             "callgraph_available": bool((env_caps or {}).get("callgraph")),
             "user_turn_sent": prompt}
 
@@ -802,8 +803,10 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "fuzzing_attempts": fuzzing_attempts,
         "arm": "claudecode",
         "agent_image": agent_image(alias),
-        # Whether gdb was offered at all (fb-bench run --no-gdb).
-        "gdb_available": not __import__("fbbench.sandbox", fromlist=["no_gdb"]).no_gdb(),
+        # Which debugger was offered: "gdb" (native), "jdb" (JVM), or "" when
+        # none was (fb-bench run --no-debugging-tool, or the image has none).
+        "debugger": r.get("debugger", ""),
+        "gdb_available": r.get("debugger") == "gdb",
         # Whether the static call graph was offered (image has it, no --no-callgraph).
         "callgraph_available": bool(r.get("callgraph_available")),
         "agent_image_digest": image_digest(agent_image(alias)),

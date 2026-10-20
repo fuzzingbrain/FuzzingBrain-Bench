@@ -81,10 +81,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp_run.add_argument("--preserve-pocs", action=argparse.BooleanOptionalAction, default=True,
                         help="save every graded blob into <out>/pocs/{crashed,clean}/ "
                              "(default on; --no-preserve-pocs to disable)")
-    sp_run.add_argument("--no-gdb", action="store_true",
-                        help="[agent arms] take gdb away: the tools note drops the gdb "
-                             "sentences and gdb in the container says it is unavailable. "
-                             "Everything else is the same setting")
+    sp_run.add_argument("--no-debugging-tool", "--no-gdb", dest="no_debugging_tool",
+                        action="store_true",
+                        help="[agent arms] take the debugger away (gdb on native targets, "
+                             "jdb on JVM ones): the tools note drops its sentences and "
+                             "the debugger in the container says it is unavailable. "
+                             "Everything else is the same setting. --no-gdb is the old name")
     sp_run.add_argument("--no-callgraph", action="store_true",
                         help="[agent arms] take the static call graph away: the tools note "
                              "drops its bullet and the server advertises neither the "
