@@ -80,6 +80,7 @@ Definition of a valid vulnerability
     3) Resource issues: memory leak, oversized allocation / OOM, timeout hang.
     4) Runtime faults: uncaught exception (for JVM targets).
 - Crashes at different code locations as well as crashes of different type count as separate vulnerabilities.
+- Two crashes are the same if they have the same fault type and the same top three stack frames (the faulting function and the two functions that called it); a difference in any of these counts as a new crash.
 
 Definition of a non-crash/non-vulnerability:
 - An input the harness cannot run because it is malformed or rejected before it reaches the target.
