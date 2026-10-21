@@ -12,6 +12,7 @@ CATALOG: list[tuple[str, str, str]] = [
     # Anthropic
     ("claude-opus-5",            "anthropic", "flagship"),
     ("claude-opus-4-8",          "anthropic", "flagship"),
+    ("claude-fable-5-1",         "anthropic", "flagship"),
     ("claude-sonnet-4-6",        "anthropic", "mid"),
     ("claude-haiku-4-5",         "anthropic", "fast"),
     # OpenAI
@@ -78,6 +79,7 @@ CONTEXT_WINDOWS: dict[str, int] = {
     # the CSV documents 4-7 only. Same treatment pricing.py already gives it.
     "claude-opus-5":          1_000_000,
     "claude-opus-4-8":        1_000_000,
+    "claude-fable-5-1":       1_000_000,
     "claude-opus-4-7":        1_000_000,
     "claude-sonnet-4-6":      1_000_000,
     "claude-haiku-4-5":         200_000,

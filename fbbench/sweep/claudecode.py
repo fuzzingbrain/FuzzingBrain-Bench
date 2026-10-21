@@ -294,7 +294,11 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
           # and stop calling tools. Without this the arm resumed anyway, so the
           # model could never finish -- every claudecode cell on record was cut
           # off by a cap while every fbagent cell ended on its own judgement.
-          "said_complete": False}
+          "said_complete": False,
+          # Set when the CLI swapped the requested model for another one.
+          "fallback": None}
+    # The model asked for, so a reply from any other model can be told apart.
+    want = argv[argv.index("--model") + 1] if "--model" in argv else ""
     msg_ids: set = set()
     grade_ids: set = set()
     stop = threading.Event()
@@ -320,8 +324,30 @@ def _run_claude_once(argv: list[str], lf, deadline: float, work: str = "",
         t = ev.get("type")
         if t == "system" and ev.get("subtype") == "init":
             st["session_id"] = ev.get("session_id") or st["session_id"]
+        elif t == "system" and ev.get("subtype") == "model_refusal_fallback":
+            # Claude Code answers a safety refusal by moving the WHOLE session
+            # to another model (Fable 5.1 -> Opus 4.8, with no flag to turn it
+            # off), and everything after would be scored under the model asked
+            # for. Stop here: what the requested model did so far still counts,
+            # and the cell ends as a refusal, as the api arm records one.
+            st["fallback"] = {"from": ev.get("original_model"),
+                              "to": ev.get("fallback_model"),
+                              "category": ev.get("api_refusal_category"),
+                              "request_id": ev.get("request_id")}
+            st["ended"] = "refusal"
+            _kill_pg(proc)
+            break
         elif t == "assistant":
             msg = ev.get("message", {})
+            got = msg.get("model") or ""
+            if (want.startswith("claude-") and got.startswith("claude-")
+                    and got != want):
+                # the same swap without the notice: never score it
+                st["fallback"] = {"from": want, "to": got, "category": None,
+                                  "request_id": None}
+                st["ended"] = "refusal"
+                _kill_pg(proc)
+                break
             mid = msg.get("id")
             if mid is not None:
                 msg_ids.add(mid)
@@ -416,6 +442,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
     session_id = None
     last_grade_turn = 0
     terminated = "resumes_exhausted"
+    fallback = None
 
     with open(log_path, "w") as lf:
         prompt = claude_task_prompt(setup_resp, env_caps)
@@ -469,6 +496,11 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             if st.get("ended") == "auth_error":
                 terminated = "auth_error"
                 break
+            if st.get("ended") == "refusal":
+                # never resumed: the resumed session would run on the fallback
+                terminated = "refusal"
+                fallback = st["fallback"]
+                break
             if st.get("said_complete"):
                 # the same end the fbagent arm gets: the agent's call, not a cap
                 terminated = "done"
@@ -515,6 +547,7 @@ def run_claude(work: str, mcp_cfg: str, model: str, timeout_s: int,
             "gdb_source_map": (env_caps or {}).get("gdb_source_map") or [],
             "debugger": debugger_offered(env_caps),
             "callgraph_available": bool((env_caps or {}).get("callgraph")),
+            "model_fallback": fallback,
             "user_turn_sent": prompt}
 
 
@@ -819,6 +852,9 @@ def _persist(cell_dir: Path, *, bug: str, model: str, real: str,
         "max_turns": r.get("max_turns"), "duration_s": round(r["duration_s"], 1),
         "grade_calls": r["grade_calls"], "blobs_written": len(blobs),
         "tokens_used": r["tokens"] or None, "total_usd": r["total_usd"],
+        # The model Claude Code tried to switch to when it stopped the cell on a
+        # safety refusal (None when it did not): {from, to, category, request_id}.
+        "model_fallback": r.get("model_fallback"),
     }
     (cell_dir / "score.json").write_text(json.dumps(score, indent=2))
     # cost.json, aligned with the api/codex arms. total_usd is Claude Code's OWN
