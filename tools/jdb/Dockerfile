@@ -11,13 +11,21 @@
 ARG BASE
 FROM ${BASE}
 ARG JDK_VERSION
+# The JDK brings javac, jshell, jar and two dozen other tools along with jdb. Only
+# jdb is the change: every command the package added is removed again, so the
+# agent's toolbox differs from the published image by exactly one debugger.
 RUN set -e; before=$(dpkg-query -W -f='${Version}' openjdk-17-jre-headless); \
     test "$before" = "${JDK_VERSION}"; \
+    J=$(dirname "$(dirname "$(readlink -f "$(command -v java)")")"); \
+    ls "$J/bin" > /tmp/bin.before; ls /usr/bin > /tmp/usrbin.before; \
     apt-get update; \
     apt-get install -y --no-install-recommends "openjdk-17-jdk-headless=${JDK_VERSION}"; \
     rm -rf /var/lib/apt/lists/*; \
     test "$(dpkg-query -W -f='${Version}' openjdk-17-jre-headless)" = "$before"; \
-    command -v jdb
+    for t in $(ls "$J/bin" | grep -vxF -f /tmp/bin.before); do [ "$t" = jdb ] || rm -f "$J/bin/$t"; done; \
+    for t in $(ls /usr/bin | grep -vxF -f /tmp/usrbin.before); do [ "$t" = jdb ] || rm -f "/usr/bin/$t"; done; \
+    rm -f /tmp/bin.before /tmp/usrbin.before; \
+    command -v jdb; ! command -v javac; ! command -v jshell
 COPY jdb-run /usr/local/bin/jdb-run
 # jdb wants source roots (the directory a package path starts from), not files.
 # Derived from each .java file's own package line, so non-Maven layouts (mx suites) work too.

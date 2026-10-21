@@ -39,6 +39,12 @@ for a in "${ALIASES[@]}"; do
   tag="${PREFIX}${a}:latest"
   ver=$(docker run --rm --entrypoint dpkg-query "$base" -W -f='${Version}' openjdk-17-jre-headless 2>/dev/null || true)
   if [ -z "$ver" ]; then echo "SKIP $a: no openjdk-17-jre-headless in $base"; fail+=("$a"); continue; fi
+  # Layering twice would keep the first layer's extra JDK tools underneath: the
+  # base must be an image without jdb (once published, pass --base with the
+  # pre-jdb images, e.g. tagged from the parent of the jdb layer).
+  if docker run --rm --entrypoint sh "$base" -c 'command -v jdb' >/dev/null 2>&1; then
+    echo "SKIP $a: $base already has jdb; pass --base with the image it was built on"; fail+=("$a"); continue
+  fi
   echo "== $a  ($base -> $tag, JDK $ver)"
   if ! docker build -q -f "$HERE/Dockerfile" --build-arg BASE="$base" --build-arg JDK_VERSION="$ver" \
        -t "$tag" "$HERE" >/dev/null; then
