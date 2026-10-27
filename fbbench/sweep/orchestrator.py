@@ -11,6 +11,7 @@ index (kept named `seed-N` for back-compat with the legacy 518-row dataset).
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -18,6 +19,7 @@ from pathlib import Path
 
 from fbbench.grading import list_bugs
 from fbbench.models import SUPPORTED_MODELS, default_sweep
+from fbbench.models.catalog import LOCAL_PROVIDERS, provider_for
 from fbbench.paths import REPO, resolve_output
 
 RUNNER = [sys.executable, "-m", "fbbench.runner"]
@@ -167,14 +169,26 @@ def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
                    api_key=api_key, image_prefix=image_prefix,
                    runner=runner)
     cd.mkdir(parents=True, exist_ok=True)
+    # A self-hosted model: this cell holds one server from
+    # FBBENCH_AGENT_ENDPOINTS for its whole episode, as an FB-Agent cell does
+    # (sweep.external._Endpoint), and waits for one before its clock starts.
+    env, endpoint = None, None
+    if provider_for(model) in LOCAL_PROVIDERS:
+        from fbbench.sweep.external import _Endpoint
+        endpoint = _Endpoint()
+        if endpoint.url:
+            env = {**os.environ, "OLLAMA_BASE_URL": endpoint.url}
     try:
         # The episode self-stops at `timeout`; SIGKILL only if it overruns the
         # graceful-writeout backstop (so a finished run isn't lost to the killer).
         with (cd / _STDERR_LOG).open("wb") as errlog:
             subprocess.run(cmd, cwd=REPO, timeout=timeout + _SUBPROC_BACKSTOP_S,
-                           stdout=subprocess.DEVNULL, stderr=errlog)
+                           stdout=subprocess.DEVNULL, stderr=errlog, env=env)
     except subprocess.TimeoutExpired:
         return {"error": "timeout", "error_log": str(cd / _STDERR_LOG)}
+    finally:
+        if endpoint is not None:
+            endpoint.release()
     sj = cd / "score.json"
     if sj.is_file():
         _tidy_stderr_log(cd)
@@ -238,24 +252,17 @@ def _run_images(arm: str, bugs: list[str], image_prefix: str | None) -> list[str
     """The images a run of `arm` over `bugs` starts containers from: ONE per
     challenge.
 
-    The agent arms both work in and are graded in the agent image (see
-    sweep.external / sweep.claudecode); the api arm and codex use the challenge
-    image for both.
+    Every arm works in and is graded in the agent image (gdb/jdb and the call
+    graph; see sweep.external, sweep.claudecode, runner.episode).
     """
     from fbbench.grading import find_bug
-    from fbbench.images import DEFAULT_IMAGE_PREFIX, agent_image, challenge_image
+    from fbbench.images import agent_image
     from fbbench.runner.mcp_client import _full_scan_alias
     images = []
     for b in bugs:
         real = find_bug(b)
         alias = _full_scan_alias(str(real)) if real else b
-        if arm in ("external", "claudecode"):
-            images.append(agent_image(alias))
-        elif arm == "codex":
-            from fbbench.sweep.codex import IMAGE_PREFIX
-            images.append(f"{IMAGE_PREFIX}{alias}")
-        else:
-            images.append(challenge_image(alias, image_prefix or DEFAULT_IMAGE_PREFIX))
+        images.append(agent_image(alias))
     return images
 
 

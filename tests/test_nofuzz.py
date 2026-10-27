@@ -110,8 +110,9 @@ def test_every_challenge_container_gets_the_sandbox():
     from fbbench.sweep import codex, mcp_episode
     assert "sandbox_args()" in inspect.getsource(mcp_episode._start_episode_server)
     assert "sandbox_args()" in inspect.getsource(mcp_client.MCPClient.__init__)
-    assert "sandbox_args()" in inspect.getsource(codex.stage_codex_env)
-    assert "{sandbox}" in codex._CODEX_CONFIG
+    # codex starts no container of its own: it uses the episode server above
+    assert "_start_episode_server" in inspect.getsource(codex.stage_codex_env)
+    assert '"docker"' not in inspect.getsource(codex)
 
 
 def test_the_sandbox_flags():
@@ -130,12 +131,12 @@ def test_a_missing_guard_is_an_error_not_an_open_door(monkeypatch, tmp_path):
 def test_the_codex_config_is_still_valid_toml(tmp_path, monkeypatch):
     tomllib = pytest.importorskip("tomllib")
     from fbbench.sweep import codex
-    text = codex._CODEX_CONFIG.format(
-        image="img", ws="/w", model="m", login="api",
-        sandbox=", ".join(json.dumps(a) for a in sandbox_args()))
-    args = tomllib.loads(text)["mcp_servers"]["harness"]["args"]
-    assert args[args.index("--network") + 1] == "none"
-    assert args[-2:] == ["img", "mcp-server"]
+    text = codex.codex_config(model="m", login="api", instructions='say "hi"\n',
+                              relay_path="/r/relay.py", sock_path="/r/bench.sock")
+    cfg = tomllib.loads(text)
+    assert cfg["mcp_servers"]["bench"]["args"] == ["/r/relay.py", "/r/bench.sock"]
+    assert cfg["developer_instructions"] == 'say "hi"\n'
+    assert cfg["features"]["shell_tool"] is False
 
 
 # ------------------------------------------------------------ the record

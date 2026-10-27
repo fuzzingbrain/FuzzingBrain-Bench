@@ -8,13 +8,14 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
 
 from fbbench.env import load_dotenv
 from fbbench.grading.bench_yaml import find_bug, read_bench
-from fbbench.images import DEFAULT_IMAGE_PREFIX, challenge_image
+from fbbench.images import DEFAULT_IMAGE_PREFIX, agent_image
 from fbbench.models import CATALOG, PRICES, cost_usd, default_sweep
 from fbbench.sweep.mcp_episode import AGENT_USD_CAP, AGENT_WALL_CAP_S
 from fbbench.paths import REPO
@@ -72,7 +73,8 @@ def main() -> int:
                     help="benchmark repo root (default: auto-detected)")
     ap.add_argument("--api-key", default=None, help="provider API key (or use the env var)")
     ap.add_argument("--image-prefix", default=DEFAULT_IMAGE_PREFIX,
-                    help="registry prefix for the canonical challenge images")
+                    help="unused: every arm runs the agent image "
+                         "(override with FBBENCH_AGENT_IMAGE_PREFIX)")
     ap.add_argument("--list-models", action="store_true",
                     help="print the supported-model catalog and exit")
     args = ap.parse_args()
@@ -91,11 +93,11 @@ def main() -> int:
         print(f"error: bug {args.bug} not found under {repo_root}/bugs", file=sys.stderr)
         return 2
 
-    # The agent runs against the PUBLIC challenge image — the same artifact the
-    # world runs, self-contained and grading in-container. A bug may pin its own
+    # The agent runs in the agent image, as every other arm does: the published
+    # challenge plus gdb/jdb and the call graph, grading in-container. A bug may pin its own
     # image via the optional top-level `image:` field in bench.yaml, tag included.
     bug_image = read_bench(Path(bug_dir) / "bench.yaml").get("image")
-    image = bug_image or challenge_image(_full_scan_alias(str(bug_dir)), args.image_prefix)
+    image = bug_image or agent_image(_full_scan_alias(str(bug_dir)))
     out_dir = (Path(args.out_dir) if args.out_dir
                else Path(args.output) / args.bug / args.model)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -152,12 +154,21 @@ def main() -> int:
             # candidate, so nothing graded and there is nothing to claim.
             "grading": result.grading or "not-exercised",
             "image": image,
+            # The self-hosted server this episode held (None for an API model).
+            "endpoint": (os.environ.get("OLLAMA_BASE_URL")
+                         if getattr(backend, "local", False) else None),
         },
         # The metric: the number of DISTINCT crashes the agent found (unique
         # crash-type + top-frames signatures).
         "score": result.unique_crashes,
         "unique_crashes": result.unique_crashes,
         "crash_signatures": sorted(result.crash_signatures),
+        # The same environment record the agent arms write.
+        "debugger": result.debugger,
+        "gdb_available": result.debugger == "gdb",
+        "callgraph_available": result.callgraph_available,
+        "gdb_source_map": result.gdb_source_map,
+        "system_prompt_sent": result.system_prompt_sent,
         "terminated_reason": result.terminated_reason,
         "refusal_retries": result.refusal_retries,
         "malformed_retries": result.malformed_retries,

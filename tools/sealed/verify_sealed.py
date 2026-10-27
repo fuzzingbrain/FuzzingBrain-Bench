@@ -103,7 +103,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", default=None)
     ap.add_argument("--sample", type=int, default=0, help="verify first N bugs only")
-    ap.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-challenge-")
+    ap.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-agent-")
     ap.add_argument("--no-pull", action="store_true",
                     help="audit only what is already cached locally")
     ap.add_argument("--prune", action="store_true",

@@ -255,7 +255,7 @@ returns only what the harness printed plus whether that crash is one this episod
 has already produced — never an answer key.
 
 ```
-docker.io/osanzas/fbbench-challenge-<alias>:latest      # one image per challenge
+docker.io/osanzas/fbbench-agent-<alias>:latest      # one image per challenge
 ```
 
 One image, one tag, and it judges itself. It carries the sanitizer-instrumented

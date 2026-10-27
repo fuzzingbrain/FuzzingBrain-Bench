@@ -26,7 +26,7 @@ _OUT = Path(__file__).resolve().parents[1] / "docs" / "PROMPTS.md"
 # image's mcp-server at render time (tools/list), so this doc always reflects the
 # real tool schemas the agent receives. Override the image via --image or env.
 _DEFAULT_IMAGE = os.environ.get(
-    "FBBENCH_IMAGE_PREFIX", "docker.io/osanzas/fbbench-challenge-") + "avro-03"
+    "FBBENCH_IMAGE_PREFIX", "docker.io/osanzas/fbbench-agent-") + "avro-03"
 
 # Tool return shapes, EXTRACTED from real tool calls (the 3 tools are fixed).
 # The MCP tool-call protocol carries no output schema to the model, and our

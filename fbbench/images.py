@@ -2,7 +2,7 @@
 
 Two sets, one per arm kind:
 
-    docker.io/osanzas/fbbench-challenge-<alias>:latest   the api arm
+    docker.io/osanzas/fbbench-agent-<alias>:latest   the api arm
     docker.io/osanzas/fbbench-agent-<alias>:latest       the agent arms
 
 Same challenge in both -- same source, same harness, same prebuilt binary, byte
@@ -18,7 +18,7 @@ from __future__ import annotations
 import os
 import subprocess
 
-DEFAULT_IMAGE_PREFIX = "docker.io/osanzas/fbbench-challenge-"
+DEFAULT_IMAGE_PREFIX = "docker.io/osanzas/fbbench-agent-"
 AGENT_IMAGE_PREFIX = os.environ.get(
     "FBBENCH_AGENT_IMAGE_PREFIX", "docker.io/osanzas/fbbench-agent-")
 DEFAULT_IMAGE_TAG = "latest"

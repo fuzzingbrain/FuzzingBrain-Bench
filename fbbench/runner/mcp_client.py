@@ -96,11 +96,14 @@ class MCPClient:
         # cell grades 30 candidates, so a sweep asked Docker Hub a thousand
         # times and Hub began refusing with TLS timeouts, failing whole cells.
         _pull_once(image)
+        from fbbench.sweep.mcp_episode import GDB_CONFIG_HOME
         cmd = ["docker", "run", "-i", "--rm",
                "--pull=missing",
                "--cidfile", self._cidfile,
                "--security-opt", "seccomp=unconfined",
-               "-e", "BENCH_GRADE_REVEAL=1"]
+               "-e", "BENCH_GRADE_REVEAL=1",
+               # gdb reads its init from here; see _start_episode_server.
+               "-e", f"XDG_CONFIG_HOME={GDB_CONFIG_HOME}"]
         cmd += sandbox_args()
         cmd += [image, "mcp-server"]
         bug_dir, workspace = "/src", "/workspace"

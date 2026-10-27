@@ -5,6 +5,7 @@ Handles the gpt-5.x / o-series reasoning models, which require
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 
@@ -21,6 +22,20 @@ def _is_reasoning(model: str) -> bool:
 def _is_local(model: str) -> bool:
     # Open models served via an OpenAI-compatible local endpoint (Ollama/vLLM).
     return model.lower().startswith(("llama", "codellama", "ollama"))
+
+
+# Self-hosted models run with the sampling FB-Agent sends them
+# (FuzzingBrain-Agent config/hprc_gemma.yaml: Gemma's model card, thinking on)
+# and no output cap, as FB-Agent sends none, so the two arms make the same
+# request to the same server.
+OPEN_MODEL_SAMPLING = {
+    "gemma4:31b-qat": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "extra_body": {"top_k": 64,
+                       "chat_template_kwargs": {"enable_thinking": True}},
+    },
+}
 
 
 class OpenAIBackend:
@@ -83,7 +98,9 @@ class OpenAIBackend:
             "messages": self._to_messages(system, messages),
             "tools": api_tools,
         }
-        if _is_reasoning(self.model):
+        if self.model in OPEN_MODEL_SAMPLING:
+            kwargs.update(copy.deepcopy(OPEN_MODEL_SAMPLING[self.model]))
+        elif _is_reasoning(self.model):
             # Reasoning tokens count against the completion budget; give room.
             kwargs["max_completion_tokens"] = max(max_tokens, 16384)
         elif self.local:

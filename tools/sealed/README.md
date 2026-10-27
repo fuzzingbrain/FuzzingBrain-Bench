@@ -47,9 +47,9 @@ in the image (upstream `src/` is exempt — public OSS may carry `*.bin` fixture
 ## Use a challenge (end user)
 
 ```bash
-docker pull docker.io/osanzas/fbbench-challenge-<alias>:latest
+docker pull docker.io/osanzas/fbbench-agent-<alias>:latest
 docker run -i --security-opt seccomp=unconfined \
-    docker.io/osanzas/fbbench-challenge-<alias>:latest mcp-server
+    docker.io/osanzas/fbbench-agent-<alias>:latest mcp-server
 ```
 The image speaks the stdio MCP protocol with everything baked in: `setup`, `exec`,
 `run_poc_on_harness`. That is the single canonical runtime — identical for the
@@ -62,7 +62,7 @@ your bytes into the container's workspace and runs them through the same harness
 ## Audit (anyone)
 
 ```bash
-python tools/sealed/verify_sealed.py docker.io/osanzas/fbbench-challenge-avro-03:latest
+python tools/sealed/verify_sealed.py docker.io/osanzas/fbbench-agent-avro-03:latest
 ```
 Confirms an image ships no answer key, and that grading does not depend on
 anything outside it.

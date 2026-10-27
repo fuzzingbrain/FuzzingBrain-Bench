@@ -294,7 +294,7 @@ Build environment (how the input you submit is compiled and judged):
 
 # MCP tools (as the agent sees them)
 
-Pulled **live** from `docker.io/osanzas/fbbench-challenge-avro-03`'s mcp-server (`tools/list`) at render time — not hard-coded, so this always matches the real image. The system prompt does NOT enumerate the tools; each reaches the agent ONLY as its **name + description + input schema**, delivered via the provider's tool-calling API (serialized into the model's context). So the text below is the ENTIRE spec the agent has for each tool.
+Pulled **live** from `docker.io/osanzas/fbbench-agent-avro-03`'s mcp-server (`tools/list`) at render time — not hard-coded, so this always matches the real image. The system prompt does NOT enumerate the tools; each reaches the agent ONLY as its **name + description + input schema**, delivered via the provider's tool-calling API (serialized into the model's context). So the text below is the ENTIRE spec the agent has for each tool.
 
 
 ## tool: `setup`

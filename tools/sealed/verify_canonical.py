@@ -18,7 +18,7 @@ Per bug it asserts the four user-required properties:
 
 Usage:
   verify_canonical.py [--only a,b] [--sample N] [--workers 3]
-                      [--image-prefix docker.io/osanzas/fbbench-challenge-]
+                      [--image-prefix docker.io/osanzas/fbbench-agent-]
 """
 from __future__ import annotations
 import argparse, json, subprocess, sys, traceback
@@ -143,7 +143,7 @@ def main():
     ap.add_argument("--workers", type=int, default=3)
     ap.add_argument("--settle", type=float, default=0.0,
                     help="seconds to pause after each bug (eases host memory pressure)")
-    ap.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-challenge-")
+    ap.add_argument("--image-prefix", default="docker.io/osanzas/fbbench-agent-")
     ap.add_argument("--out", default=str(ROOT / "tools" / "sealed" / "verify_canonical_report.json"))
     a = ap.parse_args()
 

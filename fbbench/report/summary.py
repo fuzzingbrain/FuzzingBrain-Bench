@@ -58,8 +58,8 @@ def _image_pattern(image: str, alias: str) -> str:
     "mixed" would be useless. Replacing just the alias leaves exactly what they DO
     share — registry, repository and tag —
 
-        docker.io/osanzas/fbbench-challenge-<alias>:latest
-        -> docker.io/osanzas/fbbench-challenge-<alias>:latest
+        docker.io/osanzas/fbbench-agent-<alias>:latest
+        -> docker.io/osanzas/fbbench-agent-<alias>:latest
 
     so a sweep whose challenges came from one place shows one value, and one that
     mixed registries or tags still says "mixed" honestly.

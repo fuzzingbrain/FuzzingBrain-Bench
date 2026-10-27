@@ -25,6 +25,8 @@ from fbbench.models.catalog import context_window
 from fbbench.models.pricing import cost_usd
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
+from fbbench.sweep.mcp_episode import (
+    debugger_offered, install_gdb_source_map, probe_environment, with_agent_tools)
 
 # Normalized refusal / safety-stop signals across providers.
 _REFUSAL_STOPS = {"refusal", "content_filter", "safety", "prohibited_content",
@@ -214,6 +216,11 @@ class EpisodeResult:
     malformed_retries: int = 0
     last_grade: dict | None = None
     error: str | None = None
+    # What this container offered, probed as the agent arms probe it.
+    debugger: str = ""
+    callgraph_available: bool = False
+    gdb_source_map: list[str] = field(default_factory=list)
+    system_prompt_sent: str = ""
 
 
 def _crash_identity(out: dict) -> str:
@@ -292,11 +299,20 @@ def run_episode(
     # Blind: the agent gets the harness and the source at the vulnerable
     # revision and nothing else.
     user_text = build_initial_user_message(setup_resp)
-    sysp = system_prompt()
+    # The same toolbox every agent arm gets: asked of the container, then named
+    # in the system prompt (sweep.external.agent_system_prompt).
+    env_caps = probe_environment(mcp)
+    if env_caps.get("gdb"):
+        env_caps["gdb_source_map"] = install_gdb_source_map(mcp, env_caps.get("target", ""))
+    sysp = with_agent_tools(system_prompt(), env_caps)
 
     messages: list[dict] = [{"role": "user", "content": user_text}]
     tools = neutral_tools(mcp)
-    result = EpisodeResult(bug_id=bug_id, model=backend.model)
+    result = EpisodeResult(bug_id=bug_id, model=backend.model,
+                           debugger=debugger_offered(env_caps),
+                           callgraph_available=bool(env_caps.get("callgraph")),
+                           gdb_source_map=env_caps.get("gdb_source_map") or [],
+                           system_prompt_sent=sysp)
     log_fp = open(episode_log, "w") if episode_log else None
     # Full-fidelity transcript alongside the compact episode.jsonl ledger:
     # every prompt, model output, tool-call argument, and tool return verbatim.

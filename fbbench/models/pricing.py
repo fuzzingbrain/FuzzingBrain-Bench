@@ -47,6 +47,9 @@ from fbbench.models.catalog import LOCAL_PROVIDERS, provider_for
 # model uses. Without this, adding Fable 5.1 to PRICES would overprice its cache
 # reads fourfold -- and on a cached agent run, cache reads ARE the bill.
 CACHE_READ_MULT_BY_MODEL = {"claude-fable-5-1": 0.025, "claude-mythos-5-1": 0.025}
+# GPT-6 Sol bills a cache write at $2.50 against $2.00 input, where earlier
+# OpenAI models wrote cache at the input rate.
+CACHE_WRITE_MULT_BY_MODEL = {"gpt-6-sol": 1.25, "gpt-5.6-sol": 1.25}
 
 CACHE_READ_MULT = {"anthropic": 0.10, "openai": 0.10, "gemini": 0.25,
                    "deepseek": 0.25, "dashscope": 0.25, "moonshot": 0.10,
@@ -77,6 +80,9 @@ PRICES: dict[str, tuple[float, float]] = {
     "claude-sonnet-4":   (3.0, 15.0),
     "claude-haiku-3-5":  (0.8, 4.0),
     # OpenAI
+    "gpt-6-sol":    (2.0, 10.0),   # standard tier, prompts up to 272K tokens
+    # OpenAI's reduced rate in effect since September 2026 ($5/$30 at launch).
+    "gpt-5.6-sol":  (4.0, 20.0),   # standard tier, prompts up to 272K tokens
     "gpt-5.5":      (5.0, 30.0),
     "gpt-5.4":      (2.5, 15.0),
     "gpt-5.4-mini": (0.75, 4.5),
@@ -139,7 +145,8 @@ def cost_usd(model: str, input_tokens: int, output_tokens: int,
     provider = provider_for(model)
     read_mult = CACHE_READ_MULT_BY_MODEL.get(
         model, CACHE_READ_MULT.get(provider, 0.10))
-    write_mult = CACHE_WRITE_MULT.get(provider, 1.0)
+    write_mult = CACHE_WRITE_MULT_BY_MODEL.get(
+        model, CACHE_WRITE_MULT.get(provider, 1.0))
     in_usd = input_tokens / 1e6 * in_rate
     read_usd = cache_read_tokens / 1e6 * in_rate * read_mult
     write_usd = cache_write_tokens / 1e6 * in_rate * write_mult

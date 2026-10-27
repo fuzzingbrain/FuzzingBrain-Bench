@@ -224,7 +224,7 @@ def test_the_api_arm_does_not_filter_tools_so_every_arm_sees_the_same_set():
 
 @pytest.mark.skipif(
     subprocess.run(["docker", "image", "inspect",
-                    "osanzas/fbbench-challenge-libxml2-04:latest"],
+                    "osanzas/fbbench-agent-libxml2-04:latest"],
                    capture_output=True).returncode != 0,
     reason="challenge image not present on this machine")
 def test_the_shared_tool_list_matches_what_a_live_server_advertises():
@@ -237,7 +237,7 @@ def test_the_shared_tool_list_matches_what_a_live_server_advertises():
     """
     p = subprocess.Popen(
         ["docker", "run", "-i", "--rm", "--entrypoint", "mcp-server",
-         "osanzas/fbbench-challenge-libxml2-04:latest"],
+         "osanzas/fbbench-agent-libxml2-04:latest"],
         stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.DEVNULL, text=True)
     try:
@@ -261,7 +261,7 @@ def test_the_shared_tool_list_matches_what_a_live_server_advertises():
                 break
     finally:
         p.kill()
-    assert names == set(mcp_episode.BENCH_TOOL_NAMES), (
+    assert set(mcp_episode.BENCH_TOOL_NAMES) <= names, (  # agent image also ships gdb/jdb/call-graph tools
         f"the image advertises {names}, the bench believes "
         f"{set(mcp_episode.BENCH_TOOL_NAMES)}")
 
@@ -299,11 +299,20 @@ def test_both_agent_arms_are_told_about_the_environment_in_the_same_words():
     assert undone == build_initial_user_message({})
 
 
-def test_the_toolbox_line_never_reaches_the_api_arm():
-    """prompts.system_prompt() is the baseline every agent is measured
-    against. Changing it makes v1 api results incomparable, and the api arm
-    has no toolbox to be told about."""
+def test_the_api_arm_is_told_about_the_toolbox_as_the_agent_arms_are():
+    """The api arm is an agent loop over the same server; it gets the same
+    probe and the same system-prompt line, so D+G means the same thing in
+    every arm."""
     from fbbench import prompts
+    from fbbench.runner import episode
+    src = "".join(inspect.getsource(episode.run_episode).split())
+    assert "probe_environment(mcp)" in src
+    assert "install_gdb_source_map(mcp," in src
+    assert "sysp=with_agent_tools(system_prompt(),env_caps)" in src
+    caps = {"gdb": True, "callgraph": True}
+    assert (mcp_episode.with_agent_tools(prompts.system_prompt(), caps)
+            == ex.agent_system_prompt(caps))
+    # the bare prompt still carries no toolbox: the line comes from the probe
     for word in ("gdb", "Also available in this environment"):
         assert word not in prompts.system_prompt()
         assert word not in prompts.build_initial_user_message({})
@@ -362,21 +371,45 @@ def test_resumes_of_one_session_cost_what_the_session_says():
     assert round(sum(by_session.values()), 4) == 2.1832
 
 
-def test_the_agent_image_set_is_for_agent_arms_only():
-    """The asymmetry is which IMAGE each arm runs in, not what gets mounted.
-
-    Both agent arms resolve fbbench-agent/<alias>, which ships gdb and leaves
-    the vulnerable build readable. The api arm resolves the published
-    challenge image, unchanged, because its v1 numbers were produced there and
-    they are the baseline every agent is measured against.
-    """
+def test_every_arm_runs_in_the_agent_image():
+    """fbbench-agent/<alias> ships gdb/jdb and the call graph and leaves the
+    vulnerable build readable; the api arm runs there too."""
+    from fbbench.runner import __main__ as runner_main
     from fbbench.runner import mcp_client
     from fbbench import images
     assert "agent_image" in inspect.getsource(ex)
     assert "agent_image" in inspect.getsource(cc)
-    assert "agent_image" not in inspect.getsource(mcp_client)
-    assert images.agent_image("x-01") != images.challenge_image("x-01")
-    assert images.challenge_image("x-01").startswith("docker.io/osanzas/fbbench-challenge-")
+    assert "agent_image(_full_scan_alias(" in inspect.getsource(runner_main.main)
+    assert "challenge_image(" not in inspect.getsource(runner_main.main)
+    # gdb finds its init where install_gdb_source_map writes it
+    assert "XDG_CONFIG_HOME={GDB_CONFIG_HOME}" in inspect.getsource(mcp_client.MCPClient)
+    assert images.agent_image("x-01") == images.challenge_image("x-01")  # challenge retired: single image set
+
+
+def test_the_probe_reaches_the_api_arm_through_its_client():
+    """The api arm has no socket; its MCPClient answers the same exec call."""
+    class Client:
+        def __init__(self):
+            self.cmds = []
+
+        def call(self, name, args):
+            assert name == "exec"
+            self.cmds.append(args["cmd"])
+            return {"stdout": "GDB=1\nJDB=0\nTARGET=1\nNATIVE=1\nCALLGRAPH=1\n",
+                    "stderr": ""}
+    c = Client()
+    caps = mcp_episode.probe_environment(c)
+    assert caps["gdb"] and caps["callgraph"] and not caps["jdb"]
+    assert caps["target"] == mcp_episode.ORACLE_HARNESS
+    assert c.cmds and "command -v gdb" in c.cmds[0]
+
+
+def test_the_api_arm_records_the_environment_the_agent_arms_record():
+    from fbbench.runner import __main__ as runner_main
+    src = inspect.getsource(runner_main.main)
+    for key in ('"debugger"', '"gdb_available"', '"callgraph_available"',
+                '"gdb_source_map"', '"system_prompt_sent"'):
+        assert key in src, key
 
 
 def test_the_episode_server_mounts_nothing_but_the_workspace():

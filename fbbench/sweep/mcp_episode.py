@@ -80,12 +80,20 @@ def _rpc(sock_path: str, timeout: float, *calls):
     return out
 
 
-def _exec_once(sock_path: str, cmd: str, timeout: float = 120.0) -> str:
-    """Run one shell command in the challenge container; "" on any failure."""
+def _exec_once(sock_path, cmd: str, timeout: float = 120.0) -> str:
+    """Run one shell command in the challenge container; "" on any failure.
+
+    `sock_path` is the agent arms' episode socket, or the api arm's MCPClient:
+    both reach the same exec tool of the same server, so the probe and the gdb
+    setup below are one code path for every arm.
+    """
+    args = {"cmd": cmd, "timeout_s": 60}
     try:
-        r = _rpc(sock_path, timeout,
-                 {"name": "exec", "arguments": {"cmd": cmd, "timeout_s": 60}})[0]
-        sc = ((r or {}).get("result") or {}).get("structuredContent") or {}
+        if isinstance(sock_path, str):
+            r = _rpc(sock_path, timeout, {"name": "exec", "arguments": args})[0]
+            sc = ((r or {}).get("result") or {}).get("structuredContent") or {}
+        else:
+            sc = sock_path.call("exec", args) or {}
         return (sc.get("stdout") or "") + (sc.get("stderr") or "")
     except Exception:  # noqa: BLE001
         return ""

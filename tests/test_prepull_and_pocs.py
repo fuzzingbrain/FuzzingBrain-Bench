@@ -40,8 +40,7 @@ def test_each_arm_prepulls_one_image_per_challenge():
     ext = _run_images("external", ["avro-03", "dtc-01"], None)
     assert len(ext) == 2 and all("fbbench-agent-" in i for i in ext)
     assert _run_images("claudecode", ["avro-03", "dtc-01"], None) == ext
-    api = _run_images("api", ["avro-03"], None)
-    assert len(api) == 1 and "fbbench-challenge-avro-03" in api[0]
+    assert _run_images("api", ["avro-03", "dtc-01"], None) == ext
 
 
 def test_the_agent_arms_are_graded_in_the_image_they_ran_in():

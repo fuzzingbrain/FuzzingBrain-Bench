@@ -6,7 +6,7 @@ is what you must discover). Pull anonymously. The published image grades
 in-image with no network and never ships an answer.
 
 ```bash
-docker pull docker.io/osanzas/fbbench-challenge-<id>:latest
+docker pull docker.io/osanzas/fbbench-agent-<id>:latest
 ```
 
 | # | challenge id | project | language | harness |
