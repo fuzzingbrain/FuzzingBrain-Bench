@@ -60,6 +60,7 @@ CATALOG: list[tuple[str, str, str]] = [
     # on one A100; and Gemma 4 31B QAT W4A16 served by vLLM on one A100. Same
     # tunnel on localhost:8000, one model at a time.
     ("qwen3.8:27b-q4",           "ollama",    "flagship"),
+    ("qwen3.8-flash-next:fp8",   "ollama",    "flagship"),
     ("gemma4:31b-qat",           "ollama",    "flagship"),
 ]
 
@@ -108,6 +109,8 @@ CONTEXT_WINDOWS: dict[str, int] = {
     "qwen3.8:27b":              229_376,
     # Placeholders until the one-A100 servers report what they fit.
     "qwen3.8:27b-q4":           262_144,
+    # must equal the vLLM --max-model-len the flash-next server is started with
+    "qwen3.8-flash-next:fp8":   262_144,
     # 141,760, not its native 256k: an A100 cannot hold an fp8 KV cache for it
     # (Triton needs SM89+), and this is vLLM's own maximum for one request in
     # bf16 on one card at --gpu-memory-utilization 0.95.

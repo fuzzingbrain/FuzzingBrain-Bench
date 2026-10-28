@@ -79,3 +79,17 @@ Stop the servers when done — idle GPUs still burn allocation:
   the id routes it to the keyless local path.
 - `tunnel-up.sh` / `tunnel-down.sh` add or remove a single forward by hand; the
   FASTER cluster uses the same scripts with `CLUSTER=faster`.
+
+## Hardware-specific values (retune per GPU)
+
+Tuned for one A100 40GB; change them for a different GPU.
+
+- Context length: vLLM `--max-model-len` (141760 for Gemma) and llama.cpp `-c`
+  (262144 for Qwen). The largest context a single node can hold, bound by VRAM.
+  It must match the model's entry in `fbbench/models/catalog.py` `CONTEXT_WINDOWS`,
+  or the server rejects anything longer.
+- KV cache quantization: llama.cpp `-ctk q8_0 -ctv q8_0`. This is what lets the
+  262144 context fit on 40GB; with more VRAM you can raise the precision.
+- vLLM `--gpu-memory-utilization 0.95`: fraction of GPU memory used.
+- Node request: `--gres`, `--mem`, `--cpus-per-task` in the `.slurm` files.
+- `--parallel 1` (llama.cpp): one request per server, matching one cell per endpoint.
