@@ -11,6 +11,15 @@ cluster/   run on the cluster (Apptainer/Singularity + Slurm)
 runner/    run on the machine that has fb-bench (needs SSH access to the cluster)
 ```
 
+## Prerequisites
+
+1. An HPRC account (NetID) that can log in to the cluster. Login is NetID
+   password + Duo two-factor; SSH public-key login is not accepted.
+2. The machine that runs `fb-bench` must be able to reach and SSH into the
+   cluster login node — the persistent SSH master and the port tunnels in
+   `runner/` are built on that connection. Without it the model endpoints cannot
+   be reached and the run cannot start.
+
 ## Before you start — fill these in
 
 - `YOUR_SLURM_ACCOUNT` in the `*.slurm` files → your Slurm `--account`.
