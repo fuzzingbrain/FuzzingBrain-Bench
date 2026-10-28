@@ -246,6 +246,82 @@ fb-bench grade <alias> my-input.bin        # -v for the evidence
 
 ---
 
+## Serving open-weight models on an HPC cluster
+
+Open-weight models (Qwen, Gemma, …) are not reached through a vendor API: you
+serve the model yourself behind an OpenAI-compatible endpoint and point the api
+arm at it. Any such endpoint works — a vLLM/Ollama on the same box needs only
+`OLLAMA_BASE_URL`. The steps below are the full HPC path (GPUs behind a login
+node, reached over an SSH tunnel), as used on TAMU HPRC (Grace/FASTER).
+
+The model id carries a `:` (e.g. `qwen3.8:27b-q4`), which routes it to the
+keyless, local path — no API key, and the cost column stays `0`.
+
+### 1. One-time: images and weights (on the cluster)
+
+HPC nodes run Apptainer/Singularity, not Docker. Two SIF images (built once into
+`/scratch`, ~10 GB total) — pin an exact tag:
+
+```bash
+apptainer pull vllm.sif  docker://vllm/vllm-openai:<tag>              # vLLM, for Gemma
+apptainer pull llama.sif docker://ghcr.io/ggml-org/llama.cpp:server-cuda-<tag>   # llama.cpp, for GGUF (Qwen)
+sbatch download-models.slurm     # weights/GGUF (HF); architecture-independent
+```
+
+### 2. Serve N instances (Slurm, one GPU each)
+
+One Slurm job = one model server on one GPU and one port. The launcher starts N
+of them on ports `8000 .. 8000+N-1`:
+
+```bash
+./start-qwen.sh 11      # 11 Qwen GGUF servers, ports 8000..8010 (1 A100 each)
+./status.sh            # job / node / port / READY|loading
+```
+
+The per-GPU Qwen serve command (`serve-gguf-grace.slurm`) is:
+
+```bash
+singularity exec --nv --bind /scratch/$USER llama.sif \
+  llama-server -m Qwen3.8-27B-UD-Q4_K_M.gguf --alias qwen3.8:27b-q4 \
+    --host 0.0.0.0 --port ${PORT:-8000} \
+    -ngl 999 -c 262144 --parallel 1 -ctk q8_0 -ctv q8_0 \
+    --jinja --reasoning-format deepseek --flash-attn on
+```
+
+`--alias` is the model id you pass as `--model`. Gemma (vLLM) instead:
+`vllm serve google/gemma-4-31B-it-qat-w4a16 --served-model-name gemma4:31b-qat
+--max-model-len 141760 --port ${PORT:-8000}`.
+
+### 3. Tunnel the endpoints to the runner machine
+
+On the machine that runs `fb-bench` (it needs SSH access to the cluster):
+
+```bash
+bash grace-master.sh                         # persistent SSH master, once (password + 2FA)
+./tunnels-from-squeue.sh gguf-serve serve-gguf   # forward every READY server's port locally
+#  -> export FBBENCH_AGENT_ENDPOINTS=http://localhost:8000/v1,...,http://localhost:8010/v1
+```
+
+`tunnels-from-squeue.sh` reads the running servers from `squeue`, forwards each
+port over the master connection, verifies `/v1/models`, and prints the
+`FBBENCH_AGENT_ENDPOINTS` line.
+
+### 4. Run
+
+Each cell claims one endpoint from the pool for its whole episode (waiting for
+one if there are fewer endpoints than workers), so size `--jobs` to the number
+of servers:
+
+```bash
+export FBBENCH_AGENT_ENDPOINTS=http://localhost:8000/v1,...   # from step 3
+fb-bench run all --arm api --model qwen3.8:27b-q4 \
+    --max-turns 10000 --timeout 3600 --jobs 11 --output qwen-fb
+```
+
+Stop the servers when done — idle GPUs still burn allocation: `./stop.sh`.
+
+---
+
 ## How it works (sealed challenges)
 
 Every challenge is a public, **answer-free** Docker image. The agent talks to it

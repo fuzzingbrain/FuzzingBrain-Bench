@@ -42,6 +42,12 @@ OPEN_MODEL_SAMPLING = {
         "top_p": 0.95,
         "extra_body": {"top_k": 20},
     },
+    # The GGUF serve (llama-server --alias qwen3.8:27b-q4) uses this id.
+    "qwen3.8:27b-q4": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "extra_body": {"top_k": 20},
+    },
     # Qwen3.8-Flash-Next (MoE). Same Qwen sampling convention; the model id must
     # match vLLM's --served-model-name and the --model passed to the run.
     "qwen3.8-flash-next:fp8": {
