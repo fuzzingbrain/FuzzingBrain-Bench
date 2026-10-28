@@ -35,6 +35,20 @@ OPEN_MODEL_SAMPLING = {
         "extra_body": {"top_k": 64,
                        "chat_template_kwargs": {"enable_thinking": True}},
     },
+    # Qwen3.8 thinks by default (no enable_thinking needed), per its model card;
+    # mirrors FuzzingBrain-Agent config/hprc_qwen.yaml (temp 1.0, top_p 0.95, top_k 20).
+    "qwen3.8:27b": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "extra_body": {"top_k": 20},
+    },
+    # Qwen3.8-Flash-Next (MoE). Same Qwen sampling convention; the model id must
+    # match vLLM's --served-model-name and the --model passed to the run.
+    "qwen3.8-flash-next:fp8": {
+        "temperature": 1.0,
+        "top_p": 0.95,
+        "extra_body": {"top_k": 20},
+    },
 }
 
 
