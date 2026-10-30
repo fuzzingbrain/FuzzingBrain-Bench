@@ -39,9 +39,12 @@ def test_the_note_changes_only_the_gdb_sentences():
     with_gdb = agent_tools_note({"gdb": True, "native": True, "target": t})
     without = agent_tools_note({"gdb": False, "native": True, "target": t})
     assert "gdb" in with_gdb and "gdb" not in without
-    # the run and coverage guidance is identical in both
-    for part in (f"Run it on an input file (`{t} /workspace/in`)",
-                 "a directory without `-runs=0` is treated as fuzzing and refused",
+    # the run and coverage guidance is the same in both, except that with gdb
+    # the harness runs only under gdb
+    assert f"Run it on an input file (`{t} /workspace/in`)" in without
+    assert f"Run it on an input file (`gdb -batch -ex run --args {t} /workspace/in`)" in with_gdb
+    assert f'gdb -batch -ex run --args {t} -runs=0 -print_coverage=1 "$d"' in with_gdb
+    for part in ("a directory without `-runs=0` is treated as fuzzing and refused",
                  f'{t} -runs=0 -print_coverage=1 "$d"',
                  "an input that crashes stops before the report",
                  "run it again."):
