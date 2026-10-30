@@ -89,6 +89,7 @@ Definition of a non-crash/non-vulnerability:
 How to work:
 - Use MCP tools for all actions; call setup() first.
 - Project source code is read-only under ./src, the harness is under ./harness.
+- IMPORTANT: Do not compile anything, and do not run any form of fuzzing (no fuzzer, no fuzzing loop, no script that runs the harness on many generated inputs).
 - Do not build a harness binary; use run_poc_on_harness() to test inputs on the official sanitizer-instrumented harness.
 - The crash is driven by the harness. Focus only on code reachable from the harness entry function.
 - Analyze the harness to learn the EXACT input format it decodes and any files it loads at startup.

@@ -391,7 +391,8 @@ def _dynamic_tools_note(have_gdb: bool, target: str, native: bool,
         # Library jars are built without local-variable tables: `locals` comes
         # back empty there, which an agent would otherwise read as "no state".
         return (f"- You may also read and run the binary run_poc_on_harness() grades "
-                f"against, at {target}. You also have `jdb`, through `jdb-run`, which "
+                f"against, at {target}. Run it only under jdb, one input at a time, "
+                f"never directly or from a script. You also have `jdb`, through `jdb-run`, which "
                 f"runs that same harness on one input under the debugger the way "
                 f"`gdb -batch` would: `jdb-run -ex run -ex where /workspace/in`. Each "
                 f"-ex is one jdb command, sent only when jdb is ready for it; run, "
@@ -428,8 +429,9 @@ def _dynamic_tools_note(have_gdb: bool, target: str, native: bool,
         # grep or head, often cutting the line that said why it stopped.
         t = target
         return (f"- You also have `gdb` and a readable copy of that binary, at "
-                f"{t}: you may run it, debug it, and ask it which functions an "
-                f"input reached. Run it on an input file (`{t} /workspace/in`); a "
+                f"{t}: run it only under gdb, one input at a time, never directly or "
+                f"from a script; under gdb you may debug it and ask it which "
+                f"functions an input reached. Run it on an input file (`{t} /workspace/in`); a "
                 f"directory without `-runs=0` is treated as fuzzing and refused. "
                 f"For coverage, copy the input alone into a new empty directory "
                 f"and run on that directory: `d=$(mktemp -d); cp /workspace/in "
