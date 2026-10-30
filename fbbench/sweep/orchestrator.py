@@ -197,15 +197,19 @@ def run_cell(model: str, bug: str, sample: int, max_turns: int, out: Path,
 
 
 def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -> None:
-    """Print the per-model leaderboard: distinct crashes, coverage, cost."""
+    """Print the per-model leaderboard: distinct crashes, coverage, cost, and
+    model response latency pooled over every call of the model's cells."""
+    from fbbench.runner.latency import pool as pool_latency
     print("\n" + "=" * 78)
     print(f"  {'model':24s} {'uniqCr':>7s} {'chall':>7s} {'crashed':>8s} "
-          f"{'refus':>6s} {'cost$':>8s}")
+          f"{'refus':>6s} {'cost$':>8s} {'calls':>7s} {'lat_p50':>8s} "
+          f"{'lat_p90':>8s} {'lat_avg':>8s} {'tok/s':>7s}")
     print("  " + "-" * 90)
     for model in models:
         refusals = n = crashed_on = 0
         crashes = 0   # headline: DISTINCT crashes, best-of-seeds per bug, summed
         cost = 0.0
+        scored = []   # every cell's score.json, for the pooled latency
         for bug in bugs:
             seen = False
             # Best (max) across this bug's seeds, never the sum: repeats measure
@@ -218,6 +222,7 @@ def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -
                     continue
                 seen = True
                 s = json.loads(sj.read_text())
+                scored.append(s)
                 bug_crashes = max(bug_crashes, int(s.get("unique_crashes", 0)))
                 if s.get("terminated_reason") == "refusal":
                     refusals += 1
@@ -229,8 +234,11 @@ def aggregate(out: Path, models: list[str], bugs: list[str], seeds: list[int]) -
             crashes += bug_crashes
             if bug_crashes:
                 crashed_on += 1
+        lat = pool_latency(scored)
+        f = lambda k, fmt="{:.1f}s": fmt.format(lat[k]) if k in lat else "-"
         print(f"  {model:24s} {crashes:>7d} {n:>7d} {crashed_on:>8d} "
-              f"{refusals:>6d} {cost:>8.2f}")
+              f"{refusals:>6d} {cost:>8.2f} {lat['model_calls']:>7d} {f('p50_s'):>8s} "
+              f"{f('p90_s'):>8s} {f('mean_s'):>8s} {f('output_tok_per_s', '{:.0f}'):>7s}")
     print("=" * 90)
 
 

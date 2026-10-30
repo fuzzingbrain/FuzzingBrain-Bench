@@ -219,7 +219,20 @@ document.getElementById("stats").innerHTML =
   stat(`${bugsCrashed.size}<span class="den"> / ${D.bugs.length}</span>`,"challenges crashed","a") +
   (errs ? stat(`${errs}`,"errors") : "") +
   stat(`$${(D.total_cost||0).toFixed(2)}`,"total cost") +
-  (D.elapsed_s ? stat(elapsed,"elapsed","a") : "");
+  (D.elapsed_s ? stat(elapsed,"elapsed","a") : "") +
+  latencyStats();
+
+// Model response latency, pooled over every call of a model's cells. Older runs
+// recorded none, so the row is simply absent for them.
+function latencyStats(){
+  const L = D.latency || {};
+  return Object.entries(L).filter(([, l]) => l && l.model_calls).map(([m, l]) => {
+    const who = Object.keys(L).length > 1 ? `${m} ` : "";
+    return stat(`${l.p50_s}s<span class="den"> / ${l.p90_s}s</span>`,
+                `${esc(who)}latency p50 / p90 (${l.model_calls} calls)`) +
+           (l.output_tok_per_s ? stat(`${l.output_tok_per_s}`, `${esc(who)}output tok/s`) : "");
+  }).join("");
+}
 
 // --- run configuration panel ---
 const C = D.config || {};

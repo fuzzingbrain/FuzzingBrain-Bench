@@ -12,6 +12,7 @@ already seen; they say what it hit, never what it was supposed to hit.
 """
 from __future__ import annotations
 
+from fbbench.runner.latency import pool as pool_latency
 from fbbench.sweep.orchestrator import cell_dir
 
 import json
@@ -106,6 +107,7 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
 
     cells = []
     cost_sum = 0.0
+    scores_by_model: dict[str, list[dict]] = {}   # for the pooled latency
     cfg_seen: dict[str, set] = {}     # config key -> set of values seen across cells
     # The crash signatures seen, unioned across a pair's samples and across a
     # challenge's models. Counted on the UNION, not summed from the cells: two
@@ -123,6 +125,8 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
                 if not sj.is_file():
                     continue
                 sc = _load(sj)
+                scores_by_model.setdefault(model, []).append(sc)
+                lat = sc.get("latency") or {}
                 cost = float(sc.get("total_usd") or 0.0)
                 cost_sum += cost
                 cfg = sc.get("config") or {}
@@ -156,6 +160,8 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
                     "cost": cost,
                     "mode": cfg.get("mode") or sc.get("mode") or "blind",
                     "reason": sc.get("terminated_reason", ""),
+                    "lat_p50": lat.get("p50_s"),
+                    "lat_mean": lat.get("mean_s"),
                     "report": (str(report.relative_to(exp_dir)) if report.is_file() else ""),
                 })
 
@@ -234,6 +240,8 @@ def build_summary(exp_dir: str | Path, *, exp: str | None = None,
         "elapsed_s": elapsed_s,
         # Per-model difficulty-weighted score, each over its own denominator.
         "scores": scores,
+        # Per-model model response latency, pooled over every call of its cells.
+        "latency": {m: pool_latency(scores_by_model.get(m, [])) for m in models},
         "comparable": comparable,
         # The frozen table this run was scored against: the coefficients for
         # THIS run's challenges, the per-challenge cap, and the whole-corpus

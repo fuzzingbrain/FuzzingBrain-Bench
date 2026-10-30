@@ -16,6 +16,7 @@ from pathlib import Path
 from fbbench.env import load_dotenv
 from fbbench.grading.bench_yaml import find_bug, read_bench
 from fbbench.images import DEFAULT_IMAGE_PREFIX, agent_image
+from fbbench.runner.latency import summarize as summarize_latency
 from fbbench.models import CATALOG, PRICES, cost_usd, default_sweep
 from fbbench.sweep.mcp_episode import AGENT_USD_CAP, AGENT_WALL_CAP_S
 from fbbench.paths import REPO
@@ -174,6 +175,11 @@ def main() -> int:
         "malformed_retries": result.malformed_retries,
         "turns_used": result.turns_used,
         "duration_s": result.duration_s,
+        # Model response time per call and its summary (fbbench.runner.latency).
+        "latency": {**summarize_latency(result.call_latencies_s,
+                                        output_tokens=result.output_tokens,
+                                        duration_s=result.duration_s),
+                    "model_wait_s": round(result.model_wait_s, 2)},
     }
     # Distinct crashes is the whole score. Deciding whether a crash is THE
     # defect a challenge was built around needs an answer key — the PoC, the

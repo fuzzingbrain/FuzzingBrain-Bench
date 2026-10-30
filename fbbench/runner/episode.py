@@ -22,6 +22,7 @@ from dataclasses import replace
 from fbbench.grading.bench_yaml import harness_sanitizer
 from fbbench.grading.signature import signature as crash_signature
 from fbbench.models.catalog import context_window
+from fbbench.runner.latency import summarize as summarize_latency
 from fbbench.models.pricing import cost_usd
 from fbbench.runner.backends.base import Backend, Completion, ToolResult
 from fbbench.runner.mcp_client import MCPClient, MCPToolError
@@ -211,6 +212,11 @@ class EpisodeResult:
     output_tokens: int = 0
     cache_read_tokens: int = 0
     cache_write_tokens: int = 0
+    # Wall-clock seconds of every backend.complete() call, in order (see
+    # fbbench.runner.latency). Failed calls are not listed; their time is in
+    # model_wait_s.
+    call_latencies_s: list[float] = field(default_factory=list)
+    model_wait_s: float = 0.0
     terminated_reason: str = "max_turns"
     refusal_retries: int = 0
     malformed_retries: int = 0
@@ -358,6 +364,14 @@ def run_episode(
     # Self-calibrating tokens/char, updated from each call's real input_tokens so
     # the pre-call estimate tracks THIS model's tokenizer (cold start = chars/4).
     tpc = [_COLD_START_TOKENS_PER_CHAR]
+    # Latency of the most recent successful model call, for the turn's event.
+    last_latency = [0.0]
+
+    def latency_fields(comp: Completion) -> dict:
+        lat = last_latency[0]
+        return {"latency_s": round(lat, 2),
+                "output_tok_per_s": (round(comp.output_tokens / lat, 1)
+                                     if lat > 0 and comp.output_tokens else None)}
 
     def complete_once() -> Completion:
         # Pre-call guard: compact BEFORE sending, so a turn that just appended a lot
@@ -379,10 +393,12 @@ def run_episode(
         # Adaptive per-turn output cap: default 65536, but shrunk so input+output
         # fit the window (fixes small-window models where a fixed 65536 alone
         # exceeds the whole window, and shrinks output when the input is large).
+        t_call = time.monotonic()
         try:
             c = backend.complete(sysp, messages, tools,
                                  max_tokens=_output_budget(est, window))
         except Exception as e:  # noqa: BLE001
+            result.model_wait_s += time.monotonic() - t_call
             if not _is_context_overflow(e):
                 raise
             # Backstop: estimate was off and the provider rejected for length. Hard-
@@ -394,8 +410,13 @@ def run_episode(
             log(ev)
             tlog(ev)
             est = _estimate_tokens(sysp, messages, tpc[0])
+            t_call = time.monotonic()
             c = backend.complete(sysp, messages, tools,
                                  max_tokens=_output_budget(est, window))
+        dt = time.monotonic() - t_call
+        result.call_latencies_s.append(dt)
+        result.model_wait_s += dt
+        last_latency[0] = dt
         # Calibrate: real prompt tokens / chars we actually sent (messages are
         # unchanged until the caller appends), so the ratio absorbs formatting +
         # tools-schema overhead the char count misses. Refresh only on real data.
@@ -429,18 +450,22 @@ def run_episode(
                 else:
                     result.malformed_retries += 1
                 log({"event": "retry", "kind": kind, "turn": turn,
-                     "attempt": attempt + 1, "stop_reason": comp.stop_reason})
+                     "attempt": attempt + 1, "stop_reason": comp.stop_reason,
+                     **latency_fields(comp)})
                 tlog({"event": "retry", "kind": kind, "turn": turn,
                       "attempt": attempt + 1, "stop_reason": comp.stop_reason,
-                      "text": comp.text})
+                      **latency_fields(comp), "text": comp.text})
                 comp = complete_once()
 
             messages.append({"role": "assistant", "text": comp.text,
                              "tool_calls": comp.tool_calls})
             log({"event": "assistant", "turn": turn, "text": comp.text,
-                 "stop_reason": comp.stop_reason, "tool_calls": len(comp.tool_calls)})
+                 "stop_reason": comp.stop_reason, "tool_calls": len(comp.tool_calls),
+                 "input_tokens": comp.input_tokens + comp.cache_read_tokens
+                 + comp.cache_write_tokens,
+                 "output_tokens": comp.output_tokens, **latency_fields(comp)})
             tlog({"event": "assistant", "turn": turn, "text": comp.text,
-                  "stop_reason": comp.stop_reason,
+                  "stop_reason": comp.stop_reason, **latency_fields(comp),
                   "input_tokens": comp.input_tokens, "output_tokens": comp.output_tokens,
                   "cache_read_tokens": comp.cache_read_tokens,
                   "cache_write_tokens": comp.cache_write_tokens,
@@ -636,18 +661,26 @@ def run_episode(
         tlog({"event": "error", "turn": result.turns_used, "error": result.error})
     finally:
         result.duration_s = time.time() - start
+        lat = summarize_latency(result.call_latencies_s,
+                                output_tokens=result.output_tokens,
+                                duration_s=result.duration_s)
+        lat.pop("per_call_s", None)
+        # Includes the time of calls that failed and were retried or ended the episode.
+        lat["model_wait_s"] = round(result.model_wait_s, 2)
         log({"event": "end", "terminated_reason": result.terminated_reason,
              "unique_crashes": result.unique_crashes,
              "crash_signatures": sorted(result.crash_signatures),
              "turns_used": result.turns_used,
              "duration_s": result.duration_s,
-             "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
+             "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
+             "latency": lat})
         tlog({"event": "end", "terminated_reason": result.terminated_reason,
                "unique_crashes": result.unique_crashes,
               "crash_signatures": sorted(result.crash_signatures),
               "turns_used": result.turns_used,
               "duration_s": result.duration_s,
-              "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
+              "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
+              "latency": lat})
         if log_fp:
             log_fp.close()
         if tlog_fp:
