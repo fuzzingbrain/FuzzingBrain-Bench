@@ -1,0 +1,9 @@
+bug_id: libwebp-01
+project: libwebp
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

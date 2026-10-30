@@ -1,0 +1,9 @@
+bug_id: imagemagick-02
+project: imagemagick
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["@@"]
+

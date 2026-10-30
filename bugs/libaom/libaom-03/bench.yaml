@@ -1,0 +1,9 @@
+bug_id: libaom-03
+project: libaom
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["-timeout=30", "-rss_limit_mb=2048", "@@"]
+

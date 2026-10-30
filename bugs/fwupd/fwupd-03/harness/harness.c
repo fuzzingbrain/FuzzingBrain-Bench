@@ -1,0 +1,30 @@
+#include "config.h"
+
+#include "plugins/logitech-hidpp/fu-logitech-rdfu-firmware.h"
+
+int
+LLVMFuzzerTestOneInput(const guint8 *data, gsize size)
+{
+	g_autoptr(FuFirmware) firmware = FU_FIRMWARE(g_object_new(FU_TYPE_LOGITECH_RDFU_FIRMWARE, NULL));
+	g_autoptr(GBytes) fw = g_bytes_new(data, size);
+	gboolean ret;
+
+	(void)g_setenv("G_DEBUG", "fatal-criticals", TRUE);
+	(void)g_setenv("FWUPD_FUZZER_RUNNING", "1", TRUE);
+	ret = fu_firmware_parse_bytes(firmware, fw, 0x0, FU_FIRMWARE_PARSE_FLAG_NONE, NULL);
+	if (!ret && fu_firmware_has_flag(firmware, FU_FIRMWARE_FLAG_HAS_CHECKSUM)) {
+		g_clear_object(&firmware);
+		firmware = FU_FIRMWARE(g_object_new(FU_TYPE_LOGITECH_RDFU_FIRMWARE, NULL));
+		ret = fu_firmware_parse_bytes(firmware,
+					fw,
+					0x0,
+					FU_FIRMWARE_PARSE_FLAG_NO_SEARCH |
+					    FU_FIRMWARE_PARSE_FLAG_IGNORE_VID_PID |
+					    FU_FIRMWARE_PARSE_FLAG_IGNORE_CHECKSUM,
+					NULL);
+	}
+	if (ret) {
+		g_autoptr(GBytes) fw2 = fu_firmware_write(firmware, NULL);
+	}
+	return 0;
+}

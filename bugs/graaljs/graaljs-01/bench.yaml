@@ -1,0 +1,9 @@
+bug_id: graaljs-01
+project: graaljs
+is_oss_fuzz: false
+language: jvm
+harness:
+  sanitizer: jazzer
+  engine: jazzer
+  invocation: ["@@"]
+

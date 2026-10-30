@@ -1,0 +1,94 @@
+# Serving open-weight models on an HPC cluster
+
+These example scripts serve an open-weight model (Qwen GGUF via
+llama.cpp, or Gemma via vLLM) as OpenAI-compatible endpoints on the cluster's
+GPU nodes, tunnel those endpoints to the machine that runs `fb-bench`, and let
+the **api arm** drive the model (`--model qwen3.8:27b-q4`, keyless, `$0`).
+
+```
+cluster/   run on the cluster (Apptainer/Singularity + Slurm)
+runner/    run on the machine that has fb-bench (needs SSH access to the cluster)
+```
+
+## Prerequisites
+
+1. An account that can log in to your cluster using its configured SSH
+   authentication method.
+2. The machine that runs `fb-bench` must be able to reach and SSH into the
+   cluster login node — the persistent SSH master and the port tunnels in
+   `runner/` are built on that connection. Without it the model endpoints cannot
+   be reached and the run cannot start.
+
+## Before you start — fill these in
+
+- `YOUR_SLURM_ACCOUNT` in the `*.slurm` files → your Slurm `--account`.
+- `HPC_USER` and `HPC_HOST` → your cluster username and login hostname.
+- `CLUSTER` → a local label for the SSH control socket (default: `cluster`).
+- Put a Hugging Face token in `~/.hf_token` on the cluster if a model needs one.
+- The scripts assume the layout `/scratch/user/$USER/fbbench-models/` with
+  `llama.sif`, `vllm.sif`, `logs/`, and the downloaded weights under `hf/`.
+
+## 1. One-time (on the cluster)
+
+```bash
+# two SIF images, ~10 GB (pin a real tag)
+apptainer pull vllm.sif  docker://vllm/vllm-openai:<tag>
+apptainer pull llama.sif docker://ghcr.io/ggml-org/llama.cpp:server-cuda-<tag>
+sbatch cluster/download-models.slurm qwen      # or: gemma / all
+```
+
+## 2. Serve N instances (on the cluster)
+
+```bash
+cd /scratch/user/$USER/fbbench-models
+./start-qwen.sh 11          # 11 Qwen GGUF servers, ports 8000..8010 (1 A100 each)
+./status.sh                 # job / node / port / READY|loading
+```
+
+## 3. Tunnel the endpoints (on the runner machine)
+
+```bash
+export HPC_USER=your_user HPC_HOST=login.example.org CLUSTER=cluster
+bash runner/master.sh                                  # once: password + 2FA
+./runner/tunnels-from-squeue.sh gguf-serve serve-gguf  # prints the env line below
+#  -> export FBBENCH_AGENT_ENDPOINTS=http://localhost:8000/v1,...,http://localhost:8010/v1
+```
+
+## 4. Run the benchmark (on the runner machine)
+
+```bash
+export FBBENCH_AGENT_ENDPOINTS=http://localhost:8000/v1,...   # from step 3
+fb-bench run all --arm api --model qwen3.8:27b-q4 \
+    --max-turns 10000 --timeout 3600 --jobs 11 --output qwen-fb
+```
+
+Stop the servers when done — idle GPUs still burn allocation:
+
+```bash
+./stop.sh        # on the cluster
+```
+
+## Notes
+
+- Each cell claims one endpoint from `FBBENCH_AGENT_ENDPOINTS` for its whole
+  episode (waiting if there are fewer endpoints than `--jobs`), so set `--jobs`
+  to the number of servers.
+- The model id must match the server's advertised name: llama.cpp `--alias`
+  (`qwen3.8:27b-q4`) or vLLM `--served-model-name` (`gemma4:31b-qat`). The `:` in
+  the id routes it to the keyless local path.
+- `tunnel-up.sh` / `tunnel-down.sh` add or remove a single forward by hand; the
+  same scripts support another login node by setting `HPC_HOST` and `CLUSTER`.
+
+## Hardware-specific values (retune per GPU)
+
+Tuned for one A100 40GB; change them for a different GPU.
+
+- Context length: vLLM `--max-model-len` (141760 for Gemma) and llama.cpp `-c`
+  (262144 for Qwen). The largest context a single node can hold, bound by VRAM.
+  It must match the model's entry in `fbbench/models/catalog.py` `CONTEXT_WINDOWS`,
+  or the server rejects anything longer.
+- KV cache quantization: llama.cpp `-ctk q8_0 -ctv q8_0`. This is what lets the
+  262144 context fit on 40GB; with more VRAM you can raise the precision.
+- vLLM `--gpu-memory-utilization 0.95`: fraction of GPU memory used.
+- Node request: `--gres`, `--mem`, `--cpus-per-task` in the `.slurm` files.
+- `--parallel 1` (llama.cpp): one request per server, matching one cell per endpoint.

@@ -1,0 +1,9 @@
+bug_id: ots-01
+project: ots
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

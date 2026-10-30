@@ -1,0 +1,9 @@
+bug_id: libavif-01
+project: libavif
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

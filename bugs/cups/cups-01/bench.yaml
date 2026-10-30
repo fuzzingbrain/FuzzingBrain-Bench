@@ -1,0 +1,9 @@
+bug_id: cups-01
+project: cups
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

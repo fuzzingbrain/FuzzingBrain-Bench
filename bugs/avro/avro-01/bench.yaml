@@ -1,0 +1,9 @@
+bug_id: avro-01
+project: avro
+is_oss_fuzz: true
+language: jvm
+harness:
+  sanitizer: jazzer
+  engine: jazzer
+  invocation: ["@@"]
+

@@ -1,0 +1,8 @@
+bug_id: systemd-02
+project: systemd
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["-timeout=10", "-rss_limit_mb=2048", "@@"]

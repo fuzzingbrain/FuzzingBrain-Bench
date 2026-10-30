@@ -1,0 +1,9 @@
+bug_id: freerdp-01
+project: freerdp
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: lsan
+  engine: libfuzzer
+  invocation: ["@@"]
+

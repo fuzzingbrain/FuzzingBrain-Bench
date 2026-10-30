@@ -1,0 +1,9 @@
+bug_id: openscreen-01
+project: openscreen
+is_oss_fuzz: false
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

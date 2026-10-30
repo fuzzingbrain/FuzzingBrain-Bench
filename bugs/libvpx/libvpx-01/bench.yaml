@@ -1,0 +1,9 @@
+bug_id: libvpx-01
+project: libvpx
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

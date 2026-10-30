@@ -1,0 +1,9 @@
+bug_id: icu-01
+project: icu
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

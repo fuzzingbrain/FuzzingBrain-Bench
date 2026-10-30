@@ -1,0 +1,775 @@
+"""Render a self-contained HTML report for one finished episode.
+
+After a run, ``report.html`` lands next to ``score.json`` / ``traj.md`` and can
+be opened straight in a browser — no server. It reads the run dir's
+``score.json``, ``cost.json``, and ``transcript.jsonl`` and lays out, in the
+GitHub-dark style of the AGF reports:
+
+* a header with the bug / model / sanitizer / language tags,
+* hero stats (distinct crashes, turns, tool calls, cost),
+* the distinct crash signatures the run produced,
+* cards for token / cost breakdown, per-tool call counts, and run metadata,
+* the full trajectory table (every tool call, its argument and result, with
+  the run_poc_on_harness() calls and the faulting call highlighted).
+
+Everything the report shows is answer-free: it is the record of what the agent
+did, which never includes a reference PoC / expected fault / location.
+"""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from fbbench.grading.bench_yaml import find_bug, harness_sanitizer, read_bench
+from fbbench.runner.traj import GRADE_TOOLS, build_traj, _grade_out
+
+_MAX_BLOCK = 6000  # cap each rendered tool arg/output block (raw transcript has full)
+
+
+def _esc(s) -> str:
+    return (str(s).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            .replace('"', "&quot;"))
+
+
+def _load(path: Path) -> dict:
+    try:
+        return json.loads(path.read_text())
+    except (OSError, ValueError):
+        return {}
+
+
+def _tool_stats(nodes: list[dict]) -> list[tuple[str, int, int]]:
+    """(tool, calls, errors) per tool, most-used first."""
+    agg: dict[str, list[int]] = {}
+    for n in nodes:
+        row = agg.setdefault(n["tool"], [0, 0])
+        row[0] += 1
+        if not n["ok"]:
+            row[1] += 1
+    return sorted(((t, c, e) for t, (c, e) in agg.items()), key=lambda r: -r[1])
+
+
+def _stat(n: str, label: str, cls: str = "") -> str:
+    return f'<div class="stat"><div class="n {cls}">{n}</div><div class="l">{_esc(label)}</div></div>'
+
+
+def _yn(v) -> str:
+    return "yes" if v else "no"
+
+
+def _config_rows(score: dict, max_turns_fallback) -> list[tuple[str, str]]:
+    """Every run knob that shaped this episode, as (label, value) pairs.
+
+    Reads the `config` block written by the runner, and also falls back to the
+    richer top-level score.json fields (mode / diff_level / distractors / …) so
+    the same report renders for both the public and the research score shapes.
+    """
+    cfg = score.get("config") or {}
+    rows: list[tuple[str, str]] = []
+
+    # Which arm produced this. Without it an agent cell and an api cell of the
+    # same model render identically, and a result nobody can attribute to an arm
+    # is not a result.
+    arm = (cfg.get("arm") or score.get("arm")
+           or ("claudecode" if str(score.get("model", "")).startswith("claude-code-")
+               else None))
+    if arm:
+        rows.append(("arm", arm))
+    agent_image = cfg.get("agent_image") or score.get("agent_image")
+    if agent_image:
+        rows.append(("image", agent_image))
+
+    mode = cfg.get("mode") or score.get("mode") or "blind"
+    rows.append(("mode", mode))
+
+    diff_level = cfg.get("diff_level", score.get("diff_level"))
+    if diff_level is not None:
+        rows.append(("diff level", str(diff_level)))
+    distractors = cfg.get("distractors", score.get("distractors"))
+    if distractors is not None:
+        n = len(distractors) if isinstance(distractors, (list, tuple)) else distractors
+        rows.append(("distractor files", str(n)))
+    for fld, label in (("changed_files", "changed files"), ("crash_files", "crash-region files")):
+        v = cfg.get(fld, score.get(fld))
+        if v:
+            rows.append((label, ", ".join(v) if isinstance(v, (list, tuple)) else str(v)))
+
+    mt = cfg.get("max_turns", score.get("max_turns", max_turns_fallback))
+    if mt is not None:
+        rows.append(("turn budget", str(mt)))
+
+    rows.append(("stop-on-crash", _yn(cfg.get("stop_on_crash", False))))
+    rows.append(("preserve PoCs", _yn(cfg.get("preserve_pocs", score.get("preserve_pocs", True)))))
+    # `grading` lives under `config` for the api arm and at the top level for
+    # the external one. Read both before concluding a run never recorded it,
+    # or a cell that graded in-image reports "not recorded".
+    rows.append(("grading", cfg.get("grading") or score.get("grading")
+                 or "not recorded"))
+    img = cfg.get("image")
+    if img and img != agent_image:
+        rows.append(("challenge image", img))
+    return rows
+
+
+def _config_html(rows: list[tuple[str, str]]) -> str:
+    body = "".join(
+        f'<tr><td>{_esc(k)}</td><td class="r">{_esc(v)}</td></tr>' for k, v in rows
+    )
+    return ('<table class="mini cfg"><tbody>' + body + "</tbody></table>")
+
+
+def _block(s: str) -> str:
+    """Escape + cap a multi-line string for a <pre> block."""
+    s = "" if s is None else str(s)
+    clipped = len(s) > _MAX_BLOCK
+    if clipped:
+        s = s[:_MAX_BLOCK] + f"\n… [+{len(s) - _MAX_BLOCK:,} more chars — see transcript.jsonl]"
+    return _esc(s)
+
+
+def _result_text(tool: str, result, is_error: bool) -> tuple[str, bool]:
+    """Full-fidelity (capped) text for a tool result + whether it faulted."""
+    if is_error:
+        data = result.get("data") if isinstance(result, dict) else result
+        return "ERROR: " + (str(data) if data else ""), False
+    if not isinstance(result, dict):
+        return str(result), False
+    if tool in GRADE_TOOLS:
+        crash = _grade_out(result)[1]
+        ho = result.get("harness_output") or {}
+        parts = []
+        if isinstance(ho, dict):
+            if ho.get("exit_code") is not None:
+                parts.append(f"exit_code: {ho.get('exit_code')}")
+            if ho.get("signal"):
+                parts.append(f"signal: {ho.get('signal')}")
+            if ho.get("stdout"):
+                parts.append("--- stdout ---\n" + str(ho.get("stdout")))
+            if ho.get("stderr"):
+                parts.append("--- stderr ---\n" + str(ho.get("stderr")))
+        verdict = {k: v for k, v in result.items() if k != "harness_output"}
+        if verdict:
+            parts.insert(0, json.dumps(verdict, indent=2))
+        return ("\n".join(parts) or json.dumps(result, indent=2)), crash
+    if tool == "exec":
+        out = [f"exit_code: {result.get('exit_code')}"]
+        if result.get("stdout"):
+            out.append("--- stdout ---\n" + str(result.get("stdout")))
+        if result.get("stderr"):
+            out.append("--- stderr ---\n" + str(result.get("stderr")))
+        return "\n".join(out), False
+    if tool == "read_file":
+        return str(result.get("content", "")), False
+    return json.dumps(result, indent=2), False
+
+
+def build_conversation(transcript_path: Path) -> tuple[list[dict], str, str]:
+    """Reconstruct the dialogue: per-turn assistant text + tool calls + results.
+
+    Returns (turns, system_prompt, initial_user_message). Each turn is
+    {turn, text, tokens, stop, calls:[{tool, input, result_text, crash, err}]}.
+    Pairs an assistant's tool_calls with the matching tool_result by id.
+    """
+    results_by_id: dict[str, dict] = {}
+    assistants: list[dict] = []
+    notes_by_turn: dict[int, list[str]] = {}
+    system_prompt = initial_user = ""
+    for line in transcript_path.read_text().splitlines():
+        if not line.strip():
+            continue
+        try:
+            e = json.loads(line)
+        except ValueError:
+            continue
+        ev = e.get("event")
+        if ev == "start":
+            system_prompt = e.get("system_prompt", "") or ""
+            initial_user = e.get("initial_user_message", "") or ""
+        elif ev == "tool_result":
+            tid = e.get("id")
+            if tid is not None:
+                results_by_id[tid] = e
+        elif ev == "assistant":
+            assistants.append(e)
+        elif ev == "budget_note":
+            notes_by_turn.setdefault(e.get("turn"), []).append(e.get("note", ""))
+
+    # One model response can arrive as two assistant events -- the text and the
+    # tool call it came with -- which renders as a turn repeated, once blank.
+    # They are one response, so fold same-numbered events back together.
+    merged: list[dict] = []
+    for a in assistants:
+        prev = merged[-1] if merged else None
+        if prev is not None and a.get("turn") == prev.get("turn"):
+            txt = " ".join(x for x in ((prev.get("text") or "").strip(),
+                                       (a.get("text") or "").strip()) if x)
+            prev["text"] = txt
+            prev["tool_calls"] = (prev.get("tool_calls") or []) + (a.get("tool_calls") or [])
+            for k in ("input_tokens", "output_tokens", "cache_read_tokens",
+                      "cache_write_tokens"):
+                prev[k] = (prev.get(k) or 0) + (a.get(k) or 0)
+            if a.get("stop_reason"):
+                prev["stop_reason"] = a["stop_reason"]
+            continue
+        merged.append(dict(a))
+    assistants = merged
+
+    turns: list[dict] = []
+    for a in assistants:
+        calls = []
+        for tc in (a.get("tool_calls") or []):
+            tid = tc.get("id")
+            r = results_by_id.get(tid, {})
+            tool = tc.get("name") or r.get("tool") or "?"
+            rtext, crash = _result_text(tool, r.get("result"), r.get("is_error", False))
+            calls.append({
+                "tool": tool,
+                "input": tc.get("input") if tc.get("input") is not None else r.get("input"),
+                "result_text": rtext,
+                "crash": crash,
+                "err": bool(r.get("is_error", False)),
+            })
+        turns.append({
+            "turn": a.get("turn"),
+            "text": a.get("text") or "",
+            "stop": a.get("stop_reason") or "",
+            "in_tok": a.get("input_tokens", 0),
+            "out_tok": a.get("output_tokens", 0),
+            "notes": notes_by_turn.get(a.get("turn"), []),
+            "calls": calls,
+        })
+    return turns, system_prompt, initial_user
+
+
+def _conversation_html(turns: list[dict], system_prompt: str, initial_user: str,
+                      wire: dict | None = None) -> str:
+    head = ""
+    if system_prompt:
+        head += (
+            '<details class="sys"><summary>system prompt — the task framing the agent '
+            'received (answer-free)</summary>'
+            f'<pre>{_block(system_prompt)}</pre></details>'
+        )
+    if initial_user:
+        head += (
+            '<details class="sys" open><summary>initial user message</summary>'
+            f'<pre>{_block(initial_user)}</pre></details>'
+        )
+
+    # State the one gap in the record rather than let a reader find it.
+    if wire and any(r[0].get("source") == "reconstructed" for r in wire.values()):
+        head += (
+            '<div class="bnote" style="margin:10px 0">Every message sent and returned is '
+            'recorded below. The model\'s internal reasoning is not: this arm runs through '
+            'the Claude Code CLI, which streams each <code>thinking</code> block with its '
+            'text stripped and only a signature left, so the reasoning tokens the run was '
+            'billed for cannot be recovered. The API-driven arm records reasoning too.</div>'
+        )
+
+    blocks = []
+    for t in turns:
+        inner = []
+        if t["text"].strip():
+            inner.append(f'<div class="think">{_block(t["text"])}</div>')
+        elif t["calls"]:
+            inner.append('<div class="think nowords">the model returned no prose this '
+                         'turn — only the tool call below</div>')
+        for note in t["notes"]:
+            inner.append(f'<div class="bnote">{_esc(note)}</div>')
+        for c in t["calls"]:
+            badge = ('<span class="b crash">crash</span>' if c["crash"]
+                     else ('<span class="b err">error</span>' if c["err"] else ""))
+            arg_json = json.dumps(c["input"], indent=2, ensure_ascii=False) if c["input"] is not None else ""
+            arg_det = (f'<details open><summary>arguments</summary><pre>{_block(arg_json)}</pre></details>'
+                       if arg_json.strip() not in ("", "{}", "null") else "")
+            open_attr = " open" if (c["crash"] or c["err"]) else ""
+            res_det = (f'<details{open_attr}><summary>result {badge}</summary>'
+                       f'<pre>{_block(c["result_text"])}</pre></details>')
+            ccls = "crash" if c["crash"] else ("err" if c["err"] else "")
+            inner.append(
+                f'<div class="tcall {ccls}"><div class="tc-h"><code>{_esc(c["tool"])}</code>{badge}</div>'
+                f'{arg_det}{res_det}</div>'
+            )
+        if wire and t["turn"] in wire:
+            inner.append(_wire_html(wire[t["turn"]]))
+        meta = (f'turn {t["turn"]}'
+                + (f' · {t["in_tok"]:,} in / {t["out_tok"]:,} out tok' if (t["in_tok"] or t["out_tok"]) else "")
+                + (f' · stop: {_esc(t["stop"])}' if t["stop"] else ""))
+        blocks.append(
+            f'<div class="cturn"><div class="cturn-h">{meta}</div>{"".join(inner)}</div>'
+        )
+    body = "".join(blocks) or '<div class="muted">no conversation recorded</div>'
+    return head + '<div class="conv">' + body + "</div>"
+
+
+def _msg_text(content) -> str:
+    """One message's content as text. litellm carries either a string or the
+    content-block list, and a tool_calls-only assistant turn carries neither."""
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        out = []
+        for b in content:
+            if isinstance(b, str):
+                out.append(b)
+            elif not isinstance(b, dict):
+                continue
+            elif b.get("type") == "text":
+                out.append(b.get("text") or "")
+            elif b.get("type") == "thinking":
+                # The signature is a page of base64 carrying no meaning to a
+                # reader; exchange.jsonl keeps the block whole.
+                out.append(b.get("thinking") or "[thinking block, empty]")
+            elif b.get("type") == "tool_use":
+                out.append(f'[calls {b.get("name")}]\n' + json.dumps(
+                    b.get("input"), indent=2, ensure_ascii=False))
+            elif b.get("type") == "tool_result":
+                out.append(_msg_text(b.get("content")))
+            else:
+                out.append(b.get("text") or b.get("content")
+                           or json.dumps(b, indent=2, ensure_ascii=False))
+        return "\n".join(x for x in out if x)
+    return "" if content is None else json.dumps(content, indent=2, ensure_ascii=False)
+
+
+def _load_exchange(run_dir: Path) -> list[dict]:
+    """The recorded API calls, in order. One record is one call."""
+    path = run_dir / "exchange.jsonl"
+    if not path.is_file():
+        return []
+    recs = []
+    for line in path.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            recs.append(json.loads(line))
+        except json.JSONDecodeError:
+            continue
+    return recs
+
+
+def _exchange_by_turn(recs: list[dict]) -> dict:
+    """Each call keyed by the turn it produced, with its prefix already peeled.
+
+    A call re-posts the whole conversation, so what is new in it is the tail:
+    either recorded as the appended messages, or found by matching the previous
+    call's array. Rendering the shared prefix per turn would repeat the same
+    text N times over -- it is what made this page 36 MB.
+    """
+    out = {}
+    for i, rec in enumerate(recs):
+        req = rec.get("request") or {}
+        if "messages_appended" in req:
+            msgs = req.get("messages_appended") or []
+            total = req.get("message_count") or len(msgs)
+        else:
+            full = req.get("messages") or []
+            prev = (recs[i - 1].get("request") or {}).get("messages") or [] if i else []
+            k = 0
+            while k < len(prev) and k < len(full) and prev[k] == full[k]:
+                k += 1
+            msgs, total = full[k:], len(full)
+        turn = rec.get("turn") or (i + 1)
+        out[turn] = (rec, msgs, total, total - len(msgs))
+    return out
+
+
+def _wire_html(entry) -> str:
+    """One turn's call: the messages it added, and the response, verbatim."""
+    rec, msgs, total, carried = entry
+    resp = rec.get("response") or {}
+    sent = []
+    for m in msgs:
+        role = str(m.get("role", "?"))
+        body = _msg_text(m.get("content"))
+        tcs = m.get("tool_calls") or []
+        if tcs:
+            body = (body + "\n" if body else "") + json.dumps(tcs, indent=2, ensure_ascii=False)
+        cls = role if role in ("system", "user", "assistant", "tool") else ""
+        sent.append(f'<div class="xmsg {cls}"><div class="r">{_esc(role)}</div>'
+                    f'<pre>{_block(body)}</pre></div>')
+    got = []
+    for ch in (resp.get("choices") or []):
+        m = ch.get("message") or {}
+        body = _msg_text(m.get("content"))
+        tcs = m.get("tool_calls") or []
+        if tcs:
+            body = (body + "\n" if body else "") + json.dumps(tcs, indent=2, ensure_ascii=False)
+        fin = ch.get("finish_reason")
+        label = "assistant" + (f" · finish: {fin}" if fin else "")
+        got.append(f'<div class="xmsg assistant"><div class="r">{_esc(label)}</div>'
+                   f'<pre>{_block(body)}</pre></div>')
+    u = resp.get("usage") or {}
+    meta = " · ".join(filter(None, [
+        f'{total} message{"s" if total != 1 else ""} posted',
+        f'{(u.get("prompt_tokens") or u.get("input_tokens")):,} prompt tok'
+        if (u.get("prompt_tokens") or u.get("input_tokens")) else "",
+        f'{u.get("completion_tokens"):,} completion tok' if u.get("completion_tokens") else "",
+        f'{u.get("cache_read_input_tokens"):,} cached' if u.get("cache_read_input_tokens") else "",
+        "request rebuilt from the stream" if rec.get("source") == "reconstructed" else "",
+    ]))
+    return (
+        f'<details class="wire"><summary>raw exchange — {meta}</summary>'
+        + '<div class="sub" style="margin:8px 0 2px">sent to the model'
+        + (f' — the {carried} message{"s" if carried != 1 else ""} from the turns above, '
+           'then:' if carried > 0 else ':')
+        + '</div>' + (("".join(sent)) or "<div class=muted>—</div>")
+        + '<div class="sub" style="margin:14px 0 2px">returned by the model</div>'
+        + (("".join(got)) or "<div class=muted>—</div>") + '</details>'
+    )
+
+
+def _findings_section(score: dict) -> tuple[str, str, str]:
+    """The results block, and the headline stat above it.
+
+    The score is DISTINCT CRASHES. An image carries no answer key, so nothing
+    can judge a candidate against the recorded defect; what a run can say is
+    which crashes it produced that no earlier submission in it had.
+    """
+    uniq = score.get("unique_crashes", 0)
+    sigs = score.get("crash_signatures") or []
+    rows = "".join(
+        f'<tr><td class="r">{i}</td><td>{_sig_html(s)}</td></tr>'
+        for i, s in enumerate(sigs, 1)
+    ) or ('<tr><td colspan="2" class="muted">no crash was produced in this '
+          'episode</td></tr>')
+    grading = ((score.get("config") or {}).get("grading")
+               or score.get("grading") or "local")
+    html = (
+        '<h2>Distinct crashes</h2>\n'
+        f'<div class="sub">graded <b>{_esc(grading)}</b> &mdash; each row is one '
+        'crash this run produced that no earlier submission in it had.</div>\n'
+        '<table><thead><tr><th class="r">#</th><th>signature</th></tr></thead>'
+        f'<tbody>{rows}</tbody></table>'
+    )
+    return html, str(uniq), "distinct crashes"
+
+
+def _split_sig(sig: str) -> list[str]:
+    """Split a canonical signature on its unescaped `|` separators."""
+    parts, cur, esc = [], "", False
+    for ch in sig:
+        if esc:
+            cur, esc = cur + ch, False
+        elif ch == "\\":
+            esc = True
+        elif ch == "|":
+            parts.append(cur)
+            cur = ""
+        else:
+            cur += ch
+    return parts + [cur]
+
+
+def _short_frame(f: str) -> str:
+    # Java frames carry the full package; the class and method are what reads.
+    if "::" in f or "." not in f:
+        return f
+    seg = f.split(".")
+    return ".".join(seg[-2:]) if len(seg) > 2 else f
+
+
+def _sig_html(sig: str) -> str:
+    """Fault type, then its top frames innermost first -- the same rendering
+    as the sweep index. The full signature stays on hover."""
+    kind, *frames = _split_sig(sig)
+    body = '<span class="sep">&lsaquo;</span>'.join(
+        f'<span class="fr">{_esc(_short_frame(f))}</span>' for f in frames)
+    return (f'<div class="sig" title="{_esc(sig)}"><span class="ty">{_esc(kind)}</span>'
+            f'{body}</div>')
+
+
+def _turns_from_transcript(tpath: Path) -> int:
+    """How many acting turns the transcript shows.
+
+    `turns_used` is written by the api arm and was never written by the external
+    one, so those cells rendered "0 turns used" beside a full trajectory. The
+    transcript always knows: count the assistant turns that called a tool.
+    """
+    try:
+        n = 0
+        for line in tpath.read_text(errors="replace").splitlines():
+            if not line.strip():
+                continue
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if e.get("event") == "assistant" and e.get("tool_calls"):
+                n += 1
+        return n
+    except OSError:
+        return 0
+
+
+def build_report_html(run_dir: str | Path) -> str:
+    run_dir = Path(run_dir)   # write_report coerces; callers of this one did not
+    # A cell that never finished has no score.json, only the running tally the
+    # judge keeps. Falling back to it is the difference between a report that
+    # names the bug, the model and the crashes found so far, and one that says
+    # nothing at all about the run that just cost real money.
+    score = _load(run_dir / "score.json") or _load(run_dir / "score.partial.json")
+    cost = _load(run_dir / "cost.json")
+    tpath = run_dir / "transcript.jsonl"
+    nodes = build_traj(tpath) if tpath.is_file() else []
+
+    bug = score.get("bug_id", run_dir.parent.parent.name if run_dir.name.startswith("seed")
+                     else run_dir.name)
+    model = score.get("model", "—")
+    reason = score.get("terminated_reason") or ("interrupted (run did not finish)"
+                                                if score.get("in_progress") else "—")
+    turns = score.get("turns_used") or _turns_from_transcript(tpath)
+    dur = score.get("duration_s", 0.0)
+    # An unknown cost is not a free run. The external arm can only price a cell
+    # from the summary an agent prints as it exits, so a killed or crashed run
+    # reports None -- and rendering that as $0.0000 claims something the run
+    # never measured. `_agent_usage` makes the same point about its own output.
+    _usd = score.get("total_usd")
+    if _usd is None:
+        _usd = cost.get("total_usd")
+    usd_known = _usd is not None
+    err = score.get("error", "")
+
+    # Header tags: the public build facts, straight from this challenge's
+    # bench.yaml. They used to be read from the transcript's start event, which
+    # never carried them — so both were always blank and the tags never rendered.
+    sanitizer = language = ""
+    bd = find_bug(bug)
+    if bd is not None:
+        language = read_bench(bd / "bench.yaml").get("language", "") or ""
+        sanitizer = harness_sanitizer(bd) or ""
+
+    grades = [n for n in nodes if n["tool"] in GRADE_TOOLS]
+    faults = [n for n in grades if n["crash"]]
+    tool_rows = _tool_stats(nodes)
+
+    in_tok = cost.get("input_tokens", 0)
+    out_tok = cost.get("output_tokens", 0)
+    cache_r = cost.get("cache_read_tokens", 0)
+
+    cfg = score.get("config") or {}
+    mode = cfg.get("mode") or score.get("mode") or "blind"
+    tags = []
+    if language:
+        tags.append(language)
+    if sanitizer:
+        tags.append(sanitizer)
+    tags.append(mode)
+    tag_html = "".join(f'<span class="tag">{_esc(t)}</span>' for t in tags)
+
+    # Green when the run found something, red on error, amber otherwise.
+    verdict_cls = ("r" if reason == "error"
+                   else ("g" if score.get("unique_crashes") else "a"))
+
+    # ---- trajectory rows ----
+    traj_rows = []
+    for n in nodes:
+        mark = "💥" if n["crash"] else ("✗" if not n["ok"] else "")
+        rcls = "crash" if n["crash"] else ("err" if not n["ok"] else "")
+        traj_rows.append(
+            f'<tr class="{rcls}"><td class="r">{n["n"]}</td><td class="r">{n["turn"]}</td>'
+            f'<td><code>{_esc(n["tool"])}</code></td>'
+            f'<td class="arg">{_esc(n["arg"])}</td>'
+            f'<td class="out">{_esc(n["out"])}</td>'
+            f'<td class="mk">{mark}</td></tr>'
+        )
+
+    tool_rows_html = "".join(
+        f'<tr><td><code>{_esc(t)}</code></td><td class="r">{c}</td>'
+        f'<td class="r">{e or ""}</td></tr>'
+        for t, c, e in tool_rows
+    )
+
+    err_card = (
+        f'<div class="note">Episode ended in <b>error</b>: <code>{_esc(err)}</code></div>'
+        if err else ""
+    )
+
+    conv_html = ""
+    if tpath.is_file():
+        conv_turns, system_prompt_full, initial_user = build_conversation(tpath)
+        conv_html = _conversation_html(
+            conv_turns, system_prompt_full, initial_user,
+            _exchange_by_turn(_load_exchange(run_dir)))
+
+    config_html = _config_html(_config_rows(score, None))
+
+    findings_html, headline, headline_label = _findings_section(score)
+
+    return _TEMPLATE.format(
+        bug=_esc(bug), model=_esc(model), tags=tag_html,
+        headline=headline, headline_label=headline_label,
+        findings=findings_html, verdict_cls=verdict_cls,
+        turns=turns, ncalls=len(nodes),
+        usd=(f"{_usd:.4f}" if usd_known else "0.0000"),
+        usd_stat=(f"${_usd:.4f}" if usd_known else
+                  '<span title="the agent exited without reporting usage">'
+                  'not reported</span>'),
+        config=config_html,
+        reason=_esc(reason), dur=f"{dur:.1f}",
+        refus=score.get("refusal_retries", 0), malf=score.get("malformed_retries", 0),
+        in_tok=f"{in_tok:,}", out_tok=f"{out_tok:,}", cache_r=f"{cache_r:,}",
+        in_usd=f'{cost.get("input_usd", 0.0):.4f}',
+        out_usd=f'{cost.get("output_usd", 0.0):.4f}',
+        ngrades=len(grades), nfaults=len(faults),
+        tool_rows=tool_rows_html or '<tr><td colspan="3" class="muted">no tool calls</td></tr>',
+        traj_rows="".join(traj_rows) or '<tr><td colspan="6" class="muted">no trajectory</td></tr>',
+        conversation=conv_html,
+        err_card=err_card,
+    )
+
+
+def write_report(run_dir: str | Path) -> Path:
+    run_dir = Path(run_dir)
+    html = build_report_html(run_dir)
+    out = run_dir / "report.html"
+    out.write_text(html)
+    return out
+
+
+_TEMPLATE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{bug} · {model} — FB·Bench run report</title>
+<style>
+:root{{--bg:#0d1117;--card:#161b22;--card2:#1c2230;--line:#2a3038;--txt:#e6edf3;
+--muted:#8b949e;--accent:#58a6ff;--green:#3fb950;--amber:#d29922;--red:#f85149;--purple:#bc8cff;}}
+*{{box-sizing:border-box}}
+body{{margin:0;background:var(--bg);color:var(--txt);line-height:1.55;
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}}
+.wrap{{max-width:1080px;margin:0 auto;padding:44px 24px 80px;}}
+header h1{{font-size:1.9rem;margin:0 0 6px;letter-spacing:-.02em;}}
+header h1 .m{{color:var(--accent);}}
+.sub{{color:var(--muted);font-size:1rem;}}
+.tag{{display:inline-block;font-size:.72rem;background:#1f6feb22;color:var(--accent);
+border:1px solid #1f6feb55;border-radius:20px;padding:3px 11px;margin-right:6px;}}
+h2{{font-size:1.25rem;margin:48px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line);}}
+.stats{{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:26px 0 8px;}}
+.stat{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 16px;text-align:center;}}
+.stat .n{{font-size:2rem;font-weight:700;letter-spacing:-.02em;}}
+.stat .n.g{{color:var(--green)}}.stat .n.a{{color:var(--accent)}}.stat .n.r{{color:var(--red)}}.stat .n.p{{color:var(--purple)}}
+.stat .l{{color:var(--muted);font-size:.82rem;margin-top:2px;}}
+padding:14px 18px;text-align:center;min-width:108px;}}
+.grid{{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}}
+.card{{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;}}
+.card h3{{margin:0 0 10px;font-size:.95rem;}}
+table{{width:100%;border-collapse:collapse;font-size:.88rem;}}
+th,td{{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top;}}
+th{{color:var(--muted);font-weight:600;font-size:.72rem;text-transform:uppercase;letter-spacing:.04em;}}
+td.r{{text-align:right;font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;}}
+td.mk{{text-align:center;}}td.muted,.muted{{color:var(--muted);}}
+code{{background:#0d1117;border:1px solid var(--line);border-radius:4px;padding:0 5px;font-size:.9em;color:#ff7b72;}}
+.sig{{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.8rem;line-height:1.5;overflow-wrap:anywhere;}}
+.sig .ty{{color:var(--amber);font-weight:600;margin-right:8px;}}
+.sig .sep{{color:#454d57;margin:0 5px;}}
+.mini td{{padding:5px 8px;}}.mini td:first-child{{font-weight:600;}}
+table.cfg{{max-width:560px;}}table.cfg td:first-child{{color:var(--muted);font-weight:500;}}
+table.cfg td.r{{color:var(--txt);font-weight:600;text-align:right;word-break:break-all;}}
+.traj td.arg{{color:var(--muted);font-family:ui-monospace,monospace;font-size:.82rem;word-break:break-all;}}
+.traj td.out{{font-family:ui-monospace,monospace;font-size:.82rem;color:#9da7b3;word-break:break-all;}}
+.traj tr.crash td{{background:#f8514915;}}.traj tr.crash td.mk{{color:var(--red);}}
+.traj tr.err td.out{{color:var(--amber);}}
+.note{{background:#f8514915;border:1px solid #f8514944;border-radius:10px;padding:11px 15px;color:#ffa198;font-size:.88rem;margin:16px 0;}}
+/* conversation */
+details.sys{{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:10px 0;padding:4px 14px;}}
+details.sys>summary{{cursor:pointer;color:var(--muted);font-size:.84rem;padding:8px 0;}}
+.conv{{display:flex;flex-direction:column;gap:16px;margin-top:18px;}}
+.cturn{{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px 16px;}}
+.cturn-h{{color:var(--muted);font-size:.74rem;text-transform:uppercase;letter-spacing:.04em;
+margin-bottom:8px;font-variant-numeric:tabular-nums;}}
+.think{{white-space:pre-wrap;word-break:break-word;color:var(--txt);font-size:.92rem;
+background:var(--card2);border-left:3px solid var(--purple);border-radius:8px;padding:11px 14px;margin:6px 0 12px;}}
+.think.nowords{{color:var(--muted);font-style:italic;border-left-color:var(--line);}}
+details.wire{{margin:10px 0 2px;border:1px solid var(--line);border-radius:10px;
+padding:2px 12px;background:#0d1117;}}
+details.wire>summary{{cursor:pointer;color:var(--muted);font-size:.78rem;padding:7px 0;}}
+.xmsg{{border:1px solid var(--line);border-radius:10px;margin:7px 0;background:#11161f;}}
+.xmsg>.r{{font-size:.72rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);
+padding:6px 12px;border-bottom:1px solid var(--line);background:#0d1117;text-align:left;}}
+.xmsg>pre{{margin:0;padding:10px 12px;}}
+.xmsg.system>.r{{color:var(--purple)}}.xmsg.user>.r{{color:var(--accent)}}
+.xmsg.assistant>.r{{color:var(--green)}}.xmsg.tool>.r{{color:var(--amber)}}
+.bnote{{color:var(--amber);font-size:.82rem;background:#d2992212;border:1px solid #d2992233;
+border-radius:8px;padding:7px 12px;margin:6px 0;}}
+.tcall{{border:1px solid var(--line);border-radius:10px;padding:9px 12px;margin:8px 0;background:#11161f;}}
+.tcall.crash{{border-color:#f8514955;background:#f8514910;}}
+.tcall.err{{border-color:#d2992255;}}
+.tc-h{{font-size:.9rem;margin-bottom:4px;display:flex;align-items:center;gap:8px;}}
+.tc-h code{{background:#0d1117;color:var(--accent);border-color:#1f6feb44;}}
+.b{{font-size:.68rem;border-radius:20px;padding:2px 9px;font-weight:600;}}
+.b.crash{{background:#f8514922;color:var(--red);border:1px solid #f8514955;}}
+.b.err{{background:#d2992222;color:var(--amber);border:1px solid #d2992255;}}
+.tcall details{{margin:5px 0;}}.tcall summary{{cursor:pointer;color:var(--muted);font-size:.78rem;padding:3px 0;}}
+.tcall pre,details.sys pre{{white-space:pre-wrap;word-break:break-word;background:#0d1117;border:1px solid var(--line);
+border-radius:8px;padding:10px 12px;font-size:.78rem;line-height:1.5;max-height:480px;overflow:auto;
+color:#c9d1d9;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;margin:4px 0 2px;}}
+.foot{{color:var(--muted);font-size:.8rem;margin-top:48px;border-top:1px solid var(--line);padding-top:16px;}}
+@media(max-width:760px){{.stats,.grid{{grid-template-columns:1fr 1fr}}}}
+</style></head><body><div class="wrap">
+
+<header>
+<div style="margin-bottom:10px">{tags}</div>
+<h1>{bug} <span class="m">· {model}</span></h1>
+<div class="sub">FuzzingBrain&nbsp;Bench — single-episode run report</div>
+</header>
+
+{err_card}
+
+<div class="stats">
+  <div class="stat"><div class="n {verdict_cls}">{headline}</div><div class="l">{headline_label}</div></div>
+  <div class="stat"><div class="n">{turns}</div><div class="l">turns used</div></div>
+  <div class="stat"><div class="n a">{ncalls}</div><div class="l">tool calls</div></div>
+  <div class="stat"><div class="n p">{usd_stat}</div><div class="l">total cost</div></div>
+</div>
+
+<h2>Run configuration</h2>
+<div class="sub" style="margin-bottom:10px">Every knob that shaped this episode — the run is
+reproducible from these parameters alone.</div>
+{config}
+
+{findings}
+
+<h2>Breakdown</h2>
+<div class="grid">
+  <div class="card"><h3>Tokens &amp; cost</h3>
+    <table class="mini">
+      <tr><td>input</td><td class="r">{in_tok} tok</td><td class="r">${in_usd}</td></tr>
+      <tr><td>output</td><td class="r">{out_tok} tok</td><td class="r">${out_usd}</td></tr>
+      <tr><td>cache read</td><td class="r">{cache_r} tok</td><td class="r"></td></tr>
+      <tr><td><b>total</b></td><td class="r"></td><td class="r">{usd_stat}</td></tr>
+    </table>
+  </div>
+  <div class="card"><h3>Tool calls</h3>
+    <table><thead><tr><th>tool</th><th class="r">calls</th><th class="r">err</th></tr></thead>
+    <tbody>{tool_rows}</tbody></table>
+  </div>
+  <div class="card"><h3>Run</h3>
+    <table class="mini">
+      <tr><td>terminated</td><td class="r">{reason}</td></tr>
+      <tr><td>duration</td><td class="r">{dur}s</td></tr>
+      <tr><td>run_poc_on_harness() calls</td><td class="r">{ngrades}</td></tr>
+      <tr><td>faulting grades</td><td class="r">{nfaults}</td></tr>
+      <tr><td>refusal retries</td><td class="r">{refus}</td></tr>
+      <tr><td>malformed retries</td><td class="r">{malf}</td></tr>
+    </table>
+  </div>
+</div>
+
+<h2>Trajectory</h2>
+<table class="traj"><thead><tr><th class="r">#</th><th class="r">turn</th><th>tool</th>
+<th>argument</th><th>result</th><th></th></tr></thead>
+<tbody>{traj_rows}</tbody></table>
+
+<h2>Conversation</h2>
+<div class="sub" style="margin-bottom:6px">Every turn: what the model said, every tool
+call with its arguments, and what came back. Each turn also carries <b>raw exchange</b> —
+the messages that call posted and the response object it returned, verbatim. Same data on
+disk as <code>exchange.jsonl</code>.</div>
+{conversation}
+
+<div class="foot">Generated by FuzzingBrain&nbsp;Bench · the report records the agent's own
+actions only — no reference PoC, expected fault, or crash location is ever included.</div>
+
+</div></body></html>
+"""

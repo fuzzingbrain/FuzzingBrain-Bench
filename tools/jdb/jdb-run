@@ -1,0 +1,148 @@
+#!/usr/bin/env python3
+"""jdb-run: jdb on the graded JVM harness, driven like `gdb -batch -ex`.
+
+    jdb-run [-ex CMD]... [--timeout S] INPUT
+
+jdb has no batch mode. Fed through a pipe it executes each line as soon as it
+reads it, so a `where` sent after `run` runs before the program has stopped and
+prints nothing useful. This sends one command at a time and waits for jdb to be
+ready for the next: after run/cont/step/next/step up, until the program actually
+stops (breakpoint, caught exception, step) or exits; after anything else, until
+the prompt returns.
+
+The program is the same one run_poc_on_harness() grades: the image's harness
+wrapper (/opt/fbbench/oracle/binaries/vuln/asan/harness) names the classpath,
+main class, -D properties and heap size, and they are read from it rather than
+restated here. `catch uncaught java.lang.Throwable` is always set first, so any
+exception that escapes the harness stops the program where it was thrown.
+With no -ex, the commands are `run` and `where`. Output is printed unfiltered.
+"""
+import os
+import re
+import select
+import shlex
+import subprocess
+import sys
+import time
+
+HARNESS = "/opt/fbbench/oracle/binaries/vuln/asan/harness"
+SOURCEPATH_FILE = "/opt/fbbench-jdb/sourcepath"
+PRELUDE = ["catch uncaught java.lang.Throwable"]
+# Commands that resume the program: wait for it to stop again or to end.
+RESUME = re.compile(r"^(run|cont|step|next|step up|stepi)\b")
+# A prompt at the end of jdb's output: "> " with no current thread, "main[1] " with one.
+PROMPT = re.compile(r"(?:^|\n)(?:> |[\w$.\-]+\[\d+\] )$")
+STOPPED = re.compile(r"Breakpoint hit:|Exception occurred:|Step completed:|"
+                     r"Method entered:|Method exited:|Field \(.*\) is |access encountered")
+ENDED = re.compile(r"The application exited|The application has been disconnected")
+
+
+def harness_launch():
+    """(classpath, main class, jvm options) from the image's wrapper script."""
+    text = open(HARNESS).read()
+    lib = os.path.join(os.path.dirname(HARNESS), "..", "lib")
+    lib = os.path.normpath(lib)
+    words = shlex.split(text[text.index("exec java"):].replace("\\\n", " "), comments=True)
+    words = [w.replace("${LIB}", lib).replace("$LIB", lib).replace("${DIR}", os.path.dirname(HARNESS))
+             for w in words[2:]]
+    cp, opts, main = "", [], None
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if w in ("-cp", "-classpath"):
+            cp = words[i + 1]; i += 2; continue
+        if w.startswith("-"):
+            opts.append(w); i += 1; continue
+        main = w
+        break
+    # jdb does not expand "dir/*" itself.
+    parts = []
+    for p in cp.split(":"):
+        if p.endswith("/*") and os.path.isdir(p[:-2]):
+            parts += sorted(os.path.join(p[:-2], j) for j in os.listdir(p[:-2]) if j.endswith(".jar"))
+        elif p:
+            parts.append(p)
+    return ":".join(parts), main, opts
+
+
+def main(argv):
+    cmds, timeout, inputs = [], 120.0, []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a in ("-ex", "-e") and i + 1 < len(argv):
+            cmds.append(argv[i + 1]); i += 2
+        elif a == "--timeout" and i + 1 < len(argv):
+            timeout = float(argv[i + 1]); i += 2
+        elif a in ("-h", "--help"):
+            print(__doc__.strip()); return 0
+        elif a == "--":
+            inputs += argv[i + 1:]; break
+        else:
+            inputs.append(a); i += 1
+    if len(inputs) != 1:
+        print("usage: jdb-run [-ex CMD]... [--timeout S] INPUT", file=sys.stderr)
+        return 2
+    cmds = cmds or ["run", "where"]
+    cp, mainclass, opts = harness_launch()
+    sp = open(SOURCEPATH_FILE).read().strip() if os.path.exists(SOURCEPATH_FILE) else ""
+    # Debuggee options: jdb passes -D and -X options and -classpath on to the program's JVM.
+    argv_jdb = ["jdb", *(["-sourcepath", sp] if sp else []), "-classpath", cp,
+                *[o for o in opts if o.startswith(("-D", "-X"))], mainclass, inputs[0]]
+    proc = subprocess.Popen(argv_jdb, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.STDOUT, bufsize=0)
+    deadline = time.time() + timeout
+    buf = ""
+
+    def read_until(done) -> bool:
+        nonlocal buf
+        while time.time() < deadline:
+            r, _, _ = select.select([proc.stdout], [], [], 0.2)
+            if r:
+                chunk = os.read(proc.stdout.fileno(), 65536).decode("utf-8", "replace")
+                if not chunk:
+                    return False
+                sys.stdout.write(chunk); sys.stdout.flush()
+                buf += chunk
+            if done(buf):
+                return True
+            if proc.poll() is not None:
+                return False
+        return False
+
+    def send(c):
+        nonlocal buf
+        buf = ""
+        proc.stdin.write((c + "\n").encode()); proc.stdin.flush()
+
+    ok = read_until(lambda b: PROMPT.search(b) is not None)
+    ended = False
+    for c in PRELUDE + cmds:
+        if not ok or proc.poll() is not None:
+            break
+        if ended and RESUME.match(c):
+            continue
+        send(c)
+        if RESUME.match(c):
+            ok = read_until(lambda b: (STOPPED.search(b) and PROMPT.search(b)) or ENDED.search(b))
+            ended = bool(ENDED.search(buf))
+        else:
+            ok = read_until(lambda b: PROMPT.search(b) is not None)
+    timed_out = time.time() >= deadline
+    try:
+        if proc.poll() is None:
+            proc.stdin.write(b"quit\n"); proc.stdin.flush()
+            proc.wait(timeout=10)
+    except Exception:  # noqa: BLE001
+        pass
+    if proc.poll() is None:
+        proc.kill()
+    rest = proc.stdout.read().decode("utf-8", "replace") if proc.stdout else ""
+    sys.stdout.write(rest)
+    if timed_out:
+        print(f"\n[jdb-run] stopped after {timeout:.0f}s; pass --timeout to wait longer.")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

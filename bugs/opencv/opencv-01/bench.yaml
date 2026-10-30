@@ -1,0 +1,9 @@
+bug_id: opencv-01
+project: opencv
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

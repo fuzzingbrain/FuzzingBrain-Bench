@@ -1,0 +1,9 @@
+bug_id: ghidra-01
+project: ghidra
+is_oss_fuzz: false
+language: c
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["-rss_limit_mb=256", "@@"]
+

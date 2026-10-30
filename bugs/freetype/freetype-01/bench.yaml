@@ -1,0 +1,9 @@
+bug_id: freetype-01
+project: freetype2
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

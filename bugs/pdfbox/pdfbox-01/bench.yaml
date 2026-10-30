@@ -1,0 +1,9 @@
+bug_id: pdfbox-01
+project: pdfbox
+is_oss_fuzz: true
+language: jvm
+harness:
+  sanitizer: jazzer
+  engine: jazzer
+  invocation: ["@@"]
+

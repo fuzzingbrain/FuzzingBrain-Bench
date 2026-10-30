@@ -1,0 +1,9 @@
+bug_id: dtc-01
+project: dtc
+is_oss_fuzz: false
+language: c
+harness:
+  sanitizer: ubsan
+  engine: libfuzzer
+  invocation: ["@@"]
+

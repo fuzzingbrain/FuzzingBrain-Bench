@@ -1,0 +1,9 @@
+bug_id: binutils-01
+project: binutils
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["-rss_limit_mb=256", "@@"]
+

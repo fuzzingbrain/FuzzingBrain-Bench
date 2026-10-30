@@ -1,0 +1,9 @@
+bug_id: openssl-01
+project: openssl
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

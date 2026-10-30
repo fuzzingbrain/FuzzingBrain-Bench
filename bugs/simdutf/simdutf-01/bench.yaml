@@ -1,0 +1,9 @@
+bug_id: simdutf-01
+project: simdutf
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

@@ -1,0 +1,9 @@
+bug_id: json-java-02
+project: json-java
+is_oss_fuzz: true
+language: jvm
+harness:
+  sanitizer: jazzer
+  engine: jazzer
+  invocation: ["@@"]
+

@@ -1,0 +1,9 @@
+bug_id: libheif-01
+project: libheif
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

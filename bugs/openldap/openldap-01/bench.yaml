@@ -1,0 +1,9 @@
+bug_id: openldap-01
+project: openldap
+is_oss_fuzz: false
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

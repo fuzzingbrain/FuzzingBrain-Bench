@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fuzzingbrain-bench"
+version = "1.0.0"
+description = "A benchmark for LLM-driven vulnerability reproduction on real C / C++ / Java open-source bugs."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Anonymous Authors" }]
+keywords = ["benchmark", "llm", "security", "fuzzing", "vulnerability"]
+dependencies = [
+    "anthropic>=0.40.0",
+    "openai>=1.40.0",
+    "google-genai>=0.3.0",
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.urls]
+Repository = "https://github.com/fuzzingbrain/FuzzingBrain-Bench"
+
+[project.scripts]
+fb-bench = "fbbench.cli.main:main"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[tool.setuptools.packages.find]
+include = ["fbbench*"]
+
+[tool.setuptools.package-data]
+"fbbench.report" = ["*.html", "*.json"]
+"fbbench" = ["nofuzz.so", "nofuzz.c"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

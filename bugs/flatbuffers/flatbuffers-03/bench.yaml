@@ -1,0 +1,9 @@
+bug_id: flatbuffers-03
+project: flatbuffers
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

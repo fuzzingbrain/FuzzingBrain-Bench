@@ -1,0 +1,45 @@
+# FuzzingBrain-Bench's pinned dependency set.
+#
+# The declared dependencies resolved to the versions this checkout's suite
+# passes on, plus their transitive closure -- captured from the interpreter
+# that produced the recorded cells, not guessed. ./setup.sh installs from this
+# file, so a fresh clone on any machine gets the same tree and a run here is
+# comparable to a run there.
+#
+# pytest is included: `.venv/bin/python -m pytest tests` must work from a clone
+# without a second install step.
+#
+# Captured 2026-09-19 under CPython 3.12 (the project supports >=3.10).
+annotated-types==0.7.0
+anthropic==0.109.1
+anyio==4.13.0
+certifi==2023.11.17
+colorama==0.4.6
+cryptography==41.0.7
+distro==1.9.0
+docstring_parser==0.18.0
+google-auth==2.54.0
+google-genai==2.8.0
+h11==0.16.0
+httpcore==1.0.9
+httpx==0.28.1
+idna==3.6
+jiter==0.15.0
+markdown-it-py==3.0.0
+mdurl==0.1.2
+openai==2.41.1
+pyasn1==0.6.3
+pyasn1_modules==0.4.2
+pydantic==2.13.4
+pydantic_core==2.46.4
+Pygments==2.17.2
+PyYAML==6.0.1
+requests==2.31.0
+rich==13.7.1
+sniffio==1.3.1
+tenacity==9.1.4
+tqdm==4.68.2
+typing-inspection==0.4.2
+typing_extensions==4.15.0
+websockets==16.0
+pytest==8.3.4

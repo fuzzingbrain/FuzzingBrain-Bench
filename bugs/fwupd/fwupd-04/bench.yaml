@@ -1,0 +1,9 @@
+bug_id: fwupd-04
+project: fwupd
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["-rss_limit_mb=512", "@@"]
+

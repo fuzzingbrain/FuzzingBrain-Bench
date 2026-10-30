@@ -1,0 +1,9 @@
+bug_id: systemd-01
+project: systemd
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

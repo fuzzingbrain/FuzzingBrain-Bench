@@ -1,0 +1,9 @@
+bug_id: libvpx-03
+project: libvpx
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: ubsan
+  engine: libfuzzer
+  invocation: ["@@"]
+

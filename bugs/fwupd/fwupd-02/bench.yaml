@@ -1,0 +1,9 @@
+bug_id: fwupd-02
+project: fwupd
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

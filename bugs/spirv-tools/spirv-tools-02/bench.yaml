@@ -1,0 +1,9 @@
+bug_id: spirv-tools-02
+project: spirv-tools
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

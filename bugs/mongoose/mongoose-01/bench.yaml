@@ -1,0 +1,9 @@
+bug_id: mongoose-01
+project: mongoose
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

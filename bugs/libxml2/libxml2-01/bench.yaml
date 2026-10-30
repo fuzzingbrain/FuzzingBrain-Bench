@@ -1,0 +1,9 @@
+bug_id: libxml2-01
+project: libxml2
+is_oss_fuzz: true
+language: c
+harness:
+  sanitizer: asan
+  engine: libfuzzer
+  invocation: ["@@"]
+

@@ -1,0 +1,9 @@
+bug_id: upx-01
+project: upx
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: lsan
+  engine: libfuzzer
+  invocation: ["@@"]
+

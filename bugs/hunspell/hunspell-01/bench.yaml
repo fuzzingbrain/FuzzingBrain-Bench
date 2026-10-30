@@ -1,0 +1,9 @@
+bug_id: hunspell-01
+project: hunspell
+is_oss_fuzz: true
+language: cpp
+harness:
+  sanitizer: libfuzzer
+  engine: libfuzzer
+  invocation: ["-rss_limit_mb=256", "@@"]
+
