@@ -248,6 +248,11 @@ fb-bench grade <alias> my-input.bin        # -v for the evidence
 
 ## Serving open-weight models on an HPC cluster
 
+The exact four-GH200 Qwen3.8-Flash-Next FP8 configuration used for the
+77-challenge evaluation—including the Slurm job, vLLM flags, SSH tunnel,
+two-sweep runner, and metrics sampler—is archived in
+[`examples/flash-next/`](examples/flash-next/).
+
 Open-weight models (Qwen, Gemma, …) are not reached through a vendor API: you
 serve the model yourself behind an OpenAI-compatible endpoint and point the api
 arm at it. Any such endpoint works — a vLLM/Ollama on the same box needs only
